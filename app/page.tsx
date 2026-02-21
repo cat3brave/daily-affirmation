@@ -1,65 +1,65 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const affirmations = [
+  "今の自分でOK!",
+  "短所も欠点も自分の大切な個性",
+  "心の揺れは成長のチャンス",
+  "失敗は成長の機会",
+  "自分を大切にすることは、他人を大切にすること",
+  "それでいい、今の自分でOK!",
+  "自分を責めるのは古傷が傷んでいるから。つらかったね。でも今はもう安心!",
+  "自分の決断で他者を傷つける結果になることもある。それが生きること。自分の軸に従って自分の気持ちを表明できたことが素晴らしい!",
+];
 
 export default function Home() {
+  const [text, setText] = useState<string>("");
+
+  const handleClick = () => {
+    let newText = text;
+    // 前回と違う言葉が出るまで抽選をやり直す（UX向上：必ずアニメーションさせるため）
+    // ※リストが1個しかない場合は無限ループになるので注意（今回は8個あるのでOK）
+    while (newText === text) {
+      const randomIndex = Math.floor(Math.random() * affirmations.length);
+      newText = affirmations[randomIndex];
+    }
+    setText(newText);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="flex min-h-screen flex-col items-center justify-center p-6">
+      {/* 肯定文の表示エリア */}
+      <div className="h-60 flex items-center justify-center mb-8 w-full max-w-lg">
+        {/* 高さを少し広げ(h-60)、横幅制限(max-w-lg)で長い文章でも読みやすくしました */}
+        <AnimatePresence mode="wait">
+          {text && (
+            <motion.p
+              key={text}
+              initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10, filter: "blur(10px)" }}
+              transition={{ duration: 0.8, ease: "easeOut" }} // 少しテンポよく0.8秒に
+              className="text-xl md:text-2xl text-gray-600 font-medium text-center leading-loose tracking-widest"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              {text}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <motion.button
+        whileHover={{
+          scale: 1.05,
+          boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)",
+        }}
+        whileTap={{ scale: 0.95 }}
+        onClick={handleClick}
+        className="px-8 py-4 bg-white text-gray-500 rounded-full shadow-sm transition-colors duration-300 text-lg tracking-[0.2em] border border-gray-100 hover:bg-gray-50"
+      >
+        言葉を受け取る
+      </motion.button>
+    </main>
   );
 }
