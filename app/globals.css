@@ -1,8 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 body {
-  background-color: #faf9f6; /* 真っ白ではなく、目に優しいオフホワイト */
-  color: #4a4a4a; /* 真っ黒ではなく、柔らかいダークグレー */
+  /* 青空をイメージしたグラデーション */
+  background: linear-gradient(to bottom, #dcedff, #f0f8ff);
+  color: #4a8ab7; /* 文字色を優しい青色に */
+  min-height: 100vh;
 }

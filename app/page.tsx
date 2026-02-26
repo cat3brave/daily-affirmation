@@ -2,63 +2,82 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const affirmations = [
-  "今の自分でOK!",
-  "短所も欠点も自分の大切な個性",
-  "心の揺れは成長のチャンス",
-  "失敗は成長の機会",
-  "自分を大切にすることは、他人を大切にすること",
-  "それでいい、今の自分でOK!",
-  "自分を責めるのは古傷が傷んでいるから。つらかったね。でも今はもう安心!",
-  "自分の決断で他者を傷つける結果になることもある。それが生きること。自分の軸に従って自分の気持ちを表明できたことが素晴らしい!",
-];
+import { generateAffirmation } from "./actions"; // ★先ほど作ったAI関数を読み込む
 
 export default function Home() {
   const [text, setText] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const handleClick = () => {
-    let newText = text;
-    // 前回と違う言葉が出るまで抽選をやり直す（UX向上：必ずアニメーションさせるため）
-    // ※リストが1個しかない場合は無限ループになるので注意（今回は8個あるのでOK）
-    while (newText === text) {
-      const randomIndex = Math.floor(Math.random() * affirmations.length);
-      newText = affirmations[randomIndex];
+  const handleClick = async () => {
+    if (isLoading) return; // 連打防止
+    setIsLoading(true);
+    setText(""); // 古い言葉を一旦消す
+
+    try {
+      // ★AI執事に新しい肯定文を作ってもらう
+      const newText = await generateAffirmation();
+      setText(newText);
+    } catch (error) {
+      setText("深呼吸して、もう一度試してみてくださいね。");
+    } finally {
+      setIsLoading(false);
     }
-    setText(newText);
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6">
-      {/* 肯定文の表示エリア */}
-      <div className="h-60 flex items-center justify-center mb-8 w-full max-w-lg">
-        {/* 高さを少し広げ(h-60)、横幅制限(max-w-lg)で長い文章でも読みやすくしました */}
+      {/* 肯定文の表示エリア（雲のような半透明ボックス） */}
+      <div className="h-64 flex items-center justify-center mb-10 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
         <AnimatePresence mode="wait">
-          {text && (
+          {isLoading ? (
+            // ★AIが考えている間の表示
+            <motion.p
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-lg text-blue-400/70 animate-pulse tracking-widest"
+            >
+              言葉を紡いでいます...
+            </motion.p>
+          ) : text ? (
+            // AIから受け取った言葉の表示
             <motion.p
               key={text}
-              initial={{ opacity: 0, y: 10, filter: "blur(10px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -10, filter: "blur(10px)" }}
-              transition={{ duration: 0.8, ease: "easeOut" }} // 少しテンポよく0.8秒に
-              className="text-xl md:text-2xl text-gray-600 font-medium text-center leading-loose tracking-widest"
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.95 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest"
             >
               {text}
             </motion.p>
+          ) : (
+            // 初期状態
+            <p className="text-blue-400/70 text-lg">
+              ボタンを押して、言葉を受け取ってください
+            </p>
           )}
         </AnimatePresence>
       </div>
 
+      {/* 動きを止めた、濃いスカイブルーのボタン */}
       <motion.button
         whileHover={{
-          scale: 1.05,
-          boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)",
+          scale: isLoading ? 1 : 1.05,
+          backgroundColor: isLoading ? "#0ea5e9" : "#0284c7",
+          boxShadow: isLoading
+            ? "none"
+            : "0px 10px 25px rgba(14, 165, 233, 0.4)",
         }}
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: isLoading ? 1 : 0.95 }}
         onClick={handleClick}
-        className="px-8 py-4 bg-white text-gray-500 rounded-full shadow-sm transition-colors duration-300 text-lg tracking-[0.2em] border border-gray-100 hover:bg-gray-50"
+        disabled={isLoading}
+        className={`px-12 py-5 bg-sky-500 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-500 ${
+          isLoading ? "opacity-70 cursor-not-allowed" : ""
+        }`}
       >
-        言葉を受け取る
+        {isLoading ? "受け取り中..." : "言葉を受け取る"}
       </motion.button>
     </main>
   );
