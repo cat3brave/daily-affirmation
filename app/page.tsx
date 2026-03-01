@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
 
@@ -16,8 +16,15 @@ const growthMessages = [
 export default function Home() {
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
   const [growth, setGrowth] = useState<number>(0);
+
+  // ★修正箇所：saveGrowth を storedGrowth に直しました！
+  useEffect(() => {
+    const storedGrowth = localStorage.getItem("flowerGrowth");
+    if (storedGrowth) {
+      setGrowth(parseInt(storedGrowth, 10));
+    }
+  }, []);
 
   const handleClick = async () => {
     if (isLoading) return; // 連打防止
@@ -35,11 +42,15 @@ export default function Home() {
   };
 
   const handleWalk = () => {
+    let nextGrowth = 0;
     if (growth >= flowerStages.length - 1) {
-      setGrowth(0); // 成長が最大になったらリセット
+      nextGrowth = 0; // 成長が最大になったらリセット
     } else {
-      setGrowth(growth + 1); // 成長を進める
+      nextGrowth = growth + 1; // 成長を進める
     }
+
+    setGrowth(nextGrowth); // 成長を更新
+    localStorage.setItem("flowerGrowth", nextGrowth.toString()); // 成長をローカルストレージに保存
   };
 
   return (
