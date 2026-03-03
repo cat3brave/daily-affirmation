@@ -18,11 +18,19 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [growth, setGrowth] = useState<number>(0);
 
+  const [totalBlooms, setTotalBlooms] = useState<number>(0); // 新しい状態：総開花数
+
   // ★修正箇所：saveGrowth を storedGrowth に直しました！
   useEffect(() => {
     const storedGrowth = localStorage.getItem("flowerGrowth");
     if (storedGrowth) {
       setGrowth(parseInt(storedGrowth, 10));
+    }
+
+    // 総開花数もローカルストレージから読み込む
+    const storedTotal = localStorage.getItem("totalBlooms");
+    if (storedTotal) {
+      setTotalBlooms(parseInt(storedTotal, 10));
     }
   }, []);
 
@@ -45,6 +53,11 @@ export default function Home() {
     let nextGrowth = 0;
     if (growth >= flowerStages.length - 1) {
       nextGrowth = 0; // 成長が最大になったらリセット
+
+      //満開になったので、累計のお花を1つ増やす
+      const newTotal = totalBlooms + 1;
+      setTotalBlooms(newTotal);
+      localStorage.setItem("totalBlooms", newTotal.toString()); // 総開花数をローカルストレージに保存
     } else {
       nextGrowth = growth + 1; // 成長を進める
     }
@@ -109,7 +122,14 @@ export default function Home() {
       </div>
 
       {/*デジタル花壇エリア*/}
-      <div className="flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
+      <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
+        {totalBlooms > 0 && (
+          <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200  text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
+            <span>🌸</span>
+            <span>{totalBlooms}</span>
+          </div>
+        )}
+
         <p className="text-sky-700/80 font-bold mb-2 tracking-wide">
           🌸 デジタル花壇 🌸
         </p>
