@@ -17,17 +17,17 @@ export default function Home() {
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [growth, setGrowth] = useState<number>(0);
+  const [totalBlooms, setTotalBlooms] = useState<number>(0);
 
-  const [totalBlooms, setTotalBlooms] = useState<number>(0); // 新しい状態：総開花数
+  // ★新規追加：今日の目標点数を管理するステート（初期値はもちろん最高の「60点」です！）
+  const [targetScore, setTargetScore] = useState<number>(60);
 
-  // ★修正箇所：saveGrowth を storedGrowth に直しました！
   useEffect(() => {
     const storedGrowth = localStorage.getItem("flowerGrowth");
     if (storedGrowth) {
       setGrowth(parseInt(storedGrowth, 10));
     }
 
-    // 総開花数もローカルストレージから読み込む
     const storedTotal = localStorage.getItem("totalBlooms");
     if (storedTotal) {
       setTotalBlooms(parseInt(storedTotal, 10));
@@ -51,19 +51,19 @@ export default function Home() {
 
   const handleWalk = () => {
     let nextGrowth = 0;
-    if (growth >= flowerStages.length - 1) {
-      nextGrowth = 0; // 成長が最大になったらリセット
 
-      //満開になったので、累計のお花を1つ増やす
+    if (growth >= flowerStages.length - 1) {
+      nextGrowth = 0; // 新しい種に戻す
+
       const newTotal = totalBlooms + 1;
       setTotalBlooms(newTotal);
-      localStorage.setItem("totalBlooms", newTotal.toString()); // 総開花数をローカルストレージに保存
+      localStorage.setItem("totalBlooms", newTotal.toString());
     } else {
       nextGrowth = growth + 1; // 成長を進める
     }
 
     setGrowth(nextGrowth); // 成長を更新
-    localStorage.setItem("flowerGrowth", nextGrowth.toString()); // 成長をローカルストレージに保存
+    localStorage.setItem("flowerGrowth", nextGrowth.toString()); // 成長を保存
   };
 
   return (
@@ -100,7 +100,55 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      {/* 動きを止めた、濃いスカイブルーのボタン */}
+      {/* ★新規追加：完璧主義ストッパー（60点スライダー） */}
+      <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
+        <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
+          今日の目標ラインは？
+        </p>
+
+        {/* スライダー本体 */}
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="10"
+          value={targetScore}
+          onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
+          className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+        />
+
+        {/* 目盛りのラベル */}
+        <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1">
+          <span>0点</span>
+          <span className="font-bold text-sky-600 text-sm">60点(満点)</span>
+          <span>100点</span>
+        </div>
+
+        {/* スライダーの値によってAI執事のメッセージと色が変わる！ */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={targetScore}
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mt-5 px-4 py-3 rounded-xl text-sm font-bold text-center w-full shadow-sm transition-colors duration-300 ${
+              targetScore <= 60
+                ? "bg-green-50 text-green-600 border border-green-200"
+                : targetScore < 100
+                  ? "bg-yellow-50 text-yellow-600 border border-yellow-200"
+                  : "bg-red-50 text-red-500 border border-red-200"
+            }`}
+          >
+            {targetScore <= 60 && "🌿 完璧です！60点で十分素晴らしいです。"}
+            {targetScore > 60 &&
+              targetScore < 100 &&
+              "⚠️ あれ？少し背負いすぎていませんか？"}
+            {targetScore === 100 &&
+              "🛑 ストップ！完璧主義が顔を出しています。60点に戻しましょう！"}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* アファメーションを受け取るボタン */}
       <div className="mb-12">
         <motion.button
           whileHover={{
@@ -124,7 +172,7 @@ export default function Home() {
       {/*デジタル花壇エリア*/}
       <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
         {totalBlooms > 0 && (
-          <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200  text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
+          <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
             <span>🌸</span>
             <span>{totalBlooms}</span>
           </div>
@@ -134,7 +182,7 @@ export default function Home() {
           🌸 デジタル花壇 🌸
         </p>
 
-        {/* お花の絵文字（ポンッと弾むアニメーション付き） */}
+        {/* お花の絵文字 */}
         <motion.div
           key={growth}
           initial={{ scale: 0.5, opacity: 0, y: 20 }}
