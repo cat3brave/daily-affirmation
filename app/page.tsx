@@ -170,8 +170,21 @@ export default function Home() {
             className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
           />
 
-          {/* 目盛りのラベル */}
-          <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1">
+          <div
+            className="w-full h-8 rounded-full mt-4 overflow-hidden relative shadow-inner"
+            style={{
+              background:
+                "linear-gradient(to right, black, #333 10%, #FFB6C1 20%, #87CEFA 40%, #FFFFE0 60%, #98FB98 80%, #BBB 90%, white)",
+            }}
+          >
+            {/* スライダーのつまみの位置を示す白い縦線 */}
+            <div
+              className="absolute top-0 h-full w-1 bg-white/70"
+              style={{ left: `calc(${targetScore}% - 2px)` }}
+            />
+
+            {/* 目盛りのラベル */}
+            <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1"></div>
             <span>0点</span>
             <span className="font-bold text-sky-600 text-sm">60点(満点)</span>
             <span>100点</span>
