@@ -24,6 +24,8 @@ export default function Home() {
   // ★新規追加：鳥の目線(ズームアウト)状態を管理するスイッチ
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
 
+  const [showTada, setShowTada] = useState<boolean>(false);
+
   useEffect(() => {
     const storedGrowth = localStorage.getItem("flowerGrowth");
     if (storedGrowth) {
@@ -276,7 +278,70 @@ export default function Home() {
               : "今日もお散歩した！ 💧"}
           </motion.button>
         </div>
+
+        {/* 失敗の告白ボタン */}
+        <div className="mt-8 mb-4">
+          <button
+            onClick={() => setShowTada(true)}
+            className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors duration-sky-300/50 underline-offset-4"
+          >
+            今日、ちょっと失敗しちゃった...
+          </button>
+        </div>
       </motion.div>
+
+      {/* Ta-Da! 盛大に祝うポップアップ画面 */}
+      <AnimatePresence>
+        {showTada && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-sky-900/40 backdrop-blur-sm p-4"
+            onClick={() => setShowTada(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.5, rotate: -10, y: 50 }}
+              animate={{ scale: 1, rotate: 0, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 50 }}
+              transition={{ type: "spring", bounce: 0.6, duration: 0.8 }}
+              className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border-4 border-yellow-300 text-center max-w-md w-full relative"
+              onClick={(e) => e.stopPropagation()} // ポップアップ内のクリックは背景のクリックイベントを発火させない
+            >
+              <motion.div
+                animate={{ y: [0, -15, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 1 }}
+                className="text-7xl mb-6"
+              >
+                🎉
+              </motion.div>
+
+              <h2 className="text-4xl font-black text-yellow-500 mb-4 tracking-widest drop-shadow-sm">
+                Ta-Da!
+              </h2>
+              <p className="text-sky-800 font-extrabold text-xl mb-3">
+                ナイストライ！👏
+              </p>
+              <p className="text-sky-700/80 text-base leading-relaxed mb-8 font-medium">
+                失敗は「挑戦した証拠」であり、
+                <br />
+                とても貴重なデータです。
+                <br />
+                完璧じゃないあなたも、最高に素晴らしい!
+              </p>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowTada(false)}
+                className="bg-yellow-400 text-white font-bold py-4 px-10 rounded-full shadow-md hover:bg-yellow-500 transition-colors text-lg tracking-wider"
+              >
+                ありがとう!🌟
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
