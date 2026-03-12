@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
 
+import Confetti from "react-confetti";
+
 const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
 const growthMessages = [
   "種を植えました。お散歩して育てよう！",
@@ -18,13 +20,22 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
-  // ★新規追加：今日の目標点数を管理するステート（初期値はもちろん最高の「60点」です！）
   const [targetScore, setTargetScore] = useState<number>(60);
-
-  // ★新規追加：鳥の目線(ズームアウト)状態を管理するスイッチ
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
-
   const [showTada, setShowTada] = useState<boolean>(false);
+
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     const storedGrowth = localStorage.getItem("flowerGrowth");
@@ -74,6 +85,26 @@ export default function Home() {
     <main
       className={`relative flex min-h-screen flex-col items-center justify-center p-6 pb-20 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
+      {/* 紙吹雪（Ta-Da!画面が表示されている時だけ降らせる） */}
+      {showTada && (
+        <Confetti
+          style={{ zIndex: 150 }}
+          width={windowSize.width}
+          height={windowSize.height}
+          numberOfPieces={300}
+          recycle={false}
+          gravity={0.15}
+          colors={[
+            "#FFB6C1",
+            "#87CEFA",
+            "#FFFFE0",
+            "#98FB98",
+            "#BBB",
+            "#FFD700",
+          ]}
+        />
+      )}
+
       {/* ★新規追加：鳥の目線(ズームアウト)切り替えボタン */}
       <button
         onClick={() => setIsBirdView(!isBirdView)}
