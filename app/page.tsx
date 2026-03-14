@@ -23,8 +23,10 @@ export default function Home() {
   const [targetScore, setTargetScore] = useState<number>(60);
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
-
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+
+  // 現在咲いているお花の種類を記憶する
+  const [currentFlower, setCurrentFlower] = useState<string>("🌸");
 
   useEffect(() => {
     const handleResize = () => {
@@ -46,6 +48,12 @@ export default function Home() {
     const storedTotal = localStorage.getItem("totalBlooms");
     if (storedTotal) {
       setTotalBlooms(parseInt(storedTotal, 10));
+    }
+
+    // 前回咲いたお花の種類を読み込む
+    const storedFlower = localStorage.getItem("currentFlower");
+    if (storedFlower) {
+      setCurrentFlower(storedFlower);
     }
   }, []);
 
@@ -75,6 +83,22 @@ export default function Home() {
       localStorage.setItem("totalBlooms", newTotal.toString());
     } else {
       nextGrowth = growth + 1; // 成長を進める
+
+      // 満開になる瞬間（成長度が最大になる時）にランダム変異
+      if (nextGrowth === flowerStages.length - 1) {
+        const rand = Math.random();
+        let nextFlower = "🌸"; // 基本は70%の確率でいつもの桜
+
+        if (rand > 0.7) {
+          // 残り30%の確率で、レアな植物が育つ！
+          const rareFlowers = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
+          nextFlower =
+            rareFlowers[Math.floor(Math.random() * rareFlowers.length)];
+        }
+
+        setCurrentFlower(nextFlower);
+        localStorage.setItem("currentFlower", nextFlower);
+      }
     }
 
     setGrowth(nextGrowth); // 成長を更新
@@ -289,7 +313,10 @@ export default function Home() {
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="text-7xl my-4"
           >
-            {flowerStages[growth]}
+            {/* 満開の時だけ「currentFlower」を表示する */}
+            {growth === flowerStages.length - 1
+              ? currentFlower
+              : flowerStages[growth]}
           </motion.div>
 
           {/* 成長メッセージ */}
