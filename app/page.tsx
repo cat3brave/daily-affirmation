@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
-
 import Confetti from "react-confetti";
 
 const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
@@ -24,18 +23,19 @@ export default function Home() {
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-
-  // 現在咲いているお花の種類を記憶する
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
+
+  const [maybeInput, setMaybeInput] = useState<string>("");
+  const [floatingClouds, setFloatingClouds] = useState<
+    { id: number; text: string }[]
+  >([]);
 
   useEffect(() => {
     const handleResize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     };
-
     handleResize();
     window.addEventListener("resize", handleResize);
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
@@ -44,13 +44,10 @@ export default function Home() {
     if (storedGrowth) {
       setGrowth(parseInt(storedGrowth, 10));
     }
-
     const storedTotal = localStorage.getItem("totalBlooms");
     if (storedTotal) {
       setTotalBlooms(parseInt(storedTotal, 10));
     }
-
-    // 前回咲いたお花の種類を読み込む
     const storedFlower = localStorage.getItem("currentFlower");
     if (storedFlower) {
       setCurrentFlower(storedFlower);
@@ -58,10 +55,9 @@ export default function Home() {
   }, []);
 
   const handleClick = async () => {
-    if (isLoading) return; // 連打防止
+    if (isLoading) return;
     setIsLoading(true);
-    setText(""); // 古い言葉を一旦消す
-
+    setText("");
     try {
       const newText = await generateAffirmation();
       setText(newText);
@@ -74,42 +70,43 @@ export default function Home() {
 
   const handleWalk = () => {
     let nextGrowth = 0;
-
     if (growth >= flowerStages.length - 1) {
-      nextGrowth = 0; // 新しい種に戻す
-
+      nextGrowth = 0;
       const newTotal = totalBlooms + 1;
       setTotalBlooms(newTotal);
       localStorage.setItem("totalBlooms", newTotal.toString());
     } else {
-      nextGrowth = growth + 1; // 成長を進める
-
-      // 満開になる瞬間（成長度が最大になる時）にランダム変異
+      nextGrowth = growth + 1;
       if (nextGrowth === flowerStages.length - 1) {
         const rand = Math.random();
-        let nextFlower = "🌸"; // 基本は70%の確率でいつもの桜
-
+        let nextFlower = "🌸";
         if (rand > 0.7) {
-          // 残り30%の確率で、レアな植物が育つ！
           const rareFlowers = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
           nextFlower =
             rareFlowers[Math.floor(Math.random() * rareFlowers.length)];
         }
-
         setCurrentFlower(nextFlower);
         localStorage.setItem("currentFlower", nextFlower);
       }
     }
+    setGrowth(nextGrowth);
+    localStorage.setItem("flowerGrowth", nextGrowth.toString());
+  };
 
-    setGrowth(nextGrowth); // 成長を更新
-    localStorage.setItem("flowerGrowth", nextGrowth.toString()); // 成長を保存
+  const handleFloatCloud = () => {
+    if (!maybeInput.trim()) return;
+    const newCloud = { id: Date.now(), text: maybeInput };
+    setFloatingClouds((prev) => [...prev, newCloud]);
+    setMaybeInput("");
+    setTimeout(() => {
+      setFloatingClouds((prev) => prev.filter((c) => c.id !== newCloud.id));
+    }, 8000);
   };
 
   return (
     <main
       className={`relative flex min-h-screen flex-col items-center justify-center p-6 pb-20 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
-      {/* 紙吹雪（Ta-Da!画面が表示されている時だけ降らせる） */}
       {showTada && (
         <Confetti
           style={{ zIndex: 150 }}
@@ -129,7 +126,29 @@ export default function Home() {
         />
       )}
 
-      {/* ★新規追加：鳥の目線(ズームアウト)切り替えボタン */}
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden flex justify-center items-end pb-40">
+        <AnimatePresence>
+          {floatingClouds.map((cloud) => (
+            <motion.div
+              key={cloud.id}
+              initial={{ opacity: 0, y: 50, scale: 0.8, filter: "blur(0px)" }}
+              animate={{
+                opacity: [0, 0.9, 0.8, 0],
+                y: -300 - Math.random() * 100,
+                x: (Math.random() - 0.5) * 100,
+                scale: 1.1,
+                filter: "blur(2px)",
+              }}
+              transition={{ duration: 8, ease: "easeInOut" }}
+              className="absolute bg-white/80 backdrop-blur-sm px-6 py-4 rounded-[3rem] shadow-sm border border-sky-50 text-sky-800 font-medium tracking-wide"
+            >
+              「{cloud.text}」
+              <span className="text-sky-400 font-bold ml-1">……かも？ ☁️</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       <button
         onClick={() => setIsBirdView(!isBirdView)}
         className="absolute top-6 left-6 z-50 bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all"
@@ -137,14 +156,14 @@ export default function Home() {
         {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
       </button>
 
-      {/* ★新規追加：鳥の目線(ズームアウト)時に現れる「全体像のメッセージ」 */}
       <AnimatePresence>
         {isBirdView && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-24 z-40 ] flex flex-col items-center"
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="absolute top-24 z-40 flex flex-col items-center"
           >
             <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-sky-100 text-center max-w-sm">
               <p className="text-sky-800 font-bold mb-3">🕊️ 空からの景色</p>
@@ -155,7 +174,7 @@ export default function Home() {
                 <br />
                 あなたは今日まで、こんなに素敵な軌跡を描いています。
               </p>
-              <div className="bg-pink-50 rouded-2xl p-4 inline-block border border-pink-100">
+              <div className="bg-pink-50 rounded-2xl p-4 inline-block border border-pink-100">
                 <p className="text-xs text-pink-400 font-bold mb-1">
                   今までに咲かせたお花
                 </p>
@@ -168,7 +187,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* 鳥の目線スイッチがONになると、この中身全体がギュッと縮む！ */}
       <motion.div
         animate={{
           scale: isBirdView ? 0.75 : 1,
@@ -176,10 +194,10 @@ export default function Home() {
           y: isBirdView ? 120 : 0,
         }}
         transition={{ duration: 1, ease: "easeInOut" }}
-        className="w-full max-w-lg flex flex-col items-center z-10 originate-bottom" // ズームの起点を下にして、全体が縮むように
+        className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-12"
       >
-        {/* 肯定文の表示エリア */}
-        <div className="h-64 flex items-center justify-center mb-8 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
+        {/* 1. 肯定文の表示エリア */}
+        <div className="h-64 flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
           <AnimatePresence mode="wait">
             {isLoading ? (
               <motion.p
@@ -210,69 +228,8 @@ export default function Home() {
           </AnimatePresence>
         </div>
 
-        {/* ★新規追加：完璧主義ストッパー（60点スライダー） */}
-        <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
-          <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
-            今日の目標ラインは？
-          </p>
-
-          {/* スライダー本体 */}
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="10"
-            value={targetScore}
-            onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
-            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
-
-          <div
-            className="w-full h-8 rounded-full mt-4 overflow-hidden relative shadow-inner"
-            style={{
-              background:
-                "linear-gradient(to right, black, #333 10%, #FFB6C1 20%, #87CEFA 40%, #FFFFE0 60%, #98FB98 80%, #BBB 90%, white)",
-            }}
-          >
-            {/* スライダーのつまみの位置を示す白い縦線 */}
-            <div
-              className="absolute top-0 h-full w-1 bg-white/70"
-              style={{ left: `calc(${targetScore}% - 2px)` }}
-            />
-
-            {/* 目盛りのラベル */}
-            <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1"></div>
-            <span>0点</span>
-            <span className="font-bold text-sky-600 text-sm">60点(満点)</span>
-            <span>100点</span>
-          </div>
-
-          {/* スライダーの値によってAI執事のメッセージと色が変わる！ */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={targetScore}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`mt-5 px-4 py-3 rounded-xl text-sm font-bold text-center w-full shadow-sm transition-colors duration-300 ${
-                targetScore <= 60
-                  ? "bg-green-50 text-green-600 border border-green-200"
-                  : targetScore < 100
-                    ? "bg-yellow-50 text-yellow-600 border border-yellow-200"
-                    : "bg-red-50 text-red-500 border border-red-200"
-              }`}
-            >
-              {targetScore <= 60 && "🌿 完璧です！60点で十分素晴らしいです。"}
-              {targetScore > 60 &&
-                targetScore < 100 &&
-                "⚠️ あれ？少し背負いすぎていませんか？"}
-              {targetScore === 100 &&
-                "🛑 ストップ！完璧主義が顔を出しています。60点に戻しましょう！"}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* アファメーションを受け取るボタン */}
-        <div className="mb-12">
+        {/* 2. アファメーションを受け取るボタン（表示エリアのすぐ下に移動！） */}
+        <div className="mb-10 w-full flex justify-center">
           <motion.button
             whileHover={{
               scale: isLoading ? 1 : 1.05,
@@ -284,15 +241,88 @@ export default function Home() {
             whileTap={{ scale: isLoading ? 1 : 0.95 }}
             onClick={handleClick}
             disabled={isLoading}
-            className={`px-12 py-5 bg-sky-500 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-500 ${
-              isLoading ? "opacity-70 cursor-not-allowed" : ""
-            }`}
+            className={`px-12 py-5 bg-sky-500 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-500 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
           >
             {isLoading ? "受け取り中..." : "言葉を受け取る"}
           </motion.button>
         </div>
 
-        {/*デジタル花壇エリア*/}
+        {/* 3. MBT「決めつけ」を吐き出す入力欄 */}
+        <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
+          <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
+            ☁️ 断定（決めつけ）を空に放つ ☁️
+          </p>
+          <p className="text-sky-700/60 text-xs mb-4 text-center">
+            「絶対～だ」という考えを書いて、空に浮かべてみましょう
+          </p>
+          <div className="flex w-full gap-2">
+            <input
+              type="text"
+              value={maybeInput}
+              onChange={(e) => setMaybeInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleFloatCloud()}
+              placeholder="例: 絶対に嫌われた..."
+              className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
+            />
+            <button
+              onClick={handleFloatCloud}
+              disabled={!maybeInput.trim()}
+              className="px-5 py-3 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm whitespace-nowrap"
+            >
+              放つ
+            </button>
+          </div>
+        </div>
+
+        {/* 4. 完璧主義ストッパー（60点スライダー） */}
+        <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
+          <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
+            今日の目標ラインは？
+          </p>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            step="10"
+            value={targetScore}
+            onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+          />
+          <div
+            className="w-full h-8 rounded-full mt-4 overflow-hidden relative shadow-inner"
+            style={{
+              background:
+                "linear-gradient(to right, black, #333 10%, #FFB6C1 20%, #87CEFA 40%, #FFFFE0 60%, #98FB98 80%, #BBB 90%, white)",
+            }}
+          >
+            <div
+              className="absolute top-0 h-full w-1 bg-white/70"
+              style={{ left: `calc(${targetScore}% - 2px)` }}
+            />
+          </div>
+          <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1">
+            <span>0点</span>
+            <span className="font-bold text-sky-600 text-sm">60点(満点)</span>
+            <span>100点</span>
+          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={targetScore}
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mt-5 px-4 py-3 rounded-xl text-sm font-bold text-center w-full shadow-sm transition-colors duration-300 ${targetScore <= 60 ? "bg-green-50 text-green-600 border border-green-200" : targetScore < 100 ? "bg-yellow-50 text-yellow-600 border border-yellow-200" : "bg-red-50 text-red-500 border border-red-200"}`}
+            >
+              {targetScore <= 60 && "🌿 完璧です！60点で十分素晴らしいです。"}
+              {targetScore > 60 &&
+                targetScore < 100 &&
+                "⚠️ あれ？少し背負いすぎていませんか？"}
+              {targetScore === 100 &&
+                "🛑 ストップ！完璧主義が顔を出しています。60点に戻しましょう！"}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* 5. デジタル花壇エリア */}
         <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
           {totalBlooms > 0 && (
             <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
@@ -300,12 +330,9 @@ export default function Home() {
               <span>{totalBlooms}</span>
             </div>
           )}
-
           <p className="text-sky-700/80 font-bold mb-2 tracking-wide">
             🌸 デジタル花壇 🌸
           </p>
-
-          {/* お花の絵文字 */}
           <motion.div
             key={growth}
             initial={{ scale: 0.5, opacity: 0, y: 20 }}
@@ -313,18 +340,13 @@ export default function Home() {
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             className="text-7xl my-4"
           >
-            {/* 満開の時だけ「currentFlower」を表示する */}
             {growth === flowerStages.length - 1
               ? currentFlower
               : flowerStages[growth]}
           </motion.div>
-
-          {/* 成長メッセージ */}
           <p className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5">
             {growthMessages[growth]}
           </p>
-
-          {/* 水やり・お散歩ボタン */}
           <motion.button
             whileHover={{ scale: 1.05, backgroundColor: "#f0fbf4" }}
             whileTap={{ scale: 0.95 }}
@@ -337,18 +359,17 @@ export default function Home() {
           </motion.button>
         </div>
 
-        {/* 失敗の告白ボタン */}
+        {/* 6. 失敗の告白ボタン */}
         <div className="mt-8 mb-4">
           <button
             onClick={() => setShowTada(true)}
-            className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors duration-sky-300/50 underline-offset-4"
+            className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors decoration-sky-300/50 underline underline-offset-4"
           >
             今日、ちょっと失敗しちゃった...
           </button>
         </div>
       </motion.div>
 
-      {/* Ta-Da! 盛大に祝うポップアップ画面 */}
       <AnimatePresence>
         {showTada && (
           <motion.div
@@ -364,7 +385,7 @@ export default function Home() {
               exit={{ scale: 0.8, opacity: 0, y: 50 }}
               transition={{ type: "spring", bounce: 0.6, duration: 0.8 }}
               className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl border-4 border-yellow-300 text-center max-w-md w-full relative"
-              onClick={(e) => e.stopPropagation()} // ポップアップ内のクリックは背景のクリックイベントを発火させない
+              onClick={(e) => e.stopPropagation()}
             >
               <motion.div
                 animate={{ y: [0, -15, 0] }}
@@ -373,7 +394,6 @@ export default function Home() {
               >
                 🎉
               </motion.div>
-
               <h2 className="text-4xl font-black text-yellow-500 mb-4 tracking-widest drop-shadow-sm">
                 Ta-Da!
               </h2>
@@ -387,7 +407,6 @@ export default function Home() {
                 <br />
                 完璧じゃないあなたも、最高に素晴らしい!
               </p>
-
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
