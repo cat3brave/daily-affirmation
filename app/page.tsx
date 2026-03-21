@@ -5,14 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
 import Confetti from "react-confetti";
 
-const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
-const growthMessages = [
-  "種を植えました。お散歩して育てよう！",
-  "芽が出ました！その調子！",
-  "葉っぱが育っています。いいペースですね！",
-  "つぼみがつきました！あともう少し！",
-  "満開のお花が咲きました！今日も素晴らしい一日です！",
-];
+// 🔴 作成した3つの部品をインポートする
+import HomeTab from "./components/HomeTab";
+import WorkTab from "./components/WorkTab";
+import AmuletTab from "./components/AmuletTab";
 
 export default function Home() {
   const [text, setText] = useState<string>("");
@@ -24,16 +20,19 @@ export default function Home() {
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
-
   const [maybeInput, setMaybeInput] = useState<string>("");
   const [floatingClouds, setFloatingClouds] = useState<
     { id: number; text: string }[]
   >([]);
 
+  // 現在開いているタブ（部屋）を記憶するステート
+  const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
+    "home",
+  );
+
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -41,17 +40,11 @@ export default function Home() {
 
   useEffect(() => {
     const storedGrowth = localStorage.getItem("flowerGrowth");
-    if (storedGrowth) {
-      setGrowth(parseInt(storedGrowth, 10));
-    }
+    if (storedGrowth) setGrowth(parseInt(storedGrowth, 10));
     const storedTotal = localStorage.getItem("totalBlooms");
-    if (storedTotal) {
-      setTotalBlooms(parseInt(storedTotal, 10));
-    }
+    if (storedTotal) setTotalBlooms(parseInt(storedTotal, 10));
     const storedFlower = localStorage.getItem("currentFlower");
-    if (storedFlower) {
-      setCurrentFlower(storedFlower);
-    }
+    if (storedFlower) setCurrentFlower(storedFlower);
   }, []);
 
   const handleClick = async () => {
@@ -69,6 +62,7 @@ export default function Home() {
   };
 
   const handleWalk = () => {
+    const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
     let nextGrowth = 0;
     if (growth >= flowerStages.length - 1) {
       nextGrowth = 0;
@@ -105,7 +99,7 @@ export default function Home() {
 
   return (
     <main
-      className={`relative flex min-h-screen flex-col items-center justify-center p-6 pb-20 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
+      className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
       {showTada && (
         <Confetti
@@ -126,6 +120,7 @@ export default function Home() {
         />
       )}
 
+      {/* かも雲のアニメーション（背景） */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden flex justify-center items-end pb-40">
         <AnimatePresence>
           {floatingClouds.map((cloud) => (
@@ -194,182 +189,91 @@ export default function Home() {
           y: isBirdView ? 120 : 0,
         }}
         transition={{ duration: 1, ease: "easeInOut" }}
-        className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-12"
+        className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
       >
-        {/* 1. 肯定文の表示エリア */}
-        <div className="h-64 flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
-          <AnimatePresence mode="wait">
-            {isLoading ? (
-              <motion.p
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-lg text-blue-400/70 animate-pulse tracking-widest"
-              >
-                言葉を紡いでいます...
-              </motion.p>
-            ) : text ? (
-              <motion.p
-                key={text}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest"
-              >
-                {text}
-              </motion.p>
-            ) : (
-              <p className="text-blue-400/70 text-lg">
-                ボタンを押して、言葉を受け取ってください
-              </p>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* 2. アファメーションを受け取るボタン（表示エリアのすぐ下に移動！） */}
-        <div className="mb-10 w-full flex justify-center">
-          <motion.button
-            whileHover={{
-              scale: isLoading ? 1 : 1.05,
-              backgroundColor: isLoading ? "#0ea5e9" : "#0284c7",
-              boxShadow: isLoading
-                ? "none"
-                : "0px 10px 25px rgba(14, 165, 233, 0.4)",
-            }}
-            whileTap={{ scale: isLoading ? 1 : 0.95 }}
-            onClick={handleClick}
-            disabled={isLoading}
-            className={`px-12 py-5 bg-sky-500 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-500 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
-          >
-            {isLoading ? "受け取り中..." : "言葉を受け取る"}
-          </motion.button>
-        </div>
-
-        {/* 3. MBT「決めつけ」を吐き出す入力欄 */}
-        <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
-          <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
-            ☁️ 断定（決めつけ）を空に放つ ☁️
-          </p>
-          <p className="text-sky-700/60 text-xs mb-4 text-center">
-            「絶対～だ」という考えを書いて、空に浮かべてみましょう
-          </p>
-          <div className="flex w-full gap-2">
-            <input
-              type="text"
-              value={maybeInput}
-              onChange={(e) => setMaybeInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleFloatCloud()}
-              placeholder="例: 絶対に嫌われた..."
-              className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
+        <AnimatePresence mode="wait">
+          {/* 🔴 タブの切り替え処理 🔴 */}
+          {currentTab === "home" && (
+            <HomeTab
+              isLoading={isLoading}
+              text={text}
+              handleClick={handleClick}
+              totalBlooms={totalBlooms}
+              growth={growth}
+              currentFlower={currentFlower}
+              handleWalk={handleWalk}
+              setShowTada={setShowTada}
             />
-            <button
-              onClick={handleFloatCloud}
-              disabled={!maybeInput.trim()}
-              className="px-5 py-3 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm whitespace-nowrap"
-            >
-              放つ
-            </button>
-          </div>
-        </div>
-
-        {/* 4. 完璧主義ストッパー（60点スライダー） */}
-        <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
-          <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
-            今日の目標ラインは？
-          </p>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="10"
-            value={targetScore}
-            onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
-            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
-          />
-          <div
-            className="w-full h-8 rounded-full mt-4 overflow-hidden relative shadow-inner"
-            style={{
-              background:
-                "linear-gradient(to right, black, #333 10%, #FFB6C1 20%, #87CEFA 40%, #FFFFE0 60%, #98FB98 80%, #BBB 90%, white)",
-            }}
-          >
-            <div
-              className="absolute top-0 h-full w-1 bg-white/70"
-              style={{ left: `calc(${targetScore}% - 2px)` }}
-            />
-          </div>
-          <div className="flex justify-between w-full text-xs text-sky-600/70 mt-2 font-medium px-1">
-            <span>0点</span>
-            <span className="font-bold text-sky-600 text-sm">60点(満点)</span>
-            <span>100点</span>
-          </div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={targetScore}
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`mt-5 px-4 py-3 rounded-xl text-sm font-bold text-center w-full shadow-sm transition-colors duration-300 ${targetScore <= 60 ? "bg-green-50 text-green-600 border border-green-200" : targetScore < 100 ? "bg-yellow-50 text-yellow-600 border border-yellow-200" : "bg-red-50 text-red-500 border border-red-200"}`}
-            >
-              {targetScore <= 60 && "🌿 完璧です！60点で十分素晴らしいです。"}
-              {targetScore > 60 &&
-                targetScore < 100 &&
-                "⚠️ あれ？少し背負いすぎていませんか？"}
-              {targetScore === 100 &&
-                "🛑 ストップ！完璧主義が顔を出しています。60点に戻しましょう！"}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* 5. デジタル花壇エリア */}
-        <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
-          {totalBlooms > 0 && (
-            <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
-              <span>🌸</span>
-              <span>{totalBlooms}</span>
-            </div>
           )}
-          <p className="text-sky-700/80 font-bold mb-2 tracking-wide">
-            🌸 デジタル花壇 🌸
-          </p>
-          <motion.div
-            key={growth}
-            initial={{ scale: 0.5, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="text-7xl my-4"
-          >
-            {growth === flowerStages.length - 1
-              ? currentFlower
-              : flowerStages[growth]}
-          </motion.div>
-          <p className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5">
-            {growthMessages[growth]}
-          </p>
-          <motion.button
-            whileHover={{ scale: 1.05, backgroundColor: "#f0fbf4" }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleWalk}
-            className="px-8 py-3 bg-white text-green-600 rounded-full shadow-sm transition-colors duration-300 text-base font-bold tracking-widest border-2 border-green-200"
-          >
-            {growth >= flowerStages.length - 1
-              ? "新しい種を植える 🌱"
-              : "今日もお散歩した！ 💧"}
-          </motion.button>
-        </div>
 
-        {/* 6. 失敗の告白ボタン */}
-        <div className="mt-8 mb-4">
-          <button
-            onClick={() => setShowTada(true)}
-            className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors decoration-sky-300/50 underline underline-offset-4"
-          >
-            今日、ちょっと失敗しちゃった...
-          </button>
-        </div>
+          {currentTab === "work" && (
+            <WorkTab
+              maybeInput={maybeInput}
+              setMaybeInput={setMaybeInput}
+              handleFloatCloud={handleFloatCloud}
+              targetScore={targetScore}
+              setTargetScore={setTargetScore}
+            />
+          )}
+
+          {currentTab === "amulet" && <AmuletTab setShowTada={setShowTada} />}
+        </AnimatePresence>
       </motion.div>
 
+      {/* 🔴 フローティング・ナビゲーションバー（タブ） 🔴 */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6 pb-6 pt-2 pointer-events-none">
+        <div className="bg-white/70 backdrop-blur-xl border-2 border-white shadow-[0_10px_40px_rgb(0,0,0,0.1)] rounded-[2rem] flex justify-around items-center p-2 pointer-events-auto">
+          <button
+            onClick={() => setCurrentTab("home")}
+            className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "home" ? "bg-sky-100/80 shadow-inner" : "hover:bg-sky-50"}`}
+          >
+            <span
+              className={`text-xl mb-1 ${currentTab === "home" ? "scale-110" : "opacity-70"}`}
+            >
+              🏠
+            </span>
+            <span
+              className={`text-[10px] font-bold ${currentTab === "home" ? "text-sky-600" : "text-sky-600/50"}`}
+            >
+              ホーム
+            </span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab("work")}
+            className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "work" ? "bg-sky-100/80 shadow-inner" : "hover:bg-sky-50"}`}
+          >
+            <span
+              className={`text-xl mb-1 ${currentTab === "work" ? "scale-110" : "opacity-70"}`}
+            >
+              ☁️
+            </span>
+            <span
+              className={`text-[10px] font-bold ${currentTab === "work" ? "text-sky-600" : "text-sky-600/50"}`}
+            >
+              ワーク
+            </span>
+          </button>
+
+          <button
+            onClick={() => setCurrentTab("amulet")}
+            className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "amulet" ? "bg-yellow-100/80 shadow-inner" : "hover:bg-yellow-50"}`}
+          >
+            <span
+              className={`text-xl mb-1 ${currentTab === "amulet" ? "scale-110" : "opacity-70"}`}
+            >
+              🎉
+            </span>
+            <span
+              className={`text-[10px] font-bold ${currentTab === "amulet" ? "text-yellow-600" : "text-yellow-600/50"}`}
+            >
+              お守り
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Ta-Da! ポップアップ画面 */}
       <AnimatePresence>
         {showTada && (
           <motion.div
