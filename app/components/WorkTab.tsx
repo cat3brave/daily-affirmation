@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+// 🔴 さっき actions.ts に作った関数を読み込みます！
+import { translateHarshVoice } from "../actions";
 
 type WorkTabProps = {
   maybeInput: string;
@@ -16,14 +18,36 @@ export default function WorkTab({
   targetScore,
   setTargetScore,
 }: WorkTabProps) {
-  // 🔴 新規追加：「そしての天秤」用のステート（この部屋だけのデータ）
+  // ⚖️ 天秤用のステート
   const [leftFact, setLeftFact] = useState("");
   const [rightFact, setRightFact] = useState("");
   const [isBalanced, setIsBalanced] = useState(false);
 
+  // 🕊️ 翻訳機用のステート（新規追加！）
+  const [harshVoice, setHarshVoice] = useState("");
+  const [translatedVoice, setTranslatedVoice] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+
   const handleBalance = () => {
     if (leftFact.trim() && rightFact.trim()) {
       setIsBalanced(true);
+    }
+  };
+
+  // 🕊️ 翻訳ボタンを押したときの処理
+  const handleTranslate = async () => {
+    if (!harshVoice.trim() || isTranslating) return;
+    setIsTranslating(true);
+    setTranslatedVoice(""); // 前の結果を消す
+    try {
+      const result = await translateHarshVoice(harshVoice);
+      setTranslatedVoice(result);
+    } catch (error) {
+      setTranslatedVoice(
+        "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
+      );
+    } finally {
+      setIsTranslating(false);
     }
   };
 
@@ -35,7 +59,49 @@ export default function WorkTab({
       exit={{ opacity: 0, x: -20 }}
       className="w-full flex flex-col items-center mt-4"
     >
-      {/* ⚖️ 1. 「そして」の天秤（新規追加！） */}
+      {/* 🗣️➡️🕊️ 1. 優しい翻訳機（新規追加！） */}
+      <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
+        <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
+          🗣️➡️🕊️ 優しい翻訳機
+        </p>
+        <p className="text-sky-700/60 text-xs mb-4 text-center leading-relaxed">
+          自分を責める厳しい声を、AIが「思いやりのある大人」の視点で
+          <br />
+          客観的な事実と労わりの言葉に翻訳します。
+        </p>
+
+        <textarea
+          value={harshVoice}
+          onChange={(e) => setHarshVoice(e.target.value)}
+          placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
+          className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-4 leading-relaxed"
+        />
+
+        <button
+          onClick={handleTranslate}
+          disabled={!harshVoice.trim() || isTranslating}
+          className="px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
+        >
+          {isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄"}
+        </button>
+
+        <AnimatePresence mode="wait">
+          {translatedVoice && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              className="bg-blue-50 border border-blue-200 text-blue-800 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
+            >
+              <span className="font-bold text-blue-500 block mb-2 tracking-wide">
+                🕊️ 翻訳結果：
+              </span>
+              {translatedVoice}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ⚖️ 2. 「そして」の天秤 */}
       <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
         <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
           ⚖️ 「そして」の天秤
@@ -86,7 +152,6 @@ export default function WorkTab({
           </div>
         </div>
 
-        {/* アニメーションする天秤アイコン */}
         <motion.div
           animate={{
             rotate: isBalanced ? 0 : leftFact && !rightFact ? -15 : 0,
@@ -123,7 +188,7 @@ export default function WorkTab({
         </AnimatePresence>
       </div>
 
-      {/* ☁️ 2. 断定（決めつけ）を空に放つ */}
+      {/* ☁️ 3. 断定（決めつけ）を空に放つ */}
       <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
         <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
           ☁️ 断定（決めつけ）を空に放つ ☁️
@@ -150,7 +215,7 @@ export default function WorkTab({
         </div>
       </div>
 
-      {/* 3. 完璧主義ストッパー（60点スライダー） */}
+      {/* 4. 完璧主義ストッパー（60点スライダー） */}
       <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm flex flex-col items-center">
         <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
           今日の目標ラインは？
