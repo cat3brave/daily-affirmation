@@ -1,44 +1,31 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-// 🔴 さっき actions.ts に作った関数を読み込みます！
 import { translateHarshVoice } from "../actions";
 
+// 🔴 親（page.tsx）からもらう荷物を、雲を放つ関数だけに減らしました！
 type WorkTabProps = {
-  maybeInput: string;
-  setMaybeInput: (value: string) => void;
-  handleFloatCloud: () => void;
-  targetScore: number;
-  setTargetScore: (value: number) => void;
+  handleFloatCloud: (text: string) => void;
 };
 
-export default function WorkTab({
-  maybeInput,
-  setMaybeInput,
-  handleFloatCloud,
-  targetScore,
-  setTargetScore,
-}: WorkTabProps) {
+export default function WorkTab({ handleFloatCloud }: WorkTabProps) {
+  // 🔴 page.tsx にあった状態を、この部屋に「降下」させました（パフォーマンス最適化！）
+  const [maybeInput, setMaybeInput] = useState("");
+  const [targetScore, setTargetScore] = useState(60);
+
+  // 🗣️➡️🕊️ 翻訳機用のステート
+  const [harshVoice, setHarshVoice] = useState("");
+  const [translatedVoice, setTranslatedVoice] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+
   // ⚖️ 天秤用のステート
   const [leftFact, setLeftFact] = useState("");
   const [rightFact, setRightFact] = useState("");
   const [isBalanced, setIsBalanced] = useState(false);
 
-  // 🕊️ 翻訳機用のステート（新規追加！）
-  const [harshVoice, setHarshVoice] = useState("");
-  const [translatedVoice, setTranslatedVoice] = useState("");
-  const [isTranslating, setIsTranslating] = useState(false);
-
-  const handleBalance = () => {
-    if (leftFact.trim() && rightFact.trim()) {
-      setIsBalanced(true);
-    }
-  };
-
-  // 🕊️ 翻訳ボタンを押したときの処理
   const handleTranslate = async () => {
     if (!harshVoice.trim() || isTranslating) return;
     setIsTranslating(true);
-    setTranslatedVoice(""); // 前の結果を消す
+    setTranslatedVoice("");
     try {
       const result = await translateHarshVoice(harshVoice);
       setTranslatedVoice(result);
@@ -51,6 +38,19 @@ export default function WorkTab({
     }
   };
 
+  const handleBalance = () => {
+    if (leftFact.trim() && rightFact.trim()) {
+      setIsBalanced(true);
+    }
+  };
+
+  // ☁️ 雲を放つ処理（入力欄をクリアする責任はこの部屋で持つ）
+  const onReleaseCloud = () => {
+    if (!maybeInput.trim()) return;
+    handleFloatCloud(maybeInput); // 親にテキストだけ渡す
+    setMaybeInput(""); // クリア
+  };
+
   return (
     <motion.div
       key="work"
@@ -59,7 +59,7 @@ export default function WorkTab({
       exit={{ opacity: 0, x: -20 }}
       className="w-full flex flex-col items-center mt-4"
     >
-      {/* 🗣️➡️🕊️ 1. 優しい翻訳機（新規追加！） */}
+      {/* 🗣️➡️🕊️ 1. 優しい翻訳機 */}
       <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
         <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
           🗣️➡️🕊️ 優しい翻訳機
@@ -69,14 +69,12 @@ export default function WorkTab({
           <br />
           客観的な事実と労わりの言葉に翻訳します。
         </p>
-
         <textarea
           value={harshVoice}
           onChange={(e) => setHarshVoice(e.target.value)}
           placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
           className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-4 leading-relaxed"
         />
-
         <button
           onClick={handleTranslate}
           disabled={!harshVoice.trim() || isTranslating}
@@ -84,7 +82,6 @@ export default function WorkTab({
         >
           {isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄"}
         </button>
-
         <AnimatePresence mode="wait">
           {translatedVoice && (
             <motion.div
@@ -111,7 +108,6 @@ export default function WorkTab({
           <br />
           「そして」と、もう一つの小さな事実を足してみましょう。
         </p>
-
         <div className="w-full flex flex-col gap-3 mb-6">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-sky-700 ml-2">
@@ -128,13 +124,11 @@ export default function WorkTab({
               className="w-full px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
             />
           </div>
-
           <div className="flex justify-center my-1">
             <span className="text-sky-400 font-black text-sm tracking-widest">
               ＋ そして（AND）
             </span>
           </div>
-
           <div className="flex flex-col gap-1">
             <label className="text-xs font-bold text-sky-700 ml-2">
               並列する、もう一つの事実
@@ -151,7 +145,6 @@ export default function WorkTab({
             />
           </div>
         </div>
-
         <motion.div
           animate={{
             rotate: isBalanced ? 0 : leftFact && !rightFact ? -15 : 0,
@@ -162,7 +155,6 @@ export default function WorkTab({
         >
           ⚖️
         </motion.div>
-
         <button
           onClick={handleBalance}
           disabled={!leftFact.trim() || !rightFact.trim() || isBalanced}
@@ -170,7 +162,6 @@ export default function WorkTab({
         >
           天秤でバランスを取る
         </button>
-
         <AnimatePresence>
           {isBalanced && (
             <motion.div
@@ -201,12 +192,12 @@ export default function WorkTab({
             type="text"
             value={maybeInput}
             onChange={(e) => setMaybeInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleFloatCloud()}
+            onKeyDown={(e) => e.key === "Enter" && onReleaseCloud()}
             placeholder="例: 絶対に嫌われた..."
             className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
           />
           <button
-            onClick={handleFloatCloud}
+            onClick={onReleaseCloud}
             disabled={!maybeInput.trim()}
             className="px-5 py-3 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm whitespace-nowrap"
           >

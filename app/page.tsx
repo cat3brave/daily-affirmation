@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
 import Confetti from "react-confetti";
 
-// 🔴 作成した3つの部品をインポートする
 import HomeTab from "./components/HomeTab";
 import WorkTab from "./components/WorkTab";
 import AmuletTab from "./components/AmuletTab";
@@ -15,20 +14,18 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
-  const [targetScore, setTargetScore] = useState<number>(60);
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
-  const [maybeInput, setMaybeInput] = useState<string>("");
-  const [floatingClouds, setFloatingClouds] = useState<
-    { id: number; text: string }[]
-  >([]);
-
-  // 現在開いているタブ（部屋）を記憶するステート
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
+
+  // 雲の座標情報を保持して、レンダリングごとのチラつきを防ぐ
+  const [floatingClouds, setFloatingClouds] = useState<
+    { id: number; text: string; x: number; y: number }[]
+  >([]);
 
   useEffect(() => {
     const handleResize = () =>
@@ -87,11 +84,15 @@ export default function Home() {
     localStorage.setItem("flowerGrowth", nextGrowth.toString());
   };
 
-  const handleFloatCloud = () => {
-    if (!maybeInput.trim()) return;
-    const newCloud = { id: Date.now(), text: maybeInput };
+  const handleFloatCloud = (cloudText: string) => {
+    const newCloud = {
+      id: Date.now(),
+      text: cloudText,
+      x: (Math.random() - 0.5) * 100, // 生成時に乱数を固定
+      y: -300 - Math.random() * 100, // 生成時に乱数を固定
+    };
     setFloatingClouds((prev) => [...prev, newCloud]);
-    setMaybeInput("");
+
     setTimeout(() => {
       setFloatingClouds((prev) => prev.filter((c) => c.id !== newCloud.id));
     }, 8000);
@@ -120,25 +121,37 @@ export default function Home() {
         />
       )}
 
-      {/* かも雲のアニメーション（背景） */}
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden flex justify-center items-end pb-40">
+      {/* ☁️ 雲が飛んでいる間、うしろをフワッとぼやかすカーテン（マインドフルネス効果） */}
+      <AnimatePresence>
+        {floatingClouds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="pointer-events-none fixed inset-0 z-[15] bg-sky-50/20 backdrop-blur-md"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* かも雲のアニメーション（z-20にして、ぼかしカーテンの手前を飛ぶように設定！） */}
+      <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden flex justify-center items-end pb-40">
         <AnimatePresence>
           {floatingClouds.map((cloud) => (
             <motion.div
               key={cloud.id}
-              initial={{ opacity: 0, y: 50, scale: 0.8, filter: "blur(0px)" }}
+              initial={{ opacity: 0, y: 50, scale: 0.8 }}
               animate={{
-                opacity: [0, 0.9, 0.8, 0],
-                y: -300 - Math.random() * 100,
-                x: (Math.random() - 0.5) * 100,
+                opacity: [0, 1, 1, 0],
+                y: cloud.y,
+                x: cloud.x,
                 scale: 1.1,
-                filter: "blur(2px)",
               }}
               transition={{ duration: 8, ease: "easeInOut" }}
-              className="absolute bg-white/80 backdrop-blur-sm px-6 py-4 rounded-[3rem] shadow-sm border border-sky-50 text-sky-800 font-medium tracking-wide"
+              className="absolute bg-white px-8 py-5 rounded-[3rem] shadow-xl border-2 border-sky-100 text-sky-900 font-bold text-lg tracking-wide"
             >
               「{cloud.text}」
-              <span className="text-sky-400 font-bold ml-1">……かも？ ☁️</span>
+              <span className="text-sky-500 font-black ml-1">……かも？ ☁️</span>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -192,7 +205,6 @@ export default function Home() {
         className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
       >
         <AnimatePresence mode="wait">
-          {/* 🔴 タブの切り替え処理 🔴 */}
           {currentTab === "home" && (
             <HomeTab
               isLoading={isLoading}
@@ -207,20 +219,14 @@ export default function Home() {
           )}
 
           {currentTab === "work" && (
-            <WorkTab
-              maybeInput={maybeInput}
-              setMaybeInput={setMaybeInput}
-              handleFloatCloud={handleFloatCloud}
-              targetScore={targetScore}
-              setTargetScore={setTargetScore}
-            />
+            <WorkTab handleFloatCloud={handleFloatCloud} />
           )}
 
           {currentTab === "amulet" && <AmuletTab setShowTada={setShowTada} />}
         </AnimatePresence>
       </motion.div>
 
-      {/* 🔴 フローティング・ナビゲーションバー（タブ） 🔴 */}
+      {/* フローティング・ナビゲーションバー */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6 pb-6 pt-2 pointer-events-none">
         <div className="bg-white/70 backdrop-blur-xl border-2 border-white shadow-[0_10px_40px_rgb(0,0,0,0.1)] rounded-[2rem] flex justify-around items-center p-2 pointer-events-auto">
           <button
@@ -238,7 +244,6 @@ export default function Home() {
               ホーム
             </span>
           </button>
-
           <button
             onClick={() => setCurrentTab("work")}
             className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "work" ? "bg-sky-100/80 shadow-inner" : "hover:bg-sky-50"}`}
@@ -254,7 +259,6 @@ export default function Home() {
               ワーク
             </span>
           </button>
-
           <button
             onClick={() => setCurrentTab("amulet")}
             className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "amulet" ? "bg-yellow-100/80 shadow-inner" : "hover:bg-yellow-50"}`}
@@ -273,7 +277,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Ta-Da! ポップアップ画面 */}
       <AnimatePresence>
         {showTada && (
           <motion.div
