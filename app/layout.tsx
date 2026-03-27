@@ -1,18 +1,24 @@
-import type { Metadata } from "next";
-// 1. Google Fontsから「Zen Maru Gothic」をインポート
-import { Zen_Maru_Gothic } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-// 2. フォントの設定（太さのバリエーションを指定）
-const zenMaruGothic = Zen_Maru_Gothic({
-  weight: ["300", "400", "500", "700", "900"],
-  subsets: ["latin"],
-  display: "swap",
-});
+const inter = Inter({ subsets: ["latin"] });
 
+// 📱 アプリのテーマカラー（スマホ画面の一番上、時計や電池のアイコンがあるバーの色）
+export const viewport: Viewport = {
+  themeColor: "#e0f2fe",
+};
+
+// 📄 PWA（スマホアプリ化）のための身分証明書と設定
 export const metadata: Metadata = {
   title: "Daily Affirmation",
-  description: "心を整える肯定文アプリ",
+  description: "自分を労わるためのお守りアプリ",
+  manifest: "/manifest.json", // 先ほど作った証明書を読み込む
+  appleWebApp: {
+    capable: true, // Safariで「ホーム画面に追加」した時にアプリとして動かす魔法
+    statusBarStyle: "default",
+    title: "お守り", // ホーム画面に並ぶときの短い名前
+  },
 };
 
 export default function RootLayout({
@@ -21,10 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // 言語設定を日本語(ja)に変更
     <html lang="ja">
-      {/* 3. bodyタグにフォントのクラス名を適用 */}
-      <body className={zenMaruGothic.className}>{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
