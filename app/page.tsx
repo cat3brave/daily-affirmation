@@ -4,29 +4,30 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "./actions";
 
+// 🔴 新しく作ったカスタムフック（お花係）をインポート！
+import { useFlowerGarden } from "./hooks/useFlowerGarden";
+
 import HomeTab from "./components/HomeTab";
 import WorkTab from "./components/WorkTab";
 import AmuletTab from "./components/AmuletTab";
-// 🔴 新しく雇った裏方さんたちを呼び出します！
 import BottomTabBar from "./components/BottomTabBar";
 import TadaModal from "./components/TadaModal";
 
 export default function Home() {
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [growth, setGrowth] = useState<number>(0);
-  const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-  const [currentFlower, setCurrentFlower] = useState<string>("🌸");
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
-
   const [floatingClouds, setFloatingClouds] = useState<
     { id: number; text: string; x: number; y: number }[]
   >([]);
+
+  // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
+  const { growth, totalBlooms, currentFlower, handleWalk } = useFlowerGarden();
 
   useEffect(() => {
     const handleResize = () =>
@@ -34,15 +35,6 @@ export default function Home() {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    const storedGrowth = localStorage.getItem("flowerGrowth");
-    if (storedGrowth) setGrowth(parseInt(storedGrowth, 10));
-    const storedTotal = localStorage.getItem("totalBlooms");
-    if (storedTotal) setTotalBlooms(parseInt(storedTotal, 10));
-    const storedFlower = localStorage.getItem("currentFlower");
-    if (storedFlower) setCurrentFlower(storedFlower);
   }, []);
 
   const handleClick = async () => {
@@ -57,32 +49,6 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleWalk = () => {
-    const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
-    let nextGrowth = 0;
-    if (growth >= flowerStages.length - 1) {
-      nextGrowth = 0;
-      const newTotal = totalBlooms + 1;
-      setTotalBlooms(newTotal);
-      localStorage.setItem("totalBlooms", newTotal.toString());
-    } else {
-      nextGrowth = growth + 1;
-      if (nextGrowth === flowerStages.length - 1) {
-        const rand = Math.random();
-        let nextFlower = "🌸";
-        if (rand > 0.7) {
-          const rareFlowers = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
-          nextFlower =
-            rareFlowers[Math.floor(Math.random() * rareFlowers.length)];
-        }
-        setCurrentFlower(nextFlower);
-        localStorage.setItem("currentFlower", nextFlower);
-      }
-    }
-    setGrowth(nextGrowth);
-    localStorage.setItem("flowerGrowth", nextGrowth.toString());
   };
 
   const handleFloatCloud = (cloudText: string) => {
@@ -204,7 +170,6 @@ export default function Home() {
         </AnimatePresence>
       </motion.div>
 
-      {/* 🔴 ここに裏方さん（部品）を置くだけ！ */}
       <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
       <TadaModal
         showTada={showTada}
