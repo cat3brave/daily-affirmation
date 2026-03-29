@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 
 export default function BreathingCard() {
   const [phase, setPhase] = useState<"idle" | "inhale" | "hold" | "exhale">(
@@ -45,7 +45,7 @@ export default function BreathingCard() {
   }, [phase]);
 
   // アニメーションの動き（円の大きさと色）
-  const circleVariants = {
+  const circleVariants: Variants = {
     idle: { scale: 1, backgroundColor: "#e0f2fe", transition: { duration: 1 } },
     inhale: {
       scale: 1.8,
