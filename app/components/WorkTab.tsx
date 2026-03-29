@@ -3,6 +3,7 @@ import GentleTranslatorCard from "./GentleTranslatorCard.";
 import AndBalanceCard from "./AndBalanceCard";
 import MaybeCloudCard from "./MaybeCloudCard";
 import SixtyScoreCard from "./SixtyScoreCard";
+import BreathingCard from "./BreathingCard";
 
 type WorkTabProps = {
   handleFloatCloud: (text: string) => void;
@@ -17,11 +18,12 @@ export default function WorkTab({ handleFloatCloud }: WorkTabProps) {
       exit={{ opacity: 0, x: -20 }}
       className="w-full flex flex-col items-center mt-4"
     >
-      {/* 4つのカードを並べるだけ！（順番もここで自由に入れ替えられます） */}
+      {/* 5つのカードを並べるだけ！（順番もここで自由に入れ替えられます） */}
       <GentleTranslatorCard />
       <AndBalanceCard />
       <MaybeCloudCard handleFloatCloud={handleFloatCloud} />
       <SixtyScoreCard />
+      <BreathingCard />
     </motion.div>
   );
 }
