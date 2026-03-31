@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { motion, Variants } from "framer-motion";
 
@@ -6,6 +8,25 @@ export default function BreathingCard() {
     "idle",
   );
   const [timeLeft, setTimeLeft] = useState(0);
+
+  // 🔴 【新規追加】フェーズが変わったタイミングでスマホを振動させる！
+  useEffect(() => {
+    // ブラウザがバイブレーション機能を持っているかチェック
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      if (phase === "idle") {
+        navigator.vibrate(0); // 停止
+      } else if (phase === "inhale") {
+        // 吸う始まり：短く1回「ブルッ」
+        navigator.vibrate(100);
+      } else if (phase === "hold") {
+        // 息を止める：短く2回「ブルッ、ブルッ」
+        navigator.vibrate([100, 100, 100]);
+      } else if (phase === "exhale") {
+        // 吐く始まり：少し長く1回「ブーッ」
+        navigator.vibrate(400);
+      }
+    }
+  }, [phase]);
 
   // 呼吸のフェーズ（吸う・止める・吐く）を自動で切り替えるタイマー
   useEffect(() => {
@@ -74,10 +95,11 @@ export default function BreathingCard() {
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-sky-50 w-full mb-6 flex flex-col items-center">
       <h3 className="text-sky-800 font-bold mb-2">🎈 4-7-8 深呼吸ナビ</h3>
+      {/* 🔴 説明文も少しアプリっぽく変更しました */}
       <p className="text-sky-600/80 text-xs text-center mb-8">
-        不安な時や、心がざわざわする時に。
+        目を閉じて、スマホの振動に合わせて
         <br />
-        円の動きに合わせて呼吸してみましょう。
+        呼吸してみましょう。
       </p>
 
       {/* 呼吸に合わせて動く円 */}
