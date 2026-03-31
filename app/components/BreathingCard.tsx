@@ -9,15 +9,11 @@ export default function BreathingCard() {
   );
   const [timeLeft, setTimeLeft] = useState(0);
 
-  // 🔴 【新規追加】フェーズが変わったタイミングでスマホを振動させる！
+  // 🔴 2回目以降の振動（息を止める・吐く）はここで管理します
   useEffect(() => {
-    // ブラウザがバイブレーション機能を持っているかチェック
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       if (phase === "idle") {
         navigator.vibrate(0); // 停止
-      } else if (phase === "inhale") {
-        // 吸う始まり：短く1回「ブルッ」
-        navigator.vibrate(100);
       } else if (phase === "hold") {
         // 息を止める：短く2回「ブルッ、ブルッ」
         navigator.vibrate([100, 100, 100]);
@@ -25,6 +21,7 @@ export default function BreathingCard() {
         // 吐く始まり：少し長く1回「ブーッ」
         navigator.vibrate(400);
       }
+      // ※ "inhale" (吸う) の最初の振動は、下のボタンで直接鳴らします！
     }
   }, [phase]);
 
@@ -95,7 +92,6 @@ export default function BreathingCard() {
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-sky-50 w-full mb-6 flex flex-col items-center">
       <h3 className="text-sky-800 font-bold mb-2">🎈 4-7-8 深呼吸ナビ</h3>
-      {/* 🔴 説明文も少しアプリっぽく変更しました */}
       <p className="text-sky-600/80 text-xs text-center mb-8">
         目を閉じて、スマホの振動に合わせて
         <br />
@@ -120,14 +116,26 @@ export default function BreathingCard() {
 
       {phase === "idle" ? (
         <button
-          onClick={() => setPhase("inhale")}
+          onClick={() => {
+            // 🔴 ここが最大のポイント！ボタンを押した「瞬間」に直接振動させる！
+            if (typeof window !== "undefined" && "vibrate" in navigator) {
+              navigator.vibrate(100); // 吸う始まり：短く1回「ブルッ」
+            }
+            setPhase("inhale");
+          }}
           className="bg-sky-400 hover:bg-sky-500 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm"
         >
           深呼吸をはじめる
         </button>
       ) : (
         <button
-          onClick={() => setPhase("idle")}
+          onClick={() => {
+            // ストップを押した時もピタッと振動を止める
+            if (typeof window !== "undefined" && "vibrate" in navigator) {
+              navigator.vibrate(0);
+            }
+            setPhase("idle");
+          }}
           className="bg-gray-100 hover:bg-gray-200 text-gray-500 px-6 py-2 rounded-full font-bold transition-colors text-sm"
         >
           ストップ
