@@ -4,6 +4,7 @@ import AndBalanceCard from "./AndBalanceCard";
 import MaybeCloudCard from "./MaybeCloudCard";
 import SixtyScoreCard from "./SixtyScoreCard";
 import BreathingCard from "./BreathingCard";
+import ThreeGoodThingsCard from "./ThreeGoodThingsCard";
 
 type WorkTabProps = {
   handleFloatCloud: (text: string) => void;
@@ -24,6 +25,7 @@ export default function WorkTab({ handleFloatCloud }: WorkTabProps) {
       <MaybeCloudCard handleFloatCloud={handleFloatCloud} />
       <SixtyScoreCard />
       <BreathingCard />
+      <ThreeGoodThingsCard />
     </motion.div>
   );
 }
