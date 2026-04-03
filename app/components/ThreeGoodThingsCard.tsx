@@ -7,8 +7,6 @@ export default function ThreeGoodThingsCard() {
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
   const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
-
-  // 🔴 新規追加：ユーザーがタップした「日付」を覚えておくための状態
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const getTodayDate = () => {
@@ -66,7 +64,6 @@ export default function ThreeGoodThingsCard() {
     );
 
     setIsSaved(true);
-    // 保存したと同時に、今日の日付の記録を開いて見せる！
     setSelectedDate(today);
 
     setTimeout(() => {
@@ -74,10 +71,35 @@ export default function ThreeGoodThingsCard() {
     }, 3000);
   };
 
+  // 🔴 新機能：記録を削除する関数
+  const handleDelete = (dateToDelete: string) => {
+    // 確認ダイアログを出す（うっかり消去を防止！）
+    if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
+      return;
+
+    // 現在の全記録をコピーして、指定した日付のデータを消す
+    const updatedRecords = { ...allRecords };
+    delete updatedRecords[dateToDelete];
+
+    // 画面の状態とスマホの保存データを両方更新
+    setAllRecords(updatedRecords);
+    localStorage.setItem(
+      "three-good-things-history",
+      JSON.stringify(updatedRecords),
+    );
+
+    // もし「今日」の分を消したなら、上の入力欄も空っぽにする
+    if (dateToDelete === getTodayDate()) {
+      setThings(["", "", ""]);
+    }
+
+    // 詳細表示を閉じる
+    setSelectedDate(null);
+  };
+
   const past14Days = getPast14Days();
 
   return (
-    // 🔴 下のメニューバーに隠れないよう、一番下の余白を「mb-6」から「mb-24」に増やしました！
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
       <h3 className="text-pink-700 font-bold mb-2">🌷 3つのよかったこと</h3>
       <p className="text-pink-600/80 text-xs text-center mb-6">
@@ -136,29 +158,27 @@ export default function ThreeGoodThingsCard() {
             const hasRecord =
               allRecords[date] &&
               allRecords[date].some((text) => text.trim() !== "");
-            const isSelected = selectedDate === date; // 🔴 今選ばれている日付かどうか
+            const isSelected = selectedDate === date;
 
             return (
               <button
                 key={date}
                 title={date}
                 onClick={() => {
-                  // 🔴 緑のマス（記録あり）をタップしたら、その日付をセットする
                   if (hasRecord) {
-                    setSelectedDate(isSelected ? null : date); // もう一度押したら閉じる
+                    setSelectedDate(isSelected ? null : date);
                   }
                 }}
                 className={`w-4 h-4 rounded-[4px] transition-all ${
                   hasRecord
                     ? "bg-green-400 hover:bg-green-500 cursor-pointer shadow-sm"
                     : "bg-gray-100 cursor-default"
-                } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`} // 選ばれているマスは少し目立たせる
+                } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`}
               />
             );
           })}
         </div>
 
-        {/* 🔴 新規追加：選んだ日付の記録をフワッと表示するエリア */}
         <AnimatePresence>
           {selectedDate && allRecords[selectedDate] && (
             <motion.div
@@ -167,9 +187,33 @@ export default function ThreeGoodThingsCard() {
               exit={{ opacity: 0, height: 0 }}
               className="w-full mt-2 bg-white/80 rounded-lg p-3 text-left shadow-sm border border-pink-100 overflow-hidden"
             >
-              <p className="text-[0.7rem] font-bold text-pink-500 mb-2 border-b border-pink-100 pb-1">
-                📅 {selectedDate} のよかったこと
-              </p>
+              {/* 🔴 ここに削除ボタンを追加しました */}
+              <div className="flex justify-between items-center mb-2 border-b border-pink-100 pb-1">
+                <p className="text-[0.7rem] font-bold text-pink-500">
+                  📅 {selectedDate} のよかったこと
+                </p>
+                <button
+                  onClick={() => handleDelete(selectedDate)}
+                  className="text-pink-300 hover:text-red-400 transition-colors p-1"
+                  title="この日の記録を削除"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              </div>
+
               <ul className="flex flex-col gap-1">
                 {allRecords[selectedDate].map(
                   (text, i) =>
