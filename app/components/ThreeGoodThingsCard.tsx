@@ -4,43 +4,81 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function ThreeGoodThingsCard() {
-  // 3つの入力欄のデータを配列（リスト）で管理します
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
+  const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
 
-  // 画面が開いたときに、スマホの中に保存されている前回のデータを読み込む
+  // 🔴 新規追加：ユーザーがタップした「日付」を覚えておくための状態
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const getTodayDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getPast14Days = () => {
+    const dates = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      dates.push(`${year}-${month}-${day}`);
+    }
+    return dates;
+  };
+
   useEffect(() => {
-    const savedData = localStorage.getItem("three-good-things");
+    const savedData = localStorage.getItem("three-good-things-history");
     if (savedData) {
       try {
-        setThings(JSON.parse(savedData));
+        const parsed = JSON.parse(savedData);
+        setAllRecords(parsed);
+
+        const today = getTodayDate();
+        if (parsed[today]) {
+          setThings(parsed[today]);
+        }
       } catch (e) {
         console.error("データの読み込みに失敗しました");
       }
     }
   }, []);
 
-  // 文字が入力されたときに、配列の該当する場所だけを書き換える関数
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
     setThings(newThings);
   };
 
-  // 保存ボタンを押したときの処理
   const handleSave = () => {
-    // 配列データを文字（JSON）に変換して、スマホ（localStorage）に保存
-    localStorage.setItem("three-good-things", JSON.stringify(things));
-    setIsSaved(true);
+    const today = getTodayDate();
+    const updatedRecords = { ...allRecords, [today]: things };
 
-    // 3秒後に「保存しました」のメッセージを消す
+    setAllRecords(updatedRecords);
+    localStorage.setItem(
+      "three-good-things-history",
+      JSON.stringify(updatedRecords),
+    );
+
+    setIsSaved(true);
+    // 保存したと同時に、今日の日付の記録を開いて見せる！
+    setSelectedDate(today);
+
     setTimeout(() => {
       setIsSaved(false);
     }, 3000);
   };
 
+  const past14Days = getPast14Days();
+
   return (
-    <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-6 flex flex-col items-center">
+    // 🔴 下のメニューバーに隠れないよう、一番下の余白を「mb-6」から「mb-24」に増やしました！
+    <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
       <h3 className="text-pink-700 font-bold mb-2">🌷 3つのよかったこと</h3>
       <p className="text-pink-600/80 text-xs text-center mb-6">
         今日あった、どんなに小さなことでも大丈夫。
@@ -62,7 +100,7 @@ export default function ThreeGoodThingsCard() {
         ))}
       </div>
 
-      <div className="relative w-full flex justify-center h-10">
+      <div className="relative w-full flex justify-center h-10 mb-4">
         <AnimatePresence mode="wait">
           {!isSaved ? (
             <motion.button
@@ -85,6 +123,67 @@ export default function ThreeGoodThingsCard() {
             >
               ✨ 保存しました！今日もお疲れ様です ✨
             </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="w-full bg-pink-50/30 rounded-xl p-4 flex flex-col items-center">
+        <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
+          🌱 最近の記録（2週間）
+        </p>
+        <div className="flex gap-1 mb-2">
+          {past14Days.map((date) => {
+            const hasRecord =
+              allRecords[date] &&
+              allRecords[date].some((text) => text.trim() !== "");
+            const isSelected = selectedDate === date; // 🔴 今選ばれている日付かどうか
+
+            return (
+              <button
+                key={date}
+                title={date}
+                onClick={() => {
+                  // 🔴 緑のマス（記録あり）をタップしたら、その日付をセットする
+                  if (hasRecord) {
+                    setSelectedDate(isSelected ? null : date); // もう一度押したら閉じる
+                  }
+                }}
+                className={`w-4 h-4 rounded-[4px] transition-all ${
+                  hasRecord
+                    ? "bg-green-400 hover:bg-green-500 cursor-pointer shadow-sm"
+                    : "bg-gray-100 cursor-default"
+                } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`} // 選ばれているマスは少し目立たせる
+              />
+            );
+          })}
+        </div>
+
+        {/* 🔴 新規追加：選んだ日付の記録をフワッと表示するエリア */}
+        <AnimatePresence>
+          {selectedDate && allRecords[selectedDate] && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="w-full mt-2 bg-white/80 rounded-lg p-3 text-left shadow-sm border border-pink-100 overflow-hidden"
+            >
+              <p className="text-[0.7rem] font-bold text-pink-500 mb-2 border-b border-pink-100 pb-1">
+                📅 {selectedDate} のよかったこと
+              </p>
+              <ul className="flex flex-col gap-1">
+                {allRecords[selectedDate].map(
+                  (text, i) =>
+                    text.trim() !== "" && (
+                      <li key={i} className="text-sm text-gray-600 flex gap-2">
+                        <span className="text-pink-300 font-bold">
+                          {i + 1}.
+                        </span>
+                        {text}
+                      </li>
+                    ),
+                )}
+              </ul>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
