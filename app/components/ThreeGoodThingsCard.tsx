@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+// 👇 新しく作った「通信パイプ」を呼び出します！
+import { supabase } from "../../utils/supabase";
 
 export default function ThreeGoodThingsCard() {
   const [things, setThings] = useState<string[]>(["", "", ""]);
@@ -30,21 +32,34 @@ export default function ThreeGoodThingsCard() {
     return dates;
   };
 
+  // 🔴 変更点1：Supabaseからデータを読み込む（Read）
   useEffect(() => {
-    const savedData = localStorage.getItem("three-good-things-history");
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        setAllRecords(parsed);
+    const fetchRecords = async () => {
+      // Supabaseの three_good_things テーブルから全部のデータを取ってくる！
+      const { data, error } = await supabase
+        .from("three_good_things")
+        .select("*");
 
+      if (data) {
+        // 取ってきたデータを、アプリで使いやすい形に変換する
+        const recordsObj: Record<string, string[]> = {};
+        data.forEach((row) => {
+          recordsObj[row.date] = [
+            row.things1 || "",
+            row.things2 || "",
+            row.things3 || "",
+          ];
+        });
+        setAllRecords(recordsObj);
+
+        // 今日のデータがあれば、入力欄にセットする
         const today = getTodayDate();
-        if (parsed[today]) {
-          setThings(parsed[today]);
+        if (recordsObj[today]) {
+          setThings(recordsObj[today]);
         }
-      } catch (e) {
-        console.error("データの読み込みに失敗しました");
       }
-    }
+    };
+    fetchRecords();
   }, []);
 
   const handleChange = (index: number, value: string) => {
@@ -53,48 +68,47 @@ export default function ThreeGoodThingsCard() {
     setThings(newThings);
   };
 
-  const handleSave = () => {
+  // 🔴 変更点2：Supabaseにデータを保存する（Create & Update）
+  const handleSave = async () => {
     const today = getTodayDate();
+
+    // まずは画面の見た目をすぐに更新する（サクサク動かすため）
     const updatedRecords = { ...allRecords, [today]: things };
-
     setAllRecords(updatedRecords);
-    localStorage.setItem(
-      "three-good-things-history",
-      JSON.stringify(updatedRecords),
-    );
-
     setIsSaved(true);
     setSelectedDate(today);
+
+    // Supabaseのデータを更新する
+    // （同じ日のデータがダブらないように、一旦今日の分を消して、新しいものを入れる）
+    await supabase.from("three_good_things").delete().eq("date", today);
+    await supabase.from("three_good_things").insert({
+      date: today,
+      things1: things[0],
+      things2: things[1],
+      things3: things[2], // ※もしテーブル作成時に「things3」を作り忘れていたら、ここだけエラーになります
+    });
 
     setTimeout(() => {
       setIsSaved(false);
     }, 3000);
   };
 
-  // 🔴 新機能：記録を削除する関数
-  const handleDelete = (dateToDelete: string) => {
-    // 確認ダイアログを出す（うっかり消去を防止！）
+  // 🔴 変更点3：Supabaseのデータを削除する（Delete）
+  const handleDelete = async (dateToDelete: string) => {
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
 
-    // 現在の全記録をコピーして、指定した日付のデータを消す
+    // 画面の見た目を更新する
     const updatedRecords = { ...allRecords };
     delete updatedRecords[dateToDelete];
-
-    // 画面の状態とスマホの保存データを両方更新
     setAllRecords(updatedRecords);
-    localStorage.setItem(
-      "three-good-things-history",
-      JSON.stringify(updatedRecords),
-    );
-
-    // もし「今日」の分を消したなら、上の入力欄も空っぽにする
     if (dateToDelete === getTodayDate()) {
       setThings(["", "", ""]);
     }
-
-    // 詳細表示を閉じる
     setSelectedDate(null);
+
+    // Supabaseから本当に削除する
+    await supabase.from("three_good_things").delete().eq("date", dateToDelete);
   };
 
   const past14Days = getPast14Days();
@@ -187,7 +201,6 @@ export default function ThreeGoodThingsCard() {
               exit={{ opacity: 0, height: 0 }}
               className="w-full mt-2 bg-white/80 rounded-lg p-3 text-left shadow-sm border border-pink-100 overflow-hidden"
             >
-              {/* 🔴 ここに削除ボタンを追加しました */}
               <div className="flex justify-between items-center mb-2 border-b border-pink-100 pb-1">
                 <p className="text-[0.7rem] font-bold text-pink-500">
                   📅 {selectedDate} のよかったこと
