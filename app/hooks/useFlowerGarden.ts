@@ -1,48 +1,77 @@
 import { useState, useEffect } from "react";
+import { supabase } from "../../utils/supabase";
+
+const FLOWER_STAGES = ["🌰", "🌱", "🌿", "🌷", "🌸"];
+const RARE_FLOWERS = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
+const LAST_STAGE_INDEX = FLOWER_STAGES.length - 1;
 
 export function useFlowerGarden() {
-  // 1. お花の状態を管理（店長から引き継ぎ！）
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // 2. スマホの記憶（localStorage）から過去のデータを読み込む
+  // ☁️ アプリを開いたとき、クラウド(Supabase)からお花の数を取ってくる
   useEffect(() => {
-    const storedGrowth = localStorage.getItem("flowerGrowth");
-    if (storedGrowth) setGrowth(parseInt(storedGrowth, 10));
-    const storedTotal = localStorage.getItem("totalBlooms");
-    if (storedTotal) setTotalBlooms(parseInt(storedTotal, 10));
-    const storedFlower = localStorage.getItem("currentFlower");
-    if (storedFlower) setCurrentFlower(storedFlower);
+    const fetchUserData = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        setUserId(session.user.id);
+        const { data } = await supabase
+          .from("profiles")
+          .select("total_blooms")
+          .eq("id", session.user.id)
+          .single();
+
+        if (data) {
+          setTotalBlooms(data.total_blooms || 0);
+        }
+      }
+    };
+
+    fetchUserData();
   }, []);
 
-  // 3. お花を育てる計算ロジック
   const handleWalk = () => {
-    const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
-    let nextGrowth = 0;
-    if (growth >= flowerStages.length - 1) {
-      nextGrowth = 0;
+    // すでに満開なら、次は新しい種に戻すだけ（カウントは増やさない）
+    if (growth >= LAST_STAGE_INDEX) {
+      setGrowth(0);
+      return;
+    }
+
+    const nextGrowth = growth + 1;
+    setGrowth(nextGrowth);
+
+    // 🌸 咲いた瞬間に、花の種類決定と totalBlooms 加算を行う！
+    if (nextGrowth === LAST_STAGE_INDEX) {
+      const rand = Math.random();
+      let nextFlower = "🌸";
+
+      // 30%の確率でレアな花が咲く！ガチャ機能！
+      if (rand > 0.7) {
+        nextFlower =
+          RARE_FLOWERS[Math.floor(Math.random() * RARE_FLOWERS.length)];
+      }
+
       const newTotal = totalBlooms + 1;
+
+      setCurrentFlower(nextFlower);
       setTotalBlooms(newTotal);
-      localStorage.setItem("totalBlooms", newTotal.toString());
-    } else {
-      nextGrowth = growth + 1;
-      if (nextGrowth === flowerStages.length - 1) {
-        const rand = Math.random();
-        let nextFlower = "🌸";
-        if (rand > 0.7) {
-          const rareFlowers = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
-          nextFlower =
-            rareFlowers[Math.floor(Math.random() * rareFlowers.length)];
-        }
-        setCurrentFlower(nextFlower);
-        localStorage.setItem("currentFlower", nextFlower);
+
+      // ☁️ クラウド(Supabase)にしっかり保存する！
+      if (userId) {
+        supabase
+          .from("profiles")
+          .upsert({ id: userId, total_blooms: newTotal })
+          .then(({ error }) => {
+            if (error) console.error("保存エラー:", error);
+          });
       }
     }
-    setGrowth(nextGrowth);
-    localStorage.setItem("flowerGrowth", nextGrowth.toString());
   };
 
-  // 4. 計算結果と関数だけを店長（page.tsx）に渡す！
   return { growth, totalBlooms, currentFlower, handleWalk };
 }
