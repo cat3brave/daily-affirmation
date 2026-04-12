@@ -12,6 +12,7 @@ import WorkTab from "../components/WorkTab";
 import AmuletTab from "../components/AmuletTab";
 import BottomTabBar from "../components/BottomTabBar";
 import TadaModal from "../components/TadaModal";
+import BloomGraph from "../components/BloomGraph";
 
 export default function Home() {
   const [text, setText] = useState<string>("");
@@ -101,7 +102,6 @@ export default function Home() {
           ))}
         </AnimatePresence>
       </div>
-
       {/* 🕊️ 鳥の目線ボタン */}
       <button
         onClick={() => setIsBirdView(!isBirdView)}
@@ -109,7 +109,6 @@ export default function Home() {
       >
         {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
       </button>
-
       <AnimatePresence>
         {isBirdView && (
           <motion.div
@@ -140,7 +139,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-
       <motion.div
         animate={{
           scale: isBirdView ? 0.75 : 1,
@@ -168,6 +166,11 @@ export default function Home() {
           )}
           {currentTab === "amulet" && <AmuletTab setShowTada={setShowTada} />}
         </AnimatePresence>
+
+        {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+        <div className="w-full mt-8">
+          <BloomGraph />
+        </div>
       </motion.div>
 
       <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
