@@ -63,11 +63,20 @@ export function useFlowerGarden() {
 
       // ☁️ クラウド(Supabase)にしっかり保存する！
       if (userId) {
+        // 1. これまでの総数を更新（profilesテーブル）
         supabase
           .from("profiles")
           .upsert({ id: userId, total_blooms: newTotal })
           .then(({ error }) => {
-            if (error) console.error("保存エラー:", error);
+            if (error) console.error("プロフィール保存エラー:", error);
+          });
+
+        // 2. 新規追加: いつ・何が咲いたか履歴を残す（bloom_logsテーブル）
+        supabase
+          .from("bloom_logs")
+          .insert({ user_id: userId, flower_type: nextFlower })
+          .then(({ error }) => {
+            if (error) console.error("ログ保存エラー:", error);
           });
       }
     }
