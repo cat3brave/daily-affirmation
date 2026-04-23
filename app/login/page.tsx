@@ -36,6 +36,22 @@ export default function LoginPage() {
     }
   };
 
+  // 🟢 Googleログインを実行する関数
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        // ログインが終わったら、トップページ（/）に戻ってきてね、という指示
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      console.error("Googleログインエラー:", error.message);
+      alert("ログインに失敗しました。もう一度お試しください。");
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4">
       <div className="bg-white p-8 rounded-[2rem] shadow-sm w-full max-w-md">
@@ -60,6 +76,19 @@ export default function LoginPage() {
         />
 
         <div className="flex flex-col gap-3">
+          {/* 🟢 このボタンを追加 */}
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <img
+              src="https://www.google.com/favicon.ico"
+              alt="Google"
+              className="w-5 h-5"
+            />
+            Googleでログイン
+          </button>
+
           <button
             onClick={handleLogin}
             className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors"
