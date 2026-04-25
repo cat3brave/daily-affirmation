@@ -14,7 +14,32 @@ import BottomTabBar from "../components/BottomTabBar";
 import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 
+import { createBrowserClient } from "@supabase/ssr";
+import LogoutButton from "../components/LogoutButton"; // さっき作ったボタンを呼び出す
+
 export default function Home() {
+  // ユーザーのメールアドレスを入れておく箱を用意
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  // ブラウザ用の通信パイプを準備
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+
+  // 画面が開いた瞬間に、裏側でユーザー情報を取ってくる
+  useEffect(() => {
+    const fetchUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email ?? "");
+      }
+    };
+    fetchUser();
+  }, []);
+
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
@@ -69,6 +94,12 @@ export default function Home() {
     <main
       className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
+      {/* 挨拶とログアウトボタン */}
+      <div className="flex justify-end items-center gap-4 p-4">
+        <p className="text-sm text-gray-600 font-medium">こんにちは🌷</p>
+        <LogoutButton />
+      </div>
+
       {/* ☁️ 雲のアニメーション */}
       <AnimatePresence>
         {floatingClouds.length > 0 && (
