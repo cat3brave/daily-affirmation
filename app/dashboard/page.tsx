@@ -22,11 +22,12 @@ export default function Home() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
   // ブラウザ用の通信パイプを準備
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  const [supabase] = useState(() =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    ),
   );
-
   // 画面が開いた瞬間に、裏側でユーザー情報を取ってくる
   useEffect(() => {
     const fetchUser = async () => {
@@ -96,7 +97,9 @@ export default function Home() {
     >
       {/* 挨拶とログアウトボタン */}
       <div className="flex justify-end items-center gap-4 p-4">
-        <p className="text-sm text-gray-600 font-medium">こんにちは🌷</p>
+        <p className="text-sm text-gray-600 font-medium">
+          こんにちは、{userEmail} さん🌷
+        </p>
         <LogoutButton />
       </div>
 

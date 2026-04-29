@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../../utils/supabase";
+import { createBrowserClient } from "@supabase/ssr";
 
 const FLOWER_STAGES = ["🌰", "🌱", "🌿", "🌷", "🌸"];
 const RARE_FLOWERS = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
@@ -11,31 +11,44 @@ export function useFlowerGarden() {
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
   const [userId, setUserId] = useState<string | null>(null);
 
-  // ☁️ アプリを開いたとき、クラウド(Supabase)からお花の数を取ってくる
+  // ブラウザ用の通信パイプを準備（これ1つでOK！）
+  const [supabase] = useState(() =>
+    createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    ),
+  );
+
+  // ☁️ 画面が開いた時に、ログイン情報を確認して「お花の数」を取ってくる
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserDataAndBlooms = async () => {
+      // 1. 今ログインしている人を確認する
       const {
-        data: { session },
-      } = await supabase.auth.getSession();
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (session?.user) {
-        setUserId(session.user.id);
-        const { data } = await supabase
-          .from("profiles")
-          .select("total_blooms")
-          .eq("id", session.user.id)
-          .single();
+      // ユーザーIDを記憶しておく（お花を咲かせた時の保存用）
+      setUserId(user.id);
 
-        if (data) {
-          setTotalBlooms(data.total_blooms || 0);
-        }
+      // 2. その人の bloom_logs（お花の記録）を数える
+      const { count, error } = await supabase
+        .from("bloom_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      // 3. エラーがなく、数が取れたら画面にセットする
+      if (!error && count !== null) {
+        setTotalBlooms(count);
       }
     };
 
-    fetchUserData();
-  }, []);
+    fetchUserDataAndBlooms();
+  }, []); // 👈 画面を開いた時の「最初の一回だけ」実行
 
-  const handleWalk = () => {
+  // 🌱 お散歩ボタンを押した時の処理
+  const handleWalk = async () => {
+    // await を使うために async をつけます
     // すでに満開なら、次は新しい種に戻すだけ（カウントは増やさない）
     if (growth >= LAST_STAGE_INDEX) {
       setGrowth(0);
@@ -45,7 +58,7 @@ export function useFlowerGarden() {
     const nextGrowth = growth + 1;
     setGrowth(nextGrowth);
 
-    // 🌸 咲いた瞬間に、花の種類決定と totalBlooms 加算を行う！
+    // 🌸 咲いた瞬間に、花の種類決定と保存を行う！
     if (nextGrowth === LAST_STAGE_INDEX) {
       const rand = Math.random();
       let nextFlower = "🌸";
@@ -56,28 +69,19 @@ export function useFlowerGarden() {
           RARE_FLOWERS[Math.floor(Math.random() * RARE_FLOWERS.length)];
       }
 
-      const newTotal = totalBlooms + 1;
-
+      // 先に画面の数字と花の種類を変える（ユーザーを待たせないため）
       setCurrentFlower(nextFlower);
-      setTotalBlooms(newTotal);
+      setTotalBlooms((prev) => prev + 1);
 
-      // ☁️ クラウド(Supabase)にしっかり保存する！
+      // ☁️ クラウド(Supabase)の bloom_logs に「いつ・何が咲いたか」記録を残す
       if (userId) {
-        // 1. これまでの総数を更新（profilesテーブル）
-        supabase
-          .from("profiles")
-          .upsert({ id: userId, total_blooms: newTotal })
-          .then(({ error }) => {
-            if (error) console.error("プロフィール保存エラー:", error);
-          });
-
-        // 2. 新規追加: いつ・何が咲いたか履歴を残す（bloom_logsテーブル）
-        supabase
+        const { error } = await supabase
           .from("bloom_logs")
-          .insert({ user_id: userId, flower_type: nextFlower })
-          .then(({ error }) => {
-            if (error) console.error("ログ保存エラー:", error);
-          });
+          .insert({ user_id: userId, flower_type: nextFlower });
+
+        if (error) {
+          console.error("ログ保存エラー:", error);
+        }
       }
     }
   };
