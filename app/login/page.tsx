@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-// 👇 通信パイプを呼び出します（パスは ../../utils/supabase です）
 import { supabase } from "../../utils/supabase";
 import { useRouter } from "next/navigation";
 
@@ -10,25 +9,46 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const router = useRouter();
 
+  // 入力チェック
+  const validateEmailAndPassword = () => {
+    if (!email.trim()) {
+      alert("メールアドレスを入力してください。");
+      return false;
+    }
+
+    if (!password.trim()) {
+      alert("パスワードを入力してください。");
+      return false;
+    }
+
+    return true;
+  };
+
   // ログインの処理
   const handleLogin = async () => {
+    if (!validateEmailAndPassword()) return;
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
+
     if (error) {
       alert("ログイン失敗: " + error.message);
     } else {
-      router.push("/dashboard"); // 成功したらリビングへ案内！
+      router.push("/dashboard");
     }
   };
 
   // 新規登録の処理
   const handleSignUp = async () => {
+    if (!validateEmailAndPassword()) return;
+
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     });
+
     if (error) {
       alert("登録失敗: " + error.message);
     } else {
@@ -36,12 +56,11 @@ export default function LoginPage() {
     }
   };
 
-  // 🟢 Googleログインを実行する関数
+  // Googleログインの処理
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        // ログインが終わったら、トップページ（/）に戻ってきてね、という指示
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
@@ -76,7 +95,6 @@ export default function LoginPage() {
         />
 
         <div className="flex flex-col gap-3">
-          {/* 🟢 このボタンを追加 */}
           <button
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm"

@@ -15,9 +15,11 @@ import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 
 import { createBrowserClient } from "@supabase/ssr";
-import LogoutButton from "../components/LogoutButton"; // さっき作ったボタンを呼び出す
+import { useRouter } from "next/navigation";
+import LogoutButton from "../components/LogoutButton";
 
 export default function Home() {
+  const router = useRouter();
   // ユーザーのメールアドレスを入れておく箱を用意
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -33,13 +35,19 @@ export default function Home() {
     const fetchUser = async () => {
       const {
         data: { user },
+        error,
       } = await supabase.auth.getUser();
-      if (user) {
-        setUserEmail(user.email ?? "");
+
+      if (error || !user) {
+        router.push("/login");
+        return;
       }
+
+      setUserEmail(user.email ?? "");
     };
+
     fetchUser();
-  }, []);
+  }, [router, supabase]);
 
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);

@@ -70,6 +70,29 @@ export function useFlowerGarden() {
       }
 
       // 先に画面の数字と花の種類を変える（ユーザーを待たせないため）
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("ユーザー情報が取得できませんでした", userError);
+        alert(
+          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+        );
+        return;
+      }
+
+      const { error } = await supabase
+        .from("bloom_logs")
+        .insert({ user_id: user.id, flower_type: nextFlower });
+
+      if (error) {
+        console.error("ログ保存エラー:", error);
+        alert("お花の記録を保存できませんでした。");
+        return;
+      }
+
       setCurrentFlower(nextFlower);
       setTotalBlooms((prev) => prev + 1);
 
