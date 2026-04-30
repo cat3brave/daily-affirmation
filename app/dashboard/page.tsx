@@ -103,13 +103,24 @@ export default function Home() {
     <main
       className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
-      {/* 挨拶とログアウトボタン */}
-      <div className="flex justify-end items-center gap-4 p-4">
-        <p className="text-sm text-gray-600 font-medium">
-          こんにちは、{userEmail} さん🌷
-        </p>
-        <LogoutButton />
-      </div>
+      <header className="w-full max-w-lg absolute top-4 flex justify-between items-start px-6 z-50">
+        <button
+          onClick={() => setIsBirdView(!isBirdView)}
+          className="bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all text-sm"
+        >
+          {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
+        </button>
+
+        <div className="flex flex-col items-end gap-1">
+          <LogoutButton />
+
+          {userEmail && (
+            <p className="text-xs text-gray-500 font-medium truncate max-w-[120px]">
+              {userEmail.split("@")[0]} さん🌷
+            </p>
+          )}
+        </div>
+      </header>
 
       {/* ☁️ 雲のアニメーション */}
       <AnimatePresence>
@@ -144,13 +155,7 @@ export default function Home() {
           ))}
         </AnimatePresence>
       </div>
-      {/* 🕊️ 鳥の目線ボタン */}
-      <button
-        onClick={() => setIsBirdView(!isBirdView)}
-        className="absolute top-6 left-6 z-50 bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all"
-      >
-        {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
-      </button>
+
       <AnimatePresence>
         {isBirdView && (
           <motion.div
