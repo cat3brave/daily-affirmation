@@ -104,12 +104,17 @@ export default function Home() {
       className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
     >
       <header className="w-full max-w-lg absolute top-4 flex justify-between items-start px-6 z-50">
-        <button
-          onClick={() => setIsBirdView(!isBirdView)}
-          className="bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all text-sm"
-        >
-          {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
-        </button>
+        {/* 👇 ホーム画面の時だけボタンを表示、それ以外は透明な空箱を置く */}
+        {currentTab === "home" ? (
+          <button
+            onClick={() => setIsBirdView(!isBirdView)}
+            className="bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all text-sm"
+          >
+            {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
+          </button>
+        ) : (
+          <div className="w-[120px]"></div>
+        )}
 
         <div className="flex flex-col items-end gap-1">
           <LogoutButton />
@@ -157,7 +162,7 @@ export default function Home() {
       </div>
 
       <AnimatePresence>
-        {isBirdView && (
+        {currentTab === "home" && isBirdView && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -215,9 +220,12 @@ export default function Home() {
         </AnimatePresence>
 
         {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
-        <div className="w-full mt-8">
-          <BloomGraph />
-        </div>
+        {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
+        {currentTab === "home" && (
+          <div className="w-full mt-8">
+            <BloomGraph />
+          </div>
+        )}
       </motion.div>
 
       <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
