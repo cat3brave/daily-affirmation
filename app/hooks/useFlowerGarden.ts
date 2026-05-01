@@ -9,7 +9,6 @@ export function useFlowerGarden() {
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
-  const [userId, setUserId] = useState<string | null>(null);
 
   // ブラウザ用の通信パイプを準備（これ1つでOK！）
   const [supabase] = useState(() =>
@@ -27,9 +26,6 @@ export function useFlowerGarden() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-
-      // ユーザーIDを記憶しておく（お花を咲かせた時の保存用）
-      setUserId(user.id);
 
       // 2. その人の bloom_logs（お花の記録）を数える
       const { count, error } = await supabase
@@ -95,17 +91,6 @@ export function useFlowerGarden() {
 
       setCurrentFlower(nextFlower);
       setTotalBlooms((prev) => prev + 1);
-
-      // ☁️ クラウド(Supabase)の bloom_logs に「いつ・何が咲いたか」記録を残す
-      if (userId) {
-        const { error } = await supabase
-          .from("bloom_logs")
-          .insert({ user_id: userId, flower_type: nextFlower });
-
-        if (error) {
-          console.error("ログ保存エラー:", error);
-        }
-      }
     }
   };
 
