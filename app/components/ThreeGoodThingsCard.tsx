@@ -32,17 +32,31 @@ export default function ThreeGoodThingsCard() {
     return dates;
   };
 
-  // 🔴 変更点1：Supabaseからデータを読み込む（Read）
   useEffect(() => {
     const fetchRecords = async () => {
-      // Supabaseの three_good_things テーブルから全部のデータを取ってくる！
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("ユーザー情報が取得できませんでした", userError);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("three_good_things")
-        .select("*");
+        .select("*")
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("3つのよかったこと取得エラー:", error);
+        return;
+      }
 
       if (data) {
-        // 取ってきたデータを、アプリで使いやすい形に変換する
         const recordsObj: Record<string, string[]> = {};
+
         data.forEach((row) => {
           recordsObj[row.date] = [
             row.things1 || "",
@@ -50,27 +64,39 @@ export default function ThreeGoodThingsCard() {
             row.things3 || "",
           ];
         });
+
         setAllRecords(recordsObj);
 
-        // 今日のデータがあれば、入力欄にセットする
         const today = getTodayDate();
         if (recordsObj[today]) {
           setThings(recordsObj[today]);
         }
       }
     };
+
     fetchRecords();
   }, []);
-
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
     setThings(newThings);
   };
 
-  // 🔴 変更点2：Supabaseにデータを保存する（Create & Update）
   const handleSave = async () => {
     const today = getTodayDate();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("ユーザー情報が取得できませんでした", userError);
+      alert(
+        "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+      );
+      return;
+    }
 
     // まずは画面の見た目をすぐに更新する（サクサク動かすため）
     const updatedRecords = { ...allRecords, [today]: things };
@@ -78,39 +104,81 @@ export default function ThreeGoodThingsCard() {
     setIsSaved(true);
     setSelectedDate(today);
 
-    // Supabaseのデータを更新する
-    // （同じ日のデータがダブらないように、一旦今日の分を消して、新しいものを入れる）
-    await supabase.from("three_good_things").delete().eq("date", today);
-    await supabase.from("three_good_things").insert({
-      date: today,
-      things1: things[0],
-      things2: things[1],
-      things3: things[2], // ※もしテーブル作成時に「things3」を作り忘れていたら、ここだけエラーになります
-    });
+    // 同じユーザーの今日の記録だけ削除
+    const { error: deleteError } = await supabase
+      .from("three_good_things")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("date", today);
+
+    if (deleteError) {
+      console.error("古い記録の削除エラー:", deleteError);
+      alert("前の記録を更新できませんでした。");
+      return;
+    }
+
+    // user_id つきで新しく保存
+    const { error: insertError } = await supabase
+      .from("three_good_things")
+      .insert({
+        user_id: user.id,
+        date: today,
+        things1: things[0],
+        things2: things[1],
+        things3: things[2],
+      });
+
+    if (insertError) {
+      console.error("保存エラー:", insertError);
+      alert("記録を保存できませんでした。");
+      return;
+    }
 
     setTimeout(() => {
       setIsSaved(false);
     }, 3000);
   };
 
-  // 🔴 変更点3：Supabaseのデータを削除する（Delete）
   const handleDelete = async (dateToDelete: string) => {
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("ユーザー情報が取得できませんでした", userError);
+      alert(
+        "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+      );
+      return;
+    }
 
     // 画面の見た目を更新する
     const updatedRecords = { ...allRecords };
     delete updatedRecords[dateToDelete];
     setAllRecords(updatedRecords);
+
     if (dateToDelete === getTodayDate()) {
       setThings(["", "", ""]);
     }
+
     setSelectedDate(null);
 
-    // Supabaseから本当に削除する
-    await supabase.from("three_good_things").delete().eq("date", dateToDelete);
-  };
+    // 自分のその日の記録だけ削除する
+    const { error } = await supabase
+      .from("three_good_things")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("date", dateToDelete);
 
+    if (error) {
+      console.error("削除エラー:", error);
+      alert("記録を削除できませんでした。");
+    }
+  };
   const past14Days = getPast14Days();
 
   return (
