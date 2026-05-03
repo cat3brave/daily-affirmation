@@ -14,32 +14,39 @@ export default function BreathingCard() {
   useEffect(() => {
     if (phase === "idle" || phase === "completed") return;
 
-    // まだ時間が残っている場合は、1秒後に -1 する
-    if (timeLeft > 0) {
-      const timer = setTimeout(() => {
-        setTimeLeft(timeLeft - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-    // 🔴 時間が0になったら、次の行動（フェーズ切り替え）を決める！
-    else {
+    const timer = setTimeout(() => {
+      if (timeLeft > 0) {
+        setTimeLeft((prev) => prev - 1);
+        return;
+      }
+
       if (phase === "inhale") {
         setPhase("hold");
-        setTimeLeft(4); // 止める時間（4秒）
-      } else if (phase === "hold") {
+        setTimeLeft(4);
+        return;
+      }
+
+      if (phase === "hold") {
         setPhase("exhale");
-        setTimeLeft(8); // 吐く時間（8秒）
-      } else if (phase === "exhale") {
+        setTimeLeft(8);
+        return;
+      }
+
+      if (phase === "exhale") {
         const nextCount = cycleCount + 1;
+
         if (nextCount >= 3) {
           setPhase("completed");
-        } else {
-          setCycleCount(nextCount); // 回数を増やす
-          setPhase("inhale");
-          setTimeLeft(4); // 吸う時間（4秒）に戻る
+          return;
         }
+
+        setCycleCount(nextCount);
+        setPhase("inhale");
+        setTimeLeft(4);
       }
-    }
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, [phase, timeLeft, cycleCount]);
 
   const circleVariants: Variants = {

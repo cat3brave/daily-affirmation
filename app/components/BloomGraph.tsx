@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../utils/supabase";
 
 type BloomCounts = {
@@ -10,19 +10,17 @@ type BloomCounts = {
 export default function BloomGraph() {
   const [bloomData, setBloomData] = useState<BloomCounts>({});
   const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState<{ date: string; isFuture: boolean }[]>([]);
-
-  useEffect(() => {
+  const { days, startDate } = useMemo(() => {
     // 🗓️ GitHubのようにはじめを「日曜日」に揃えるための計算
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 84); // 過去12週間（84日）分を表示
+    startDate.setDate(endDate.getDate() - 84);
 
     // 始まりの日を直近の「日曜日」に巻き戻す
-    const startDayOfWeek = startDate.getDay(); // 0(日)〜6(土)
+    const startDayOfWeek = startDate.getDay();
     startDate.setDate(startDate.getDate() - startDayOfWeek);
 
-    // 終わりの日（今日）が属する週の「土曜日」までマスを作る（グリッドの形を綺麗な長方形に保つため）
+    // 終わりの日（今日）が属する週の「土曜日」までマスを作る
     const endDayOfWeek = endDate.getDay();
     const finalDate = new Date(endDate);
     finalDate.setDate(finalDate.getDate() + (6 - endDayOfWeek));
@@ -30,28 +28,33 @@ export default function BloomGraph() {
     const daysArray: { date: string; isFuture: boolean }[] = [];
     const iterDate = new Date(startDate);
 
-    // 始まりの日曜日から、終わりの土曜日まで1日ずつ配列に追加
     while (iterDate <= finalDate) {
       const y = iterDate.getFullYear();
       const m = String(iterDate.getMonth() + 1).padStart(2, "0");
       const day = String(iterDate.getDate()).padStart(2, "0");
+
       daysArray.push({
         date: `${y}-${m}-${day}`,
-        isFuture: iterDate > endDate, // 今日より未来の日は「まだ来てない日」として判定
+        isFuture: iterDate > endDate,
       });
+
       iterDate.setDate(iterDate.getDate() + 1);
     }
 
-    setDays(daysArray);
+    return { days: daysArray, startDate };
+  }, []);
 
+  useEffect(() => {
     const fetchLogs = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (!session?.user) {
         setLoading(false);
         return;
       }
+
       const userId = session.user.id;
 
       const { data, error } = await supabase
@@ -62,11 +65,12 @@ export default function BloomGraph() {
 
       if (error) {
         console.error("ログ取得エラー:", error);
+        setLoading(false);
         return;
       }
 
-      // 取得した日付データを「YYYY-MM-DD」ごとに数え上げる
       const counts: BloomCounts = {};
+
       data?.forEach((log) => {
         const d = new Date(log.created_at);
         const y = d.getFullYear();
@@ -81,7 +85,7 @@ export default function BloomGraph() {
     };
 
     fetchLogs();
-  }, []);
+  }, [startDate]);
 
   if (loading) {
     return (
