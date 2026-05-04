@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "../../utils/supabase";
 import { useRouter } from "next/navigation";
 
@@ -99,9 +100,11 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm"
           >
-            <img
+            <Image
               src="https://www.google.com/favicon.ico"
               alt="Google"
+              width={20}
+              height={20}
               className="w-5 h-5"
             />
             Googleでログイン

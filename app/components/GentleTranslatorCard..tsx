@@ -14,7 +14,7 @@ export default function GentleTranslatorCard() {
     try {
       const result = await translateHarshVoice(harshVoice);
       setTranslatedVoice(result);
-    } catch (error) {
+    } catch {
       setTranslatedVoice(
         "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
       );

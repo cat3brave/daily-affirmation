@@ -79,7 +79,7 @@ export default function Home() {
     try {
       const newText = await generateAffirmation();
       setText(newText);
-    } catch (error) {
+    } catch {
       setText("深呼吸して、もう一度試してみてくださいね。");
     } finally {
       setIsLoading(false);

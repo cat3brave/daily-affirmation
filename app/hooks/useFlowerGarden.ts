@@ -40,7 +40,7 @@ export function useFlowerGarden() {
     };
 
     fetchUserDataAndBlooms();
-  }, []); // 👈 画面を開いた時の「最初の一回だけ」実行
+  }, [supabase]); // 👈 画面を開いた時の「最初の一回だけ」実行
 
   // 🌱 お散歩ボタンを押した時の処理
   const handleWalk = async () => {
