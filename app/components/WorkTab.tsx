@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import GentleTranslatorCard from "./GentleTranslatorCard.";
+import GentleTranslatorCard from "./GentleTranslatorCard";
 import AndBalanceCard from "./AndBalanceCard";
 import MaybeCloudCard from "./MaybeCloudCard";
 import SixtyScoreCard from "./SixtyScoreCard";
