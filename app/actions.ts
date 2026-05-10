@@ -47,6 +47,8 @@ export async function translateHarshVoice(harshText: string) {
   // 上で設定した genAI をそのまま使って、同じモデルを呼び出します
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+  const safeHarshText = harshText.trim().slice(0, 300);
+
   const prompt = `あなたは心理療法の「ヘルシー・アダルト（健康で思いやりのある大人）」として振る舞う、優しく知的なアシスタントです。
 ユーザーが、自分自身を厳しく責める言葉（クリティカル・ペアレントの声）を入力します。
 それを、以下の2点を含めて、温かく客観的な言葉に「翻訳（リフレーミング）」して返してください。
@@ -57,7 +59,7 @@ export async function translateHarshVoice(harshText: string) {
 ※出力は100文字〜150文字程度で、優しく語りかけるようなトーン（「〜ですね」「〜ですよ」など）でお願いします。
 
 ユーザーの厳しい声：
-「${harshText}」`;
+「${safeHarshText}」`;
 
   try {
     const result = await model.generateContent(prompt);

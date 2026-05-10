@@ -2,6 +2,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { translateHarshVoice } from "../actions";
 
+const MAX_HARSH_VOICE_LENGTH = 300;
+
 export default function GentleTranslatorCard() {
   const [harshVoice, setHarshVoice] = useState("");
   const [translatedVoice, setTranslatedVoice] = useState("");
@@ -36,9 +38,14 @@ export default function GentleTranslatorCard() {
       <textarea
         value={harshVoice}
         onChange={(e) => setHarshVoice(e.target.value)}
+        maxLength={MAX_HARSH_VOICE_LENGTH}
         placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
-        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-4 leading-relaxed"
+        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed"
       />
+
+      <p className="w-full text-right text-xs text-sky-700/50 mb-4">
+        {harshVoice.length} / {MAX_HARSH_VOICE_LENGTH}文字
+      </p>
       <button
         onClick={handleTranslate}
         disabled={!harshVoice.trim() || isTranslating}
