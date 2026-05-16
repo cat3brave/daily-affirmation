@@ -9,23 +9,28 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">(
+    "success",
+  );
   const router = useRouter();
-
   // 入力チェック
   const validateEmailAndPassword = () => {
     if (!email.trim()) {
-      alert("メールアドレスを入力してください。");
+      setMessageType("error");
+      setMessage("メールアドレスを入力してください。");
       return false;
     }
 
     if (!password.trim()) {
-      alert("パスワードを入力してください。");
+      setMessageType("error");
+      setMessage("パスワードを入力してください。");
       return false;
     }
 
+    setMessage("");
     return true;
   };
-
   // ログインの処理
   const handleLogin = async () => {
     if (!validateEmailAndPassword()) return;
@@ -36,8 +41,12 @@ export default function LoginPage() {
     });
 
     if (error) {
-      alert("ログイン失敗: " + error.message);
+      setMessageType("error");
+      setMessage(
+        "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
+      );
     } else {
+      setMessage("");
       router.push("/dashboard");
     }
   };
@@ -52,10 +61,14 @@ export default function LoginPage() {
     });
 
     if (error) {
-      alert("登録失敗: " + error.message);
+      setMessageType("error");
+      setMessage(
+        "登録に失敗しました。メールアドレスやパスワードを確認してください。",
+      );
     } else {
-      alert(
-        "確認メールを送信しました🌱\n\nメール内のリンクを押してから、ログインしてください。",
+      setMessageType("success");
+      setMessage(
+        "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。",
       );
       setIsSignUpMode(false);
     }
@@ -72,7 +85,8 @@ export default function LoginPage() {
 
     if (error) {
       console.error("Googleログインエラー:", error.message);
-      alert("ログインに失敗しました。もう一度お試しください。");
+      setMessageType("error");
+      setMessage("Googleログインに失敗しました。もう一度お試しください。");
     }
   };
 
@@ -100,6 +114,19 @@ export default function LoginPage() {
             </>
           )}
         </p>
+
+        {message && (
+          <div
+            className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
+              messageType === "success"
+                ? "bg-green-50 text-green-700 border border-green-100"
+                : "bg-red-50 text-red-700 border border-red-100"
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
         <input
           type="email"
           placeholder="メールアドレス"
