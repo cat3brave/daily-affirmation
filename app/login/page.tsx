@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success",
   );
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   // 入力チェック
   const validateEmailAndPassword = () => {
@@ -33,63 +34,86 @@ export default function LoginPage() {
   };
   // ログインの処理
   const handleLogin = async () => {
+    if (isLoading) return;
     if (!validateEmailAndPassword()) return;
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    setIsLoading(true);
 
-    if (error) {
-      setMessageType("error");
-      setMessage(
-        "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
-      );
-    } else {
-      setMessage("");
-      router.push("/dashboard");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        setMessageType("error");
+        setMessage(
+          "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
+        );
+      } else {
+        setMessage("");
+        router.push("/dashboard");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
-
   // 新規登録の処理
   const handleSignUp = async () => {
+    if (isLoading) return;
     if (!validateEmailAndPassword()) return;
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
+    setIsLoading(true);
 
-    if (error) {
-      setMessageType("error");
-      setMessage(
-        "登録に失敗しました。メールアドレスやパスワードを確認してください。",
-      );
-    } else {
-      setMessageType("success");
-      setMessage(
-        "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。",
-      );
-      setIsSignUpMode(false);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        setMessageType("error");
+        setMessage(
+          "登録に失敗しました。メールアドレスやパスワードを確認してください。",
+        );
+      } else {
+        setMessageType("success");
+        setMessage(
+          "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。",
+        );
+        setIsSignUpMode(false);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
-
   // Googleログインの処理
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    if (isLoading) return;
 
-    if (error) {
-      console.error("Googleログインエラー:", error.message);
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error("Googleログインエラー:", error.message);
+        setMessageType("error");
+        setMessage("Googleログインに失敗しました。もう一度お試しください。");
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Googleログインエラー:", error);
       setMessageType("error");
       setMessage("Googleログインに失敗しました。もう一度お試しください。");
+      setIsLoading(false);
     }
   };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4">
       <div className="bg-white p-8 rounded-[2rem] shadow-sm w-full max-w-md">
@@ -147,7 +171,8 @@ export default function LoginPage() {
           {!isSignUpMode && (
             <button
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Image
                 src="https://www.google.com/favicon.ico"
@@ -156,20 +181,29 @@ export default function LoginPage() {
                 height={20}
                 className="w-5 h-5"
               />
-              Googleでログイン
+              {isLoading ? "送信中..." : "Googleでログイン"}
             </button>
           )}
 
           <button
             onClick={isSignUpMode ? handleSignUp : handleLogin}
-            className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors"
+            disabled={isLoading}
+            className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSignUpMode ? "確認メールを送る" : "ログイン"}
+            {isLoading
+              ? "送信中..."
+              : isSignUpMode
+                ? "確認メールを送る"
+                : "ログイン"}
           </button>
-
           <button
-            onClick={() => setIsSignUpMode((prev) => !prev)}
-            className="w-full text-pink-400 py-2 text-sm hover:underline"
+            onClick={() => {
+              if (isLoading) return;
+              setMessage("");
+              setIsSignUpMode((prev) => !prev);
+            }}
+            disabled={isLoading}
+            className="w-full text-pink-400 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isSignUpMode
               ? "すでに登録済みの方はこちら"
