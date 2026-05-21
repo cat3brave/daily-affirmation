@@ -156,7 +156,8 @@ export default function LoginPage() {
           placeholder="メールアドレス"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-4 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200"
+          disabled={isLoading}
+          className="w-full mb-4 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
         />
 
         <input
@@ -164,7 +165,8 @@ export default function LoginPage() {
           placeholder="パスワード"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-6 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200"
+          disabled={isLoading}
+          className="w-full mb-6 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
         />
 
         <div className="flex flex-col gap-3">
