@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import Image from "next/image";
 import { supabase } from "../../utils/supabase";
 import { useRouter } from "next/navigation";
@@ -114,6 +114,18 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  // フォーム送信の処理
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (isSignUpMode) {
+      await handleSignUp();
+    } else {
+      await handleLogin();
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4">
       <div className="bg-white p-8 rounded-[2rem] shadow-sm w-full max-w-md">
@@ -138,80 +150,83 @@ export default function LoginPage() {
             </>
           )}
         </p>
-
-        {message && (
-          <div
-            className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
-              messageType === "success"
-                ? "bg-green-50 text-green-700 border border-green-100"
-                : "bg-red-50 text-red-700 border border-red-100"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-
-        <input
-          type="email"
-          placeholder="メールアドレス"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
-          className="w-full mb-4 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
-        />
-
-        <input
-          type="password"
-          placeholder="パスワード"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
-          className="w-full mb-6 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
-        />
-
-        <div className="flex flex-col gap-3">
-          {!isSignUpMode && (
-            <button
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        <form onSubmit={handleSubmit}>
+          {message && (
+            <div
+              className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                messageType === "success"
+                  ? "bg-green-50 text-green-700 border border-green-100"
+                  : "bg-red-50 text-red-700 border border-red-100"
+              }`}
             >
-              <Image
-                src="https://www.google.com/favicon.ico"
-                alt="Google"
-                width={20}
-                height={20}
-                className="w-5 h-5"
-              />
-              {isLoading ? "送信中..." : "Googleでログイン"}
-            </button>
+              {message}
+            </div>
           )}
 
-          <button
-            onClick={isSignUpMode ? handleSignUp : handleLogin}
+          <input
+            type="email"
+            placeholder="メールアドレス"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isLoading
-              ? "送信中..."
-              : isSignUpMode
-                ? "確認メールを送る"
-                : "ログイン"}
-          </button>
-          <button
-            onClick={() => {
-              if (isLoading) return;
-              setMessage("");
-              setIsSignUpMode((prev) => !prev);
-            }}
+            className="w-full mb-4 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+
+          <input
+            type="password"
+            placeholder="パスワード"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
-            className="w-full text-pink-400 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isSignUpMode
-              ? "すでに登録済みの方はこちら"
-              : "はじめての方はこちら（新規登録）"}
-          </button>
-        </div>
+            className="w-full mb-6 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+
+          <div className="flex flex-col gap-3">
+            {!isSignUpMode && (
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Image
+                  src="https://www.google.com/favicon.ico"
+                  alt="Google"
+                  width={20}
+                  height={20}
+                  className="w-5 h-5"
+                />
+                {isLoading ? "送信中..." : "Googleでログイン"}
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isLoading
+                ? "送信中..."
+                : isSignUpMode
+                  ? "確認メールを送る"
+                  : "ログイン"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isLoading) return;
+                setMessage("");
+                setIsSignUpMode((prev) => !prev);
+              }}
+              disabled={isLoading}
+              className="w-full text-pink-400 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isSignUpMode
+                ? "すでに登録済みの方はこちら"
+                : "はじめての方はこちら（新規登録）"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
