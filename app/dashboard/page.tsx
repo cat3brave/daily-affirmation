@@ -51,6 +51,9 @@ export default function Home() {
 
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [favoriteAffirmations, setFavoriteAffirmations] = useState<string[]>(
+    [],
+  );
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
@@ -85,6 +88,18 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  const handleFavoriteAffirmation = () => {
+    if (!text.trim()) return;
+
+    setFavoriteAffirmations((prev) => {
+      if (prev.includes(text)) return prev;
+      return [text, ...prev];
+    });
+  };
+
+  const isFavoriteDisabled =
+    !text.trim() || favoriteAffirmations.includes(text);
 
   const handleFloatCloud = (cloudText: string) => {
     const newCloud = {
@@ -206,6 +221,8 @@ export default function Home() {
               isLoading={isLoading}
               text={text}
               handleClick={handleClick}
+              handleFavoriteAffirmation={handleFavoriteAffirmation}
+              isFavoriteDisabled={isFavoriteDisabled}
               totalBlooms={totalBlooms}
               growth={growth}
               currentFlower={currentFlower}

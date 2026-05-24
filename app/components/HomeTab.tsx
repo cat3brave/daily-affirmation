@@ -14,6 +14,8 @@ type HomeTabProps = {
   isLoading: boolean;
   text: string;
   handleClick: () => void;
+  handleFavoriteAffirmation: () => void;
+  isFavoriteDisabled: boolean;
   totalBlooms: number;
   growth: number;
   currentFlower: string;
@@ -25,6 +27,8 @@ export default function HomeTab({
   isLoading,
   text,
   handleClick,
+  handleFavoriteAffirmation,
+  isFavoriteDisabled,
   totalBlooms,
   growth,
   currentFlower,
@@ -47,16 +51,28 @@ export default function HomeTab({
               言葉を紡いでいます...
             </motion.p>
           ) : text ? (
-            <motion.p
+            <motion.div
               key={text}
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest"
+              className="flex flex-col items-center gap-4"
             >
-              {text}
-            </motion.p>
+              <p className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest">
+                {text}
+              </p>
+
+              <button
+                onClick={handleFavoriteAffirmation}
+                disabled={isFavoriteDisabled}
+                className="px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isFavoriteDisabled
+                  ? "お気に入り済み 🌸"
+                  : "お気に入りにする 🌷"}
+              </button>
+            </motion.div>
           ) : (
             <p className="text-blue-400/70 text-lg">
               ボタンを押して、言葉を受け取ってください
