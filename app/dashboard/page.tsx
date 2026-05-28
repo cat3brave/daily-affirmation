@@ -223,6 +223,7 @@ export default function Home() {
               handleClick={handleClick}
               handleFavoriteAffirmation={handleFavoriteAffirmation}
               isFavoriteDisabled={isFavoriteDisabled}
+              favoriteAffirmations={favoriteAffirmations}
               totalBlooms={totalBlooms}
               growth={growth}
               currentFlower={currentFlower}

@@ -16,6 +16,7 @@ type HomeTabProps = {
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   isFavoriteDisabled: boolean;
+  favoriteAffirmations: string[];
   totalBlooms: number;
   growth: number;
   currentFlower: string;
@@ -29,6 +30,7 @@ export default function HomeTab({
   handleClick,
   handleFavoriteAffirmation,
   isFavoriteDisabled,
+  favoriteAffirmations,
   totalBlooms,
   growth,
   currentFlower,
@@ -100,7 +102,27 @@ export default function HomeTab({
         </motion.button>
       </div>
 
-      {/* 3. デジタル花壇エリア */}
+      {/* 3. お気に入りアファメーション一覧 */}
+      {favoriteAffirmations.length > 0 && (
+        <div className="mb-10 w-full max-w-md bg-white/50 backdrop-blur-sm p-5 rounded-3xl border border-pink-100 shadow-sm">
+          <p className="text-pink-500 font-bold mb-3 text-center tracking-wide">
+            🌷 お気に入りの言葉
+          </p>
+
+          <ul className="space-y-2">
+            {favoriteAffirmations.map((affirmation, index) => (
+              <li
+                key={`${affirmation}-${index}`}
+                className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed"
+              >
+                {affirmation}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 4. デジタル花壇エリア */}
       <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
         {totalBlooms > 0 && (
           <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
@@ -137,7 +159,7 @@ export default function HomeTab({
         </motion.button>
       </div>
 
-      {/* 4. 失敗の告白ボタン */}
+      {/* 5. 失敗の告白ボタン */}
       <div className="mt-8 mb-4">
         <button
           onClick={() => setShowTada(true)}
