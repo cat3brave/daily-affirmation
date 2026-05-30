@@ -18,6 +18,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import LogoutButton from "../components/LogoutButton";
 
+const FAVORITE_AFFIRMATIONS_STORAGE_KEY = "favoriteAffirmations";
+
 export default function Home() {
   const router = useRouter();
   // ユーザーのメールアドレスを入れておく箱を用意
@@ -54,6 +56,37 @@ export default function Home() {
   const [favoriteAffirmations, setFavoriteAffirmations] = useState<string[]>(
     [],
   );
+  const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
+
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem(
+      FAVORITE_AFFIRMATIONS_STORAGE_KEY,
+    );
+
+    if (savedFavorites) {
+      try {
+        const parsedFavorites = JSON.parse(savedFavorites);
+
+        if (Array.isArray(parsedFavorites)) {
+          setFavoriteAffirmations(parsedFavorites);
+        }
+      } catch {
+        console.error("お気に入りアファメーションの読み込みに失敗しました。");
+      }
+    }
+
+    setHasLoadedFavorites(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedFavorites) return;
+
+    localStorage.setItem(
+      FAVORITE_AFFIRMATIONS_STORAGE_KEY,
+      JSON.stringify(favoriteAffirmations),
+    );
+  }, [favoriteAffirmations, hasLoadedFavorites]);
+
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
