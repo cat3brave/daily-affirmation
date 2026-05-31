@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "../actions";
 
@@ -14,41 +14,51 @@ import BottomTabBar from "../components/BottomTabBar";
 import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 
-import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import LogoutButton from "../components/LogoutButton";
+import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const FAVORITE_AFFIRMATIONS_STORAGE_KEY = "favoriteAffirmations";
+const CLOUD_FLOAT_DURATION_MS = 8000;
+
+type FloatingCloud = { id: string; text: string; x: number; y: number };
 
 export default function Home() {
   const router = useRouter();
   // ユーザーのメールアドレスを入れておく箱を用意
+  const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAuthChecked, setIsAuthChecked] = useState<boolean>(false);
 
   // ブラウザ用の通信パイプを準備
-  const [supabase] = useState(() =>
-    createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    ),
-  );
+  const [supabase] = useState(() => createSupabaseBrowserClient());
   // 画面が開いた瞬間に、裏側でユーザー情報を取ってくる
   useEffect(() => {
+    let isMounted = true;
+
     const fetchUser = async () => {
       const {
         data: { user },
         error,
       } = await supabase.auth.getUser();
 
+      if (!isMounted) return;
+
       if (error || !user) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
+      setUserId(user.id);
       setUserEmail(user.email ?? "");
+      setIsAuthChecked(true);
     };
 
     fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router, supabase]);
 
   const [text, setText] = useState<string>("");
@@ -68,7 +78,11 @@ export default function Home() {
         const parsedFavorites = JSON.parse(savedFavorites);
 
         if (Array.isArray(parsedFavorites)) {
-          setFavoriteAffirmations(parsedFavorites);
+          setFavoriteAffirmations(
+            parsedFavorites.filter(
+              (favorite): favorite is string => typeof favorite === "string",
+            ),
+          );
         }
       } catch {
         console.error("お気に入りアファメーションの読み込みに失敗しました。");
@@ -93,12 +107,12 @@ export default function Home() {
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
-  const [floatingClouds, setFloatingClouds] = useState<
-    { id: number; text: string; x: number; y: number }[]
-  >([]);
+  const [floatingClouds, setFloatingClouds] = useState<FloatingCloud[]>([]);
+  const cloudTimeoutIds = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
-  const { growth, totalBlooms, currentFlower, handleWalk } = useFlowerGarden();
+  const { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk } =
+    useFlowerGarden(userId, supabase);
 
   useEffect(() => {
     const handleResize = () =>
@@ -134,18 +148,46 @@ export default function Home() {
   const isFavoriteDisabled =
     !text.trim() || favoriteAffirmations.includes(text);
 
+  useEffect(() => {
+    return () => {
+      cloudTimeoutIds.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      cloudTimeoutIds.current = [];
+    };
+  }, []);
+
   const handleFloatCloud = (cloudText: string) => {
+    const cloudId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
     const newCloud = {
-      id: Date.now(),
+      id: cloudId,
       text: cloudText,
       x: (Math.random() - 0.5) * 100,
       y: -300 - Math.random() * 100,
     };
+
     setFloatingClouds((prev) => [...prev, newCloud]);
-    setTimeout(() => {
+
+    const timeoutId = setTimeout(() => {
       setFloatingClouds((prev) => prev.filter((c) => c.id !== newCloud.id));
-    }, 8000);
+      cloudTimeoutIds.current = cloudTimeoutIds.current.filter(
+        (currentTimeoutId) => currentTimeoutId !== timeoutId,
+      );
+    }, CLOUD_FLOAT_DURATION_MS);
+
+    cloudTimeoutIds.current.push(timeoutId);
   };
+
+  if (!isAuthChecked) {
+    return (
+      <main className="relative flex min-h-screen flex-col items-center justify-center p-6 bg-sky-50 text-sky-700">
+        <p className="bg-white/80 backdrop-blur-sm rounded-full px-6 py-4 shadow-sm border border-sky-100 font-bold tracking-wide">
+          ログイン情報を確認しています...
+        </p>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -260,6 +302,7 @@ export default function Home() {
               totalBlooms={totalBlooms}
               growth={growth}
               currentFlower={currentFlower}
+              isBloomSaving={isBloomSaving}
               handleWalk={handleWalk}
               setShowTada={setShowTada}
             />

@@ -1,50 +1,52 @@
-import { useState, useEffect } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { useCallback, useEffect, useState } from "react";
+import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const FLOWER_STAGES = ["🌰", "🌱", "🌿", "🌷", "🌸"];
 const RARE_FLOWERS = ["🌺", "🌻", "🌼", "🍀", "🌹", "🍄"];
 const LAST_STAGE_INDEX = FLOWER_STAGES.length - 1;
 
-export function useFlowerGarden() {
+type SupabaseBrowserClient = ReturnType<typeof createSupabaseBrowserClient>;
+
+export function useFlowerGarden(
+  userId: string | null,
+  supabase: SupabaseBrowserClient,
+) {
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
+  const [isBloomSaving, setIsBloomSaving] = useState<boolean>(false);
 
-  // ブラウザ用の通信パイプを準備（これ1つでOK！）
-  const [supabase] = useState(() =>
-    createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    ),
-  );
-
-  // ☁️ 画面が開いた時に、ログイン情報を確認して「お花の数」を取ってくる
+  // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
   useEffect(() => {
-    const fetchUserDataAndBlooms = async () => {
-      // 1. 今ログインしている人を確認する
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
+    if (!userId) {
+      setTotalBlooms(0);
+      return;
+    }
 
-      // 2. その人の bloom_logs（お花の記録）を数える
+    let isMounted = true;
+
+    const fetchBlooms = async () => {
       const { count, error } = await supabase
         .from("bloom_logs")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
 
-      // 3. エラーがなく、数が取れたら画面にセットする
-      if (!error && count !== null) {
+      if (isMounted && !error && count !== null) {
         setTotalBlooms(count);
       }
     };
 
-    fetchUserDataAndBlooms();
-  }, [supabase]); // 👈 画面を開いた時の「最初の一回だけ」実行
+    fetchBlooms();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase, userId]);
 
   // 🌱 お散歩ボタンを押した時の処理
-  const handleWalk = async () => {
-    // await を使うために async をつけます
+  const handleWalk = useCallback(async () => {
+    if (isBloomSaving) return;
+
     // すでに満開なら、次は新しい種に戻すだけ（カウントは増やさない）
     if (growth >= LAST_STAGE_INDEX) {
       setGrowth(0);
@@ -52,36 +54,35 @@ export function useFlowerGarden() {
     }
 
     const nextGrowth = growth + 1;
-    setGrowth(nextGrowth);
 
-    // 🌸 咲いた瞬間に、花の種類決定と保存を行う！
-    if (nextGrowth === LAST_STAGE_INDEX) {
-      const rand = Math.random();
-      let nextFlower = "🌸";
+    // 満開前の成長はすぐに画面へ反映する
+    if (nextGrowth < LAST_STAGE_INDEX) {
+      setGrowth(nextGrowth);
+      return;
+    }
 
-      // 30%の確率でレアな花が咲く！ガチャ機能！
-      if (rand > 0.7) {
-        nextFlower =
-          RARE_FLOWERS[Math.floor(Math.random() * RARE_FLOWERS.length)];
-      }
+    if (!userId) {
+      alert(
+        "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+      );
+      return;
+    }
 
-      // 先に画面の数字と花の種類を変える（ユーザーを待たせないため）
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+    const rand = Math.random();
+    let nextFlower = "🌸";
 
-      if (userError || !user) {
-        console.error("ユーザー情報が取得できませんでした", userError);
-        alert(
-          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
-        );
-        return;
-      }
+    // 30%の確率でレアな花が咲く！ガチャ機能！
+    if (rand > 0.7) {
+      nextFlower =
+        RARE_FLOWERS[Math.floor(Math.random() * RARE_FLOWERS.length)];
+    }
 
+    setIsBloomSaving(true);
+
+    try {
       const { error } = await supabase
         .from("bloom_logs")
-        .insert({ user_id: user.id, flower_type: nextFlower });
+        .insert({ user_id: userId, flower_type: nextFlower });
 
       if (error) {
         console.error("ログ保存エラー:", error);
@@ -91,8 +92,11 @@ export function useFlowerGarden() {
 
       setCurrentFlower(nextFlower);
       setTotalBlooms((prev) => prev + 1);
+      setGrowth(nextGrowth);
+    } finally {
+      setIsBloomSaving(false);
     }
-  };
+  }, [growth, isBloomSaving, supabase, userId]);
 
-  return { growth, totalBlooms, currentFlower, handleWalk };
+  return { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk };
 }

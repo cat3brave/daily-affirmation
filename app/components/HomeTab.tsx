@@ -20,7 +20,8 @@ type HomeTabProps = {
   totalBlooms: number;
   growth: number;
   currentFlower: string;
-  handleWalk: () => void;
+  isBloomSaving: boolean;
+  handleWalk: () => void | Promise<void>;
   setShowTada: (value: boolean) => void;
 };
 
@@ -34,6 +35,7 @@ export default function HomeTab({
   totalBlooms,
   growth,
   currentFlower,
+  isBloomSaving,
   handleWalk,
   setShowTada,
 }: HomeTabProps) {
@@ -148,14 +150,20 @@ export default function HomeTab({
           {growthMessages[growth]}
         </p>
         <motion.button
-          whileHover={{ scale: 1.05, backgroundColor: "#f0fbf4" }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{
+            scale: isBloomSaving ? 1 : 1.05,
+            backgroundColor: isBloomSaving ? "#ffffff" : "#f0fbf4",
+          }}
+          whileTap={{ scale: isBloomSaving ? 1 : 0.95 }}
           onClick={handleWalk}
-          className="px-8 py-3 bg-white text-green-600 rounded-full shadow-sm transition-colors duration-300 text-base font-bold tracking-widest border-2 border-green-200"
+          disabled={isBloomSaving}
+          className="px-8 py-3 bg-white text-green-600 rounded-full shadow-sm transition-colors duration-300 text-base font-bold tracking-widest border-2 border-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {growth >= flowerStages.length - 1
-            ? "新しい種を植える 🌱"
-            : "今日もお散歩した！ 💧"}
+          {isBloomSaving
+            ? "お花を記録中... 🌸"
+            : growth >= flowerStages.length - 1
+              ? "新しい種を植える 🌱"
+              : "今日もお散歩した！ 💧"}
         </motion.button>
       </div>
 
