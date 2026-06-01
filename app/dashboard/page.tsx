@@ -145,6 +145,12 @@ export default function Home() {
     });
   };
 
+  const handleRemoveFavoriteAffirmation = (affirmationToRemove: string) => {
+    setFavoriteAffirmations((prev) =>
+      prev.filter((affirmation) => affirmation !== affirmationToRemove),
+    );
+  };
+
   const isFavoriteDisabled =
     !text.trim() || favoriteAffirmations.includes(text);
 
@@ -299,6 +305,7 @@ export default function Home() {
               handleFavoriteAffirmation={handleFavoriteAffirmation}
               isFavoriteDisabled={isFavoriteDisabled}
               favoriteAffirmations={favoriteAffirmations}
+              handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
               totalBlooms={totalBlooms}
               growth={growth}
               currentFlower={currentFlower}

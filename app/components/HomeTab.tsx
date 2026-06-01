@@ -15,6 +15,7 @@ type HomeTabProps = {
   text: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
+  handleRemoveFavoriteAffirmation: (affirmation: string) => void;
   isFavoriteDisabled: boolean;
   favoriteAffirmations: string[];
   totalBlooms: number;
@@ -30,6 +31,7 @@ export default function HomeTab({
   text,
   handleClick,
   handleFavoriteAffirmation,
+  handleRemoveFavoriteAffirmation,
   isFavoriteDisabled,
   favoriteAffirmations,
   totalBlooms,
@@ -115,9 +117,17 @@ export default function HomeTab({
             {favoriteAffirmations.map((affirmation, index) => (
               <li
                 key={`${affirmation}-${index}`}
-                className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed"
+                className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed flex items-start justify-between gap-3"
               >
-                {affirmation}
+                <span className="flex-1">{affirmation}</span>
+
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFavoriteAffirmation(affirmation)}
+                  className="shrink-0 text-xs text-pink-400 hover:text-pink-600 font-bold"
+                >
+                  削除
+                </button>
               </li>
             ))}
           </ul>
