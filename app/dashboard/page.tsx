@@ -101,6 +101,41 @@ export default function Home() {
     );
   }, [favoriteAffirmations, hasLoadedFavorites]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    let isMounted = true;
+
+    const fetchFavoriteAffirmations = async () => {
+      const { data, error } = await supabase
+        .from("favorite_affirmations")
+        .select("text")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      if (data) {
+        setFavoriteAffirmations(
+          data
+            .map((favorite) => favorite.text)
+            .filter((text): text is string => typeof text === "string"),
+        );
+      }
+    };
+
+    fetchFavoriteAffirmations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase, userId]);
+
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
