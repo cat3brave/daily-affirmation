@@ -25,6 +25,7 @@ type FloatingCloud = { id: string; text: string; x: number; y: number };
 
 export default function Home() {
   const router = useRouter();
+
   // ユーザーのメールアドレスを入れておく箱を用意
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function Home() {
 
   // ブラウザ用の通信パイプを準備
   const [supabase] = useState(() => createSupabaseBrowserClient());
+
   // 画面が開いた瞬間に、裏側でユーザー情報を取ってくる
   useEffect(() => {
     let isMounted = true;
@@ -102,7 +104,7 @@ export default function Home() {
   }, [favoriteAffirmations, hasLoadedFavorites]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !hasLoadedFavorites) return;
 
     let isMounted = true;
 
@@ -121,10 +123,12 @@ export default function Home() {
       }
 
       if (data) {
-        setFavoriteAffirmations(
-          data
-            .map((favorite) => favorite.text)
-            .filter((text): text is string => typeof text === "string"),
+        const fetchedFavorites = data
+          .map((favorite) => favorite.text)
+          .filter((text): text is string => typeof text === "string");
+
+        setFavoriteAffirmations((prev) =>
+          Array.from(new Set([...fetchedFavorites, ...prev])),
         );
       }
     };
@@ -134,7 +138,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, [supabase, userId]);
+  }, [hasLoadedFavorites, supabase, userId]);
 
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
@@ -152,15 +156,19 @@ export default function Home() {
   useEffect(() => {
     const handleResize = () =>
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+
     handleResize();
     window.addEventListener("resize", handleResize);
+
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const handleClick = async () => {
     if (isLoading) return;
+
     setIsLoading(true);
     setText("");
+
     try {
       const newText = await generateAffirmation();
       setText(newText);
@@ -201,6 +209,7 @@ export default function Home() {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
+
     const newCloud = {
       id: cloudId,
       text: cloudText,
@@ -232,7 +241,9 @@ export default function Home() {
 
   return (
     <main
-      className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${isBirdView ? "bg-sky-100" : "bg-transparent"}`}
+      className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${
+        isBirdView ? "bg-sky-100" : "bg-transparent"
+      }`}
     >
       <header className="w-full max-w-lg absolute top-4 flex justify-between items-start px-6 z-50">
         {/* 👇 ホーム画面の時だけボタンを表示、それ以外は透明な空箱を置く */}
@@ -270,6 +281,7 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
+
       <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden flex justify-center items-end pb-40">
         <AnimatePresence>
           {floatingClouds.map((cloud) => (
@@ -310,6 +322,7 @@ export default function Home() {
                 <br />
                 あなたは今日まで、こんなに素敵な軌跡を描いています。
               </p>
+
               <div className="bg-pink-50 rounded-2xl p-4 inline-block border border-pink-100">
                 <p className="text-xs text-pink-400 font-bold mb-1">
                   今までに咲かせたお花
@@ -322,6 +335,7 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
       <motion.div
         animate={{
           scale: isBirdView ? 0.75 : 1,
@@ -349,9 +363,11 @@ export default function Home() {
               setShowTada={setShowTada}
             />
           )}
+
           {currentTab === "work" && (
             <WorkTab handleFloatCloud={handleFloatCloud} />
           )}
+
           {currentTab === "amulet" && <AmuletTab setShowTada={setShowTada} />}
         </AnimatePresence>
 
@@ -365,6 +381,7 @@ export default function Home() {
       </motion.div>
 
       <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+
       <TadaModal
         showTada={showTada}
         setShowTada={setShowTada}
