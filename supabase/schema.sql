@@ -121,3 +121,41 @@ on public.three_good_things
 for delete
 to authenticated
 using (auth.uid() = user_id);
+
+-- =========================================================
+-- favorite_affirmations
+-- =========================================================
+
+create table if not exists public.favorite_affirmations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  text text not null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists favorite_affirmations_user_text_unique
+on public.favorite_affirmations (user_id, text);
+
+alter table public.favorite_affirmations enable row level security;
+
+drop policy if exists "Users can read own favorite affirmations" on public.favorite_affirmations;
+drop policy if exists "Users can insert own favorite affirmations" on public.favorite_affirmations;
+drop policy if exists "Users can delete own favorite affirmations" on public.favorite_affirmations;
+
+create policy "Users can read own favorite affirmations"
+on public.favorite_affirmations
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+create policy "Users can insert own favorite affirmations"
+on public.favorite_affirmations
+for insert
+to authenticated
+with check (auth.uid() = user_id);
+
+create policy "Users can delete own favorite affirmations"
+on public.favorite_affirmations
+for delete
+to authenticated
+using (auth.uid() = user_id);
