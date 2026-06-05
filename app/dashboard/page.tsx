@@ -179,13 +179,25 @@ export default function Home() {
     }
   };
 
-  const handleFavoriteAffirmation = () => {
-    if (!text.trim()) return;
+  const handleFavoriteAffirmation = async () => {
+    const favoriteText = text.trim();
+
+    if (!favoriteText) return;
 
     setFavoriteAffirmations((prev) => {
-      if (prev.includes(text)) return prev;
-      return [text, ...prev];
+      if (prev.includes(favoriteText)) return prev;
+      return [favoriteText, ...prev];
     });
+
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from("favorite_affirmations")
+      .insert({ user_id: userId, text: favoriteText });
+
+    if (error) {
+      console.error(error);
+    }
   };
 
   const handleRemoveFavoriteAffirmation = (affirmationToRemove: string) => {
@@ -195,7 +207,7 @@ export default function Home() {
   };
 
   const isFavoriteDisabled =
-    !text.trim() || favoriteAffirmations.includes(text);
+    !text.trim() || favoriteAffirmations.includes(text.trim());
 
   useEffect(() => {
     return () => {
