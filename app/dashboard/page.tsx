@@ -200,10 +200,28 @@ export default function Home() {
     }
   };
 
-  const handleRemoveFavoriteAffirmation = (affirmationToRemove: string) => {
+  const handleRemoveFavoriteAffirmation = async (
+    affirmationToRemove: string,
+  ) => {
+    const removeText = affirmationToRemove.trim();
+
+    if (!removeText) return;
+
     setFavoriteAffirmations((prev) =>
-      prev.filter((affirmation) => affirmation !== affirmationToRemove),
+      prev.filter((affirmation) => affirmation !== removeText),
     );
+
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from("favorite_affirmations")
+      .delete()
+      .eq("user_id", userId)
+      .eq("text", removeText);
+
+    if (error) {
+      console.error(error);
+    }
   };
 
   const isFavoriteDisabled =
