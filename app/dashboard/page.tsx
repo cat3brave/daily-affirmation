@@ -18,10 +18,13 @@ import { useRouter } from "next/navigation";
 import LogoutButton from "../components/LogoutButton";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
-const FAVORITE_AFFIRMATIONS_STORAGE_KEY = "favoriteAffirmations";
+const FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX = "favoriteAffirmations";
 const CLOUD_FLOAT_DURATION_MS = 8000;
 
 type FloatingCloud = { id: string; text: string; x: number; y: number };
+
+const getFavoriteAffirmationsStorageKey = (userId: string) =>
+  `${FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX}:${userId}`;
 
 export default function Home() {
   const router = useRouter();
@@ -71,8 +74,13 @@ export default function Home() {
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
 
   useEffect(() => {
+    setHasLoadedFavorites(false);
+    setFavoriteAffirmations([]);
+
+    if (!userId) return;
+
     const savedFavorites = localStorage.getItem(
-      FAVORITE_AFFIRMATIONS_STORAGE_KEY,
+      getFavoriteAffirmationsStorageKey(userId),
     );
 
     if (savedFavorites) {
@@ -92,16 +100,16 @@ export default function Home() {
     }
 
     setHasLoadedFavorites(true);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    if (!hasLoadedFavorites) return;
+    if (!userId || !hasLoadedFavorites) return;
 
     localStorage.setItem(
-      FAVORITE_AFFIRMATIONS_STORAGE_KEY,
+      getFavoriteAffirmationsStorageKey(userId),
       JSON.stringify(favoriteAffirmations),
     );
-  }, [favoriteAffirmations, hasLoadedFavorites]);
+  }, [favoriteAffirmations, hasLoadedFavorites, userId]);
 
   useEffect(() => {
     if (!userId || !hasLoadedFavorites) return;
@@ -127,9 +135,7 @@ export default function Home() {
           .map((favorite) => favorite.text)
           .filter((text): text is string => typeof text === "string");
 
-        setFavoriteAffirmations((prev) =>
-          Array.from(new Set([...fetchedFavorites, ...prev])),
-        );
+        setFavoriteAffirmations(fetchedFavorites);
       }
     };
 
@@ -182,14 +188,12 @@ export default function Home() {
   const handleFavoriteAffirmation = async () => {
     const favoriteText = text.trim();
 
-    if (!favoriteText) return;
+    if (!favoriteText || !userId) return;
 
     setFavoriteAffirmations((prev) => {
       if (prev.includes(favoriteText)) return prev;
       return [favoriteText, ...prev];
     });
-
-    if (!userId) return;
 
     const { error } = await supabase
       .from("favorite_affirmations")
@@ -197,6 +201,9 @@ export default function Home() {
 
     if (error) {
       console.error(error);
+      setFavoriteAffirmations((prev) =>
+        prev.filter((affirmation) => affirmation !== favoriteText),
+      );
     }
   };
 
@@ -205,13 +212,11 @@ export default function Home() {
   ) => {
     const removeText = affirmationToRemove.trim();
 
-    if (!removeText) return;
+    if (!removeText || !userId) return;
 
     setFavoriteAffirmations((prev) =>
       prev.filter((affirmation) => affirmation !== removeText),
     );
-
-    if (!userId) return;
 
     const { error } = await supabase
       .from("favorite_affirmations")
@@ -221,11 +226,15 @@ export default function Home() {
 
     if (error) {
       console.error(error);
+      setFavoriteAffirmations((prev) => {
+        if (prev.includes(removeText)) return prev;
+        return [removeText, ...prev];
+      });
     }
   };
 
   const isFavoriteDisabled =
-    !text.trim() || favoriteAffirmations.includes(text.trim());
+    !userId || !text.trim() || favoriteAffirmations.includes(text.trim());
 
   useEffect(() => {
     return () => {
