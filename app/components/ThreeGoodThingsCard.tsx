@@ -104,29 +104,19 @@ export default function ThreeGoodThingsCard() {
     setIsSaved(true);
     setSelectedDate(today);
 
-    // 同じユーザーの今日の記録だけ削除
-    const { error: deleteError } = await supabase
-      .from("three_good_things")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("date", today);
-
-    if (deleteError) {
-      console.error("古い記録の削除エラー:", deleteError);
-      alert("前の記録を更新できませんでした。");
-      return;
-    }
-
-    // user_id つきで新しく保存
+    // user_id と date を使って、今日の記録を追加または更新する
     const { error: insertError } = await supabase
       .from("three_good_things")
-      .insert({
-        user_id: user.id,
-        date: today,
-        things1: things[0],
-        things2: things[1],
-        things3: things[2],
-      });
+      .upsert(
+        {
+          user_id: user.id,
+          date: today,
+          things1: things[0],
+          things2: things[1],
+          things3: things[2],
+        },
+        { onConflict: "user_id,date" },
+      );
 
     if (insertError) {
       console.error("保存エラー:", insertError);
