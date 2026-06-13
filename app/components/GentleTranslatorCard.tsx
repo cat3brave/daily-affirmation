@@ -35,6 +35,11 @@ export default function GentleTranslatorCard() {
         <br />
         客観的な事実と労わりの言葉に翻訳します。
       </p>
+      <p className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-4 py-3 mb-4">
+        入力した文章はAI処理のため外部APIに送信されます。
+        <br />
+        本名、住所、連絡先、医療情報などの個人情報は書かないでください。
+      </p>
       <textarea
         value={harshVoice}
         onChange={(e) => setHarshVoice(e.target.value)}
