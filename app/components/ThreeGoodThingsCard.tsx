@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
-import { supabase } from "../../utils/supabase";
+import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 export default function ThreeGoodThingsCard() {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
   const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
@@ -75,7 +76,7 @@ export default function ThreeGoodThingsCard() {
     };
 
     fetchRecords();
-  }, []);
+  }, [supabase]);
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
