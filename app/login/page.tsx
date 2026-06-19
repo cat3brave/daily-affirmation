@@ -2,10 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import { supabase } from "../../utils/supabase";
+import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const supabase = createSupabaseBrowserClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
