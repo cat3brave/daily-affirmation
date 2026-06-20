@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../utils/supabase";
+import { createSupabaseBrowserClient } from "../lib/supabaseClient";
+
+const supabase = createSupabaseBrowserClient();
 
 type BloomCounts = {
   [date: string]: number;

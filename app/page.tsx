@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../utils/supabase";
+import { createSupabaseBrowserClient } from "./lib/supabaseClient";
+
+const supabase = createSupabaseBrowserClient();
 
 export default function LandingPage() {
   const router = useRouter();
