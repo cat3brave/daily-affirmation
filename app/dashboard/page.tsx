@@ -6,6 +6,7 @@ import { generateAffirmation } from "../actions";
 
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
 import { useFlowerGarden } from "../hooks/useFlowerGarden";
+import { useFavoriteAffirmations } from "../hooks/useFavoriteAffirmations";
 
 import HomeTab from "../components/HomeTab";
 import WorkTab from "../components/WorkTab";
@@ -18,13 +19,9 @@ import { useRouter } from "next/navigation";
 import LogoutButton from "../components/LogoutButton";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
-const FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX = "favoriteAffirmations";
 const CLOUD_FLOAT_DURATION_MS = 8000;
 
 type FloatingCloud = { id: string; text: string; x: number; y: number };
-
-const getFavoriteAffirmationsStorageKey = (userId: string) =>
-  `${FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX}:${userId}`;
 
 export default function Home() {
   const router = useRouter();
@@ -68,83 +65,12 @@ export default function Home() {
 
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [favoriteAffirmations, setFavoriteAffirmations] = useState<string[]>(
-    [],
-  );
-  const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
-
-  useEffect(() => {
-    setHasLoadedFavorites(false);
-    setFavoriteAffirmations([]);
-
-    if (!userId) return;
-
-    const savedFavorites = localStorage.getItem(
-      getFavoriteAffirmationsStorageKey(userId),
-    );
-
-    if (savedFavorites) {
-      try {
-        const parsedFavorites = JSON.parse(savedFavorites);
-
-        if (Array.isArray(parsedFavorites)) {
-          setFavoriteAffirmations(
-            parsedFavorites.filter(
-              (favorite): favorite is string => typeof favorite === "string",
-            ),
-          );
-        }
-      } catch {
-        console.error("お気に入りアファメーションの読み込みに失敗しました。");
-      }
-    }
-
-    setHasLoadedFavorites(true);
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId || !hasLoadedFavorites) return;
-
-    localStorage.setItem(
-      getFavoriteAffirmationsStorageKey(userId),
-      JSON.stringify(favoriteAffirmations),
-    );
-  }, [favoriteAffirmations, hasLoadedFavorites, userId]);
-
-  useEffect(() => {
-    if (!userId || !hasLoadedFavorites) return;
-
-    let isMounted = true;
-
-    const fetchFavoriteAffirmations = async () => {
-      const { data, error } = await supabase
-        .from("favorite_affirmations")
-        .select("text")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (!isMounted) return;
-
-      if (error) {
-        console.error(error);
-        return;
-      }
-
-      if (data) {
-        const fetchedFavorites = data
-          .map((favorite) => favorite.text)
-          .filter((text): text is string => typeof text === "string");
-
-        setFavoriteAffirmations(fetchedFavorites);
-      }
-    };
-
-    fetchFavoriteAffirmations();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [hasLoadedFavorites, supabase, userId]);
+  const {
+    favoriteAffirmations,
+    handleFavoriteAffirmation: saveFavoriteAffirmation,
+    handleRemoveFavoriteAffirmation,
+    isFavorite,
+  } = useFavoriteAffirmations(userId, supabase);
 
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
@@ -186,55 +112,10 @@ export default function Home() {
   };
 
   const handleFavoriteAffirmation = async () => {
-    const favoriteText = text.trim();
-
-    if (!favoriteText || !userId) return;
-
-    setFavoriteAffirmations((prev) => {
-      if (prev.includes(favoriteText)) return prev;
-      return [favoriteText, ...prev];
-    });
-
-    const { error } = await supabase
-      .from("favorite_affirmations")
-      .insert({ user_id: userId, text: favoriteText });
-
-    if (error) {
-      console.error(error);
-      setFavoriteAffirmations((prev) =>
-        prev.filter((affirmation) => affirmation !== favoriteText),
-      );
-    }
+    await saveFavoriteAffirmation(text);
   };
 
-  const handleRemoveFavoriteAffirmation = async (
-    affirmationToRemove: string,
-  ) => {
-    const removeText = affirmationToRemove.trim();
-
-    if (!removeText || !userId) return;
-
-    setFavoriteAffirmations((prev) =>
-      prev.filter((affirmation) => affirmation !== removeText),
-    );
-
-    const { error } = await supabase
-      .from("favorite_affirmations")
-      .delete()
-      .eq("user_id", userId)
-      .eq("text", removeText);
-
-    if (error) {
-      console.error(error);
-      setFavoriteAffirmations((prev) => {
-        if (prev.includes(removeText)) return prev;
-        return [removeText, ...prev];
-      });
-    }
-  };
-
-  const isFavoriteDisabled =
-    !userId || !text.trim() || favoriteAffirmations.includes(text.trim());
+  const isFavoriteDisabled = !userId || !text.trim() || isFavorite(text);
 
   useEffect(() => {
     return () => {
