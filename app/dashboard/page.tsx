@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "../actions";
+import { useAuthUser } from "../hooks/useAuthUser";
 
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
 import { useFlowerGarden } from "../hooks/useFlowerGarden";
@@ -15,53 +16,14 @@ import BottomTabBar from "../components/BottomTabBar";
 import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 
-import { useRouter } from "next/navigation";
 import LogoutButton from "../components/LogoutButton";
-import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const CLOUD_FLOAT_DURATION_MS = 8000;
 
 type FloatingCloud = { id: string; text: string; x: number; y: number };
 
 export default function Home() {
-  const router = useRouter();
-
-  // ユーザーのメールアドレスを入れておく箱を用意
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isAuthChecked, setIsAuthChecked] = useState<boolean>(false);
-
-  // ブラウザ用の通信パイプを準備
-  const [supabase] = useState(() => createSupabaseBrowserClient());
-
-  // 画面が開いた瞬間に、裏側でユーザー情報を取ってくる
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (!isMounted) return;
-
-      if (error || !user) {
-        router.replace("/login");
-        return;
-      }
-
-      setUserId(user.id);
-      setUserEmail(user.email ?? "");
-      setIsAuthChecked(true);
-    };
-
-    fetchUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router, supabase]);
+  const { supabase, userId, userEmail, isAuthChecked } = useAuthUser();
 
   const [text, setText] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
