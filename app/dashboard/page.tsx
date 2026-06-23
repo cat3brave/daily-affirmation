@@ -8,6 +8,7 @@ import { useAuthUser } from "../hooks/useAuthUser";
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
 import { useFlowerGarden } from "../hooks/useFlowerGarden";
 import { useFavoriteAffirmations } from "../hooks/useFavoriteAffirmations";
+import { useWindowSize } from "../hooks/useWindowSize";
 
 import HomeTab from "../components/HomeTab";
 import WorkTab from "../components/WorkTab";
@@ -36,7 +37,7 @@ export default function Home() {
 
   const [isBirdView, setIsBirdView] = useState<boolean>(false);
   const [showTada, setShowTada] = useState<boolean>(false);
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const { windowSize } = useWindowSize();
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
@@ -46,16 +47,6 @@ export default function Home() {
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
   const { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk } =
     useFlowerGarden(userId, supabase);
-
-  useEffect(() => {
-    const handleResize = () =>
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-
-    handleResize();
-    window.addEventListener("resize", handleResize);
-
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   const handleClick = async () => {
     if (isLoading) return;
