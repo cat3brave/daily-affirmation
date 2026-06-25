@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateAffirmation } from "../actions";
 import { useAuthUser } from "../hooks/useAuthUser";
@@ -8,6 +8,7 @@ import { useAuthUser } from "../hooks/useAuthUser";
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
 import { useFlowerGarden } from "../hooks/useFlowerGarden";
 import { useFavoriteAffirmations } from "../hooks/useFavoriteAffirmations";
+import { useFloatingClouds } from "../hooks/useFloatingClouds";
 import { useWindowSize } from "../hooks/useWindowSize";
 
 import HomeTab from "../components/HomeTab";
@@ -18,10 +19,6 @@ import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 
 import LogoutButton from "../components/LogoutButton";
-
-const CLOUD_FLOAT_DURATION_MS = 8000;
-
-type FloatingCloud = { id: string; text: string; x: number; y: number };
 
 export default function Home() {
   const { supabase, userId, userEmail, isAuthChecked } = useAuthUser();
@@ -41,8 +38,7 @@ export default function Home() {
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
-  const [floatingClouds, setFloatingClouds] = useState<FloatingCloud[]>([]);
-  const cloudTimeoutIds = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const { floatingClouds, handleFloatCloud } = useFloatingClouds();
 
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
   const { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk } =
@@ -69,38 +65,6 @@ export default function Home() {
   };
 
   const isFavoriteDisabled = !userId || !text.trim() || isFavorite(text);
-
-  useEffect(() => {
-    return () => {
-      cloudTimeoutIds.current.forEach((timeoutId) => clearTimeout(timeoutId));
-      cloudTimeoutIds.current = [];
-    };
-  }, []);
-
-  const handleFloatCloud = (cloudText: string) => {
-    const cloudId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`;
-
-    const newCloud = {
-      id: cloudId,
-      text: cloudText,
-      x: (Math.random() - 0.5) * 100,
-      y: -300 - Math.random() * 100,
-    };
-
-    setFloatingClouds((prev) => [...prev, newCloud]);
-
-    const timeoutId = setTimeout(() => {
-      setFloatingClouds((prev) => prev.filter((c) => c.id !== newCloud.id));
-      cloudTimeoutIds.current = cloudTimeoutIds.current.filter(
-        (currentTimeoutId) => currentTimeoutId !== timeoutId,
-      );
-    }, CLOUD_FLOAT_DURATION_MS);
-
-    cloudTimeoutIds.current.push(timeoutId);
-  };
 
   if (!isAuthChecked) {
     return (
