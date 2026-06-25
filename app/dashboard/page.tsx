@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { generateAffirmation } from "../actions";
 import { useAuthUser } from "../hooks/useAuthUser";
 
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
 import { useFlowerGarden } from "../hooks/useFlowerGarden";
+import { useAffirmationGenerator } from "../hooks/useAffirmationGenerator";
 import { useFavoriteAffirmations } from "../hooks/useFavoriteAffirmations";
 import { useFloatingClouds } from "../hooks/useFloatingClouds";
 import { useWindowSize } from "../hooks/useWindowSize";
@@ -23,8 +23,8 @@ import LogoutButton from "../components/LogoutButton";
 export default function Home() {
   const { supabase, userId, userEmail, isAuthChecked } = useAuthUser();
 
-  const [text, setText] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { text, isLoading, handleGenerateAffirmation } =
+    useAffirmationGenerator();
   const {
     favoriteAffirmations,
     handleFavoriteAffirmation: saveFavoriteAffirmation,
@@ -43,22 +43,6 @@ export default function Home() {
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
   const { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk } =
     useFlowerGarden(userId, supabase);
-
-  const handleClick = async () => {
-    if (isLoading) return;
-
-    setIsLoading(true);
-    setText("");
-
-    try {
-      const newText = await generateAffirmation();
-      setText(newText);
-    } catch {
-      setText("深呼吸して、もう一度試してみてくださいね。");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleFavoriteAffirmation = async () => {
     await saveFavoriteAffirmation(text);
@@ -187,7 +171,7 @@ export default function Home() {
             <HomeTab
               isLoading={isLoading}
               text={text}
-              handleClick={handleClick}
+              handleClick={handleGenerateAffirmation}
               handleFavoriteAffirmation={handleFavoriteAffirmation}
               isFavoriteDisabled={isFavoriteDisabled}
               favoriteAffirmations={favoriteAffirmations}
