@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const CLOUD_FLOAT_DURATION_MS = 8000;
 
-type FloatingCloud = { id: string; text: string; x: number; y: number };
+export type FloatingCloud = { id: string; text: string; x: number; y: number };
 
 export function useFloatingClouds() {
   const [floatingClouds, setFloatingClouds] = useState<FloatingCloud[]>([]);
