@@ -15,12 +15,16 @@
 
 ## Codex作業後の必須手順
 
-コードを修正したら、必ず以下を行う。
+コードまたは設定を修正したら、必ず以下を行う。
 
-1. コード変更時は npm.cmd run lint を実行する。
-2. ドキュメントのみの変更では lint を省略してよい。
-3. ただし、import/export、ファイル削除、設定ファイル変更を含む場合は lint を実行する。
-4. 変更内容を短く要約する
+1. 修正後は `git status --short` を実行する。
+2. `git diff --stat` を実行する。
+3. `git diff --stat` は未追跡ファイルを含まないため、新規ファイルは `git status --short` で確認する。
+4. 小さいコード変更では、まず変更ファイルだけ `npx eslint <changed files>` を実行してよい。
+5. commit前、import/export変更、ファイル削除、設定ファイル変更では `npm.cmd run lint` を実行する。
+6. `npm.cmd run lint` が120秒でタイムアウトした場合は、無限に再実行せず、変更ファイル単位の eslint 結果と timeout した事実を報告する。
+7. ドキュメントのみの変更では lint を省略してよい。
+8. 変更内容を短く要約する。
 
 ## 報告形式
 
@@ -32,6 +36,7 @@
 
 確認結果:
 - npm run lint: 成功 / 失敗
+- git status --short:
 - git diff --stat:
 
 変更要約:
