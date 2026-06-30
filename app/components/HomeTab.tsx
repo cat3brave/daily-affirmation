@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import AffirmationSection from "./AffirmationSection";
+import FavoriteAffirmationsList from "./FavoriteAffirmationsList";
 
 const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
 const growthMessages = [
@@ -52,33 +53,10 @@ export default function HomeTab({
         isFavoriteDisabled={isFavoriteDisabled}
       />
 
-      {/* 3. お気に入りアファメーション一覧 */}
-      {favoriteAffirmations.length > 0 && (
-        <div className="mb-10 w-full max-w-md bg-white/50 backdrop-blur-sm p-5 rounded-3xl border border-pink-100 shadow-sm">
-          <p className="text-pink-500 font-bold mb-3 text-center tracking-wide">
-            🌷 お気に入りの言葉
-          </p>
-
-          <ul className="space-y-2">
-            {favoriteAffirmations.map((affirmation, index) => (
-              <li
-                key={`${affirmation}-${index}`}
-                className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed flex items-start justify-between gap-3"
-              >
-                <span className="flex-1">{affirmation}</span>
-
-                <button
-                  type="button"
-                  onClick={() => handleRemoveFavoriteAffirmation(affirmation)}
-                  className="shrink-0 text-xs text-pink-400 hover:text-pink-600 font-bold"
-                >
-                  削除
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <FavoriteAffirmationsList
+        favoriteAffirmations={favoriteAffirmations}
+        handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
+      />
 
       {/* 4. デジタル花壇エリア */}
       <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
