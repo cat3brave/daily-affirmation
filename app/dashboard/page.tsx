@@ -28,6 +28,7 @@ export default function Home() {
     useAffirmationGenerator();
   const {
     favoriteAffirmations,
+    favoriteError,
     handleFavoriteAffirmation: saveFavoriteAffirmation,
     handleRemoveFavoriteAffirmation,
     isFavorite,
@@ -100,6 +101,7 @@ export default function Home() {
               handleFavoriteAffirmation={handleFavoriteAffirmation}
               isFavoriteDisabled={isFavoriteDisabled}
               favoriteAffirmations={favoriteAffirmations}
+              favoriteError={favoriteError}
               handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
               totalBlooms={totalBlooms}
               growth={growth}

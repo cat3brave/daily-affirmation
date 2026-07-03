@@ -15,12 +15,14 @@ export function useFavoriteAffirmations(
   const [favoriteAffirmations, setFavoriteAffirmations] = useState<string[]>(
     [],
   );
+  const [favoriteError, setFavoriteError] = useState("");
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasLoadedFavorites(false);
     setFavoriteAffirmations([]);
+    setFavoriteError("");
 
     if (!userId) return;
 
@@ -72,8 +74,13 @@ export function useFavoriteAffirmations(
 
       if (error) {
         console.error(error);
+        setFavoriteError(
+          "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
+        );
         return;
       }
+
+      setFavoriteError("");
 
       if (data) {
         const fetchedFavorites = data
@@ -97,6 +104,8 @@ export function useFavoriteAffirmations(
 
       if (!favoriteText || !userId) return;
 
+      setFavoriteError("");
+
       setFavoriteAffirmations((prev) => {
         if (prev.includes(favoriteText)) return prev;
         return [favoriteText, ...prev];
@@ -108,6 +117,9 @@ export function useFavoriteAffirmations(
 
       if (error) {
         console.error(error);
+        setFavoriteError(
+          "お気に入りの保存に失敗しました。もう一度お試しください。",
+        );
         setFavoriteAffirmations((prev) =>
           prev.filter((affirmation) => affirmation !== favoriteText),
         );
@@ -122,6 +134,8 @@ export function useFavoriteAffirmations(
 
       if (!removeText || !userId) return;
 
+      setFavoriteError("");
+
       setFavoriteAffirmations((prev) =>
         prev.filter((affirmation) => affirmation !== removeText),
       );
@@ -134,6 +148,9 @@ export function useFavoriteAffirmations(
 
       if (error) {
         console.error(error);
+        setFavoriteError(
+          "お気に入りの削除に失敗しました。もう一度お試しください。",
+        );
         setFavoriteAffirmations((prev) => {
           if (prev.includes(removeText)) return prev;
           return [removeText, ...prev];
@@ -151,6 +168,7 @@ export function useFavoriteAffirmations(
 
   return {
     favoriteAffirmations,
+    favoriteError,
     handleFavoriteAffirmation,
     handleRemoveFavoriteAffirmation,
     isFavorite,

@@ -11,6 +11,7 @@ type HomeTabProps = {
   handleRemoveFavoriteAffirmation: (affirmation: string) => void;
   isFavoriteDisabled: boolean;
   favoriteAffirmations: string[];
+  favoriteError: string;
   totalBlooms: number;
   growth: number;
   currentFlower: string;
@@ -27,6 +28,7 @@ export default function HomeTab({
   handleRemoveFavoriteAffirmation,
   isFavoriteDisabled,
   favoriteAffirmations,
+  favoriteError,
   totalBlooms,
   growth,
   currentFlower,
@@ -46,6 +48,7 @@ export default function HomeTab({
 
       <FavoriteAffirmationsList
         favoriteAffirmations={favoriteAffirmations}
+        favoriteError={favoriteError}
         handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
       />
 
