@@ -16,6 +16,7 @@ type HomeTabProps = {
   growth: number;
   currentFlower: string;
   isBloomSaving: boolean;
+  flowerError: string;
   handleWalk: () => void | Promise<void>;
   setShowTada: (value: boolean) => void;
 };
@@ -33,6 +34,7 @@ export default function HomeTab({
   growth,
   currentFlower,
   isBloomSaving,
+  flowerError,
   handleWalk,
   setShowTada,
 }: HomeTabProps) {
@@ -57,6 +59,7 @@ export default function HomeTab({
         growth={growth}
         currentFlower={currentFlower}
         isBloomSaving={isBloomSaving}
+        flowerError={flowerError}
         handleWalk={handleWalk}
       />
 

@@ -14,6 +14,7 @@ type FlowerGardenSectionProps = {
   growth: number;
   currentFlower: string;
   isBloomSaving: boolean;
+  flowerError: string;
   handleWalk: () => void | Promise<void>;
 };
 
@@ -22,6 +23,7 @@ export default function FlowerGardenSection({
   growth,
   currentFlower,
   isBloomSaving,
+  flowerError,
   handleWalk,
 }: FlowerGardenSectionProps) {
   return (
@@ -49,6 +51,14 @@ export default function FlowerGardenSection({
       <p className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5">
         {growthMessages[growth]}
       </p>
+      {flowerError && (
+        <p
+          role="alert"
+          className="mb-4 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-center text-sm font-medium leading-relaxed text-rose-600"
+        >
+          {flowerError}
+        </p>
+      )}
       <motion.button
         whileHover={{
           scale: isBloomSaving ? 1 : 1.05,

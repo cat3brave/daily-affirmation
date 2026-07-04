@@ -43,8 +43,14 @@ export default function Home() {
   const { floatingClouds, handleFloatCloud } = useFloatingClouds();
 
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
-  const { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk } =
-    useFlowerGarden(userId, supabase);
+  const {
+    growth,
+    totalBlooms,
+    currentFlower,
+    isBloomSaving,
+    flowerError,
+    handleWalk,
+  } = useFlowerGarden(userId, supabase);
 
   const handleFavoriteAffirmation = async () => {
     await saveFavoriteAffirmation(text);
@@ -107,6 +113,7 @@ export default function Home() {
               growth={growth}
               currentFlower={currentFlower}
               isBloomSaving={isBloomSaving}
+              flowerError={flowerError}
               handleWalk={handleWalk}
               setShowTada={setShowTada}
             />

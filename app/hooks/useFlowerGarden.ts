@@ -15,11 +15,14 @@ export function useFlowerGarden(
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
   const [isBloomSaving, setIsBloomSaving] = useState<boolean>(false);
+  const [flowerError, setFlowerError] = useState<string>("");
 
   // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
   useEffect(() => {
+    setTotalBlooms(0);
+    setFlowerError("");
+
     if (!userId) {
-      setTotalBlooms(0);
       return;
     }
 
@@ -31,8 +34,21 @@ export function useFlowerGarden(
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId);
 
-      if (isMounted && !error && count !== null) {
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.error("bloom_logs count fetch error:", error);
+        setFlowerError(
+          "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
+        );
+        return;
+      }
+
+      if (count !== null) {
         setTotalBlooms(count);
+        setFlowerError("");
       }
     };
 
@@ -46,6 +62,8 @@ export function useFlowerGarden(
   // 🌱 お散歩ボタンを押した時の処理
   const handleWalk = useCallback(async () => {
     if (isBloomSaving) return;
+
+    setFlowerError("");
 
     // すでに満開なら、次は新しい種に戻すだけ（カウントは増やさない）
     if (growth >= LAST_STAGE_INDEX) {
@@ -62,7 +80,7 @@ export function useFlowerGarden(
     }
 
     if (!userId) {
-      alert(
+      setFlowerError(
         "ログイン情報を確認できませんでした。もう一度ログインしてください。",
       );
       return;
@@ -86,7 +104,9 @@ export function useFlowerGarden(
 
       if (error) {
         console.error("ログ保存エラー:", error);
-        alert("お花の記録を保存できませんでした。");
+        setFlowerError(
+          "お花の記録を保存できませんでした。もう一度お試しください。",
+        );
         return;
       }
 
@@ -98,5 +118,12 @@ export function useFlowerGarden(
     }
   }, [growth, isBloomSaving, supabase, userId]);
 
-  return { growth, totalBlooms, currentFlower, isBloomSaving, handleWalk };
+  return {
+    growth,
+    totalBlooms,
+    currentFlower,
+    isBloomSaving,
+    flowerError,
+    handleWalk,
+  };
 }
