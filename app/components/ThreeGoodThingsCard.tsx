@@ -9,6 +9,8 @@ export default function ThreeGoodThingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -84,50 +86,58 @@ export default function ThreeGoodThingsCard() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+
     const today = getTodayDate();
+    setSaveError("");
+    setIsSaving(true);
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      console.error("ユーザー情報が取得できませんでした", userError);
-      alert(
-        "ログイン情報を確認できませんでした。もう一度ログインしてください。",
-      );
-      return;
+      if (userError || !user) {
+        console.error("ユーザー情報が取得できませんでした", userError);
+        setSaveError(
+          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+        );
+        return;
+      }
+
+      // user_id と date を使って、今日の記録を追加または更新する
+      const { error: insertError } = await supabase
+        .from("three_good_things")
+        .upsert(
+          {
+            user_id: user.id,
+            date: today,
+            things1: things[0],
+            things2: things[1],
+            things3: things[2],
+          },
+          { onConflict: "user_id,date" },
+        );
+
+      if (insertError) {
+        console.error("保存エラー:", insertError);
+        setSaveError("記録を保存できませんでした。もう一度お試しください。");
+        return;
+      }
+
+      const updatedRecords = { ...allRecords, [today]: things };
+      setAllRecords(updatedRecords);
+      setSelectedDate(today);
+      setIsSaved(true);
+      setSaveError("");
+
+      setTimeout(() => {
+        setIsSaved(false);
+      }, 3000);
+    } finally {
+      setIsSaving(false);
     }
-
-    // まずは画面の見た目をすぐに更新する（サクサク動かすため）
-    const updatedRecords = { ...allRecords, [today]: things };
-    setAllRecords(updatedRecords);
-    setIsSaved(true);
-    setSelectedDate(today);
-
-    // user_id と date を使って、今日の記録を追加または更新する
-    const { error: insertError } = await supabase
-      .from("three_good_things")
-      .upsert(
-        {
-          user_id: user.id,
-          date: today,
-          things1: things[0],
-          things2: things[1],
-          things3: things[2],
-        },
-        { onConflict: "user_id,date" },
-      );
-
-    if (insertError) {
-      console.error("保存エラー:", insertError);
-      alert("記録を保存できませんでした。");
-      return;
-    }
-
-    setTimeout(() => {
-      setIsSaved(false);
-    }, 3000);
   };
 
   const handleDelete = async (dateToDelete: string) => {
@@ -204,9 +214,10 @@ export default function ThreeGoodThingsCard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               onClick={handleSave}
-              className="bg-pink-400 hover:bg-pink-500 text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
+              disabled={isSaving}
+              className="bg-pink-400 hover:bg-pink-500 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
             >
-              記録する
+              {isSaving ? "保存中..." : "記録する"}
             </motion.button>
           ) : (
             <motion.p
@@ -221,6 +232,14 @@ export default function ThreeGoodThingsCard() {
           )}
         </AnimatePresence>
       </div>
+      {saveError && (
+        <p
+          role="alert"
+          className="w-full mb-4 rounded-xl border border-red-100 bg-red-50/70 px-4 py-2 text-center text-xs font-bold text-red-500"
+        >
+          {saveError}
+        </p>
+      )}
 
       <div className="w-full bg-pink-50/30 rounded-xl p-4 flex flex-col items-center">
         <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
