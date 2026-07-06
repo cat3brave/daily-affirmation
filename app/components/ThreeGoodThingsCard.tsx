@@ -13,6 +13,8 @@ export default function ThreeGoodThingsCard() {
   const [saveError, setSaveError] = useState("");
   const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [deletingDate, setDeletingDate] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const getTodayDate = () => {
     const d = new Date();
@@ -141,46 +143,60 @@ export default function ThreeGoodThingsCard() {
   };
 
   const handleDelete = async (dateToDelete: string) => {
+    if (deletingDate !== null) return;
+
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    setDeleteError("");
+    setDeletingDate(dateToDelete);
 
-    if (userError || !user) {
-      console.error("ユーザー情報が取得できませんでした", userError);
-      alert(
-        "ログイン情報を確認できませんでした。もう一度ログインしてください。",
-      );
-      return;
-    }
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    // 画面の見た目を更新する
-    const updatedRecords = { ...allRecords };
-    delete updatedRecords[dateToDelete];
-    setAllRecords(updatedRecords);
+      if (userError || !user) {
+        console.error("ユーザー情報が取得できませんでした", userError);
+        setDeleteError(
+          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
+        );
+        return;
+      }
 
-    if (dateToDelete === getTodayDate()) {
-      setThings(["", "", ""]);
-    }
+      // 自分のその日の記録だけ削除する
+      const { error } = await supabase
+        .from("three_good_things")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("date", dateToDelete);
 
-    setSelectedDate(null);
+      if (error) {
+        console.error("削除エラー:", error);
+        setDeleteError("記録を削除できませんでした。もう一度お試しください。");
+        return;
+      }
 
-    // 自分のその日の記録だけ削除する
-    const { error } = await supabase
-      .from("three_good_things")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("date", dateToDelete);
+      setAllRecords((currentRecords) => {
+        const updatedRecords = { ...currentRecords };
+        delete updatedRecords[dateToDelete];
+        return updatedRecords;
+      });
 
-    if (error) {
-      console.error("削除エラー:", error);
-      alert("記録を削除できませんでした。");
+      if (dateToDelete === getTodayDate()) {
+        setThings(["", "", ""]);
+      }
+
+      setSelectedDate(null);
+      setDeleteError("");
+    } finally {
+      setDeletingDate(null);
     }
   };
   const past14Days = getPast14Days();
+  const isDeletingSelectedDate =
+    selectedDate !== null && deletingDate === selectedDate;
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
@@ -245,6 +261,14 @@ export default function ThreeGoodThingsCard() {
         <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
           🌱 最近の記録（2週間）
         </p>
+        {deleteError && (
+          <p
+            role="alert"
+            className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500"
+          >
+            {deleteError}
+          </p>
+        )}
         <div className="flex gap-1 mb-2">
           {past14Days.map((date) => {
             const hasRecord =
@@ -285,7 +309,10 @@ export default function ThreeGoodThingsCard() {
                 </p>
                 <button
                   onClick={() => handleDelete(selectedDate)}
-                  className="text-pink-300 hover:text-red-400 transition-colors p-1"
+                  disabled={isDeletingSelectedDate}
+                  className={`p-1 text-pink-300 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:hover:text-pink-300 ${
+                    isDeletingSelectedDate ? "opacity-50" : ""
+                  }`}
                   title="この日の記録を削除"
                 >
                   <svg
