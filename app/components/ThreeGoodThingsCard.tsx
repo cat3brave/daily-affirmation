@@ -5,12 +5,17 @@ import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
+const loadErrorMessage =
+  "記録を読み込めませんでした。時間をおいて、もう一度お試しください。";
+
 export default function ThreeGoodThingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [isLoadingRecords, setIsLoadingRecords] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [allRecords, setAllRecords] = useState<Record<string, string[]>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
@@ -39,43 +44,55 @@ export default function ThreeGoodThingsCard() {
 
   useEffect(() => {
     const fetchRecords = async () => {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      setLoadError("");
+      setIsLoadingRecords(true);
 
-      if (userError || !user) {
-        console.error("ユーザー情報が取得できませんでした", userError);
-        return;
-      }
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      const { data, error } = await supabase
-        .from("three_good_things")
-        .select("*")
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("3つのよかったこと取得エラー:", error);
-        return;
-      }
-
-      if (data) {
-        const recordsObj: Record<string, string[]> = {};
-
-        data.forEach((row) => {
-          recordsObj[row.date] = [
-            row.things1 || "",
-            row.things2 || "",
-            row.things3 || "",
-          ];
-        });
-
-        setAllRecords(recordsObj);
-
-        const today = getTodayDate();
-        if (recordsObj[today]) {
-          setThings(recordsObj[today]);
+        if (userError || !user) {
+          console.error("ユーザー情報が取得できませんでした", userError);
+          setLoadError(loadErrorMessage);
+          return;
         }
+
+        const { data, error } = await supabase
+          .from("three_good_things")
+          .select("*")
+          .eq("user_id", user.id);
+
+        if (error) {
+          console.error("3つのよかったこと取得エラー:", error);
+          setLoadError(loadErrorMessage);
+          return;
+        }
+
+        if (data) {
+          const recordsObj: Record<string, string[]> = {};
+
+          data.forEach((row) => {
+            recordsObj[row.date] = [
+              row.things1 || "",
+              row.things2 || "",
+              row.things3 || "",
+            ];
+          });
+
+          setAllRecords(recordsObj);
+
+          const today = getTodayDate();
+          if (recordsObj[today]) {
+            setThings(recordsObj[today]);
+          }
+        }
+      } catch (error) {
+        console.error("3つのよかったこと取得中に想定外のエラー:", error);
+        setLoadError(loadErrorMessage);
+      } finally {
+        setIsLoadingRecords(false);
       }
     };
 
@@ -261,6 +278,23 @@ export default function ThreeGoodThingsCard() {
         <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
           🌱 最近の記録（2週間）
         </p>
+        {isLoadingRecords ? (
+          <p
+            aria-live="polite"
+            className="w-full mb-3 rounded-xl bg-white/60 px-3 py-2 text-center text-xs font-bold text-pink-400"
+          >
+            記録を読み込んでいます...
+          </p>
+        ) : (
+          loadError && (
+            <p
+              role="alert"
+              className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500"
+            >
+              {loadError}
+            </p>
+          )
+        )}
         {deleteError && (
           <p
             role="alert"
