@@ -43,9 +43,13 @@ export default function ThreeGoodThingsCard() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchRecords = async () => {
-      setLoadError("");
-      setIsLoadingRecords(true);
+      if (isMounted) {
+        setLoadError("");
+        setIsLoadingRecords(true);
+      }
 
       try {
         const {
@@ -55,7 +59,9 @@ export default function ThreeGoodThingsCard() {
 
         if (userError || !user) {
           console.error("ユーザー情報が取得できませんでした", userError);
-          setLoadError(loadErrorMessage);
+          if (isMounted) {
+            setLoadError(loadErrorMessage);
+          }
           return;
         }
 
@@ -66,7 +72,9 @@ export default function ThreeGoodThingsCard() {
 
         if (error) {
           console.error("3つのよかったこと取得エラー:", error);
-          setLoadError(loadErrorMessage);
+          if (isMounted) {
+            setLoadError(loadErrorMessage);
+          }
           return;
         }
 
@@ -81,6 +89,8 @@ export default function ThreeGoodThingsCard() {
             ];
           });
 
+          if (!isMounted) return;
+
           setAllRecords(recordsObj);
 
           const today = getTodayDate();
@@ -90,13 +100,21 @@ export default function ThreeGoodThingsCard() {
         }
       } catch (error) {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
-        setLoadError(loadErrorMessage);
+        if (isMounted) {
+          setLoadError(loadErrorMessage);
+        }
       } finally {
-        setIsLoadingRecords(false);
+        if (isMounted) {
+          setIsLoadingRecords(false);
+        }
       }
     };
 
     fetchRecords();
+
+    return () => {
+      isMounted = false;
+    };
   }, [supabase]);
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
