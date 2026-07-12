@@ -15,7 +15,7 @@ export default function BreathingCard() {
     if (phase === "idle" || phase === "completed") return;
 
     const timer = setTimeout(() => {
-      if (timeLeft > 0) {
+      if (timeLeft > 1) {
         setTimeLeft((prev) => prev - 1);
         return;
       }
