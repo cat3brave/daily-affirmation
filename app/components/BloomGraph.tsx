@@ -9,9 +9,13 @@ type BloomCounts = {
   [date: string]: number;
 };
 
+const BLOOM_LOGS_LOAD_ERROR_MESSAGE =
+  "お花の成長記録を読み込めませんでした。時間をおいて、もう一度お試しください。";
+
 export default function BloomGraph() {
   const [bloomData, setBloomData] = useState<BloomCounts>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const { days, startDate } = useMemo(() => {
     // 🗓️ GitHubのようにはじめを「日曜日」に揃えるための計算
     const endDate = new Date();
@@ -47,46 +51,83 @@ export default function BloomGraph() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchLogs = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.user) {
-        setLoading(false);
-        return;
+      if (isMounted) {
+        setLoadError("");
+        setLoading(true);
       }
 
-      const userId = session.user.id;
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      const { data, error } = await supabase
-        .from("bloom_logs")
-        .select("created_at")
-        .eq("user_id", userId)
-        .gte("created_at", startDate.toISOString());
+        if (sessionError) {
+          console.error("セッション取得エラー:", sessionError);
+          if (isMounted) {
+            setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+          }
+          return;
+        }
 
-      if (error) {
-        console.error("ログ取得エラー:", error);
-        setLoading(false);
-        return;
+        if (!session?.user) {
+          console.error("ログインユーザーが確認できませんでした。");
+          if (isMounted) {
+            setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+          }
+          return;
+        }
+
+        const userId = session.user.id;
+
+        const { data, error } = await supabase
+          .from("bloom_logs")
+          .select("created_at")
+          .eq("user_id", userId)
+          .gte("created_at", startDate.toISOString());
+
+        if (error) {
+          console.error("ログ取得エラー:", error);
+          if (isMounted) {
+            setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+          }
+          return;
+        }
+
+        const counts: BloomCounts = {};
+
+        data?.forEach((log) => {
+          const d = new Date(log.created_at);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          const dateStr = `${y}-${m}-${day}`;
+          counts[dateStr] = (counts[dateStr] || 0) + 1;
+        });
+
+        if (isMounted) {
+          setBloomData(counts);
+        }
+      } catch (error) {
+        console.error("成長記録取得中に想定外のエラー:", error);
+        if (isMounted) {
+          setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-
-      const counts: BloomCounts = {};
-
-      data?.forEach((log) => {
-        const d = new Date(log.created_at);
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        const dateStr = `${y}-${m}-${day}`;
-        counts[dateStr] = (counts[dateStr] || 0) + 1;
-      });
-
-      setBloomData(counts);
-      setLoading(false);
     };
 
     fetchLogs();
+
+    return () => {
+      isMounted = false;
+    };
   }, [startDate]);
 
   if (loading) {
@@ -104,59 +145,70 @@ export default function BloomGraph() {
         <h3 className="text-sm font-bold text-sky-800">
           お花の成長記録（過去3ヶ月）
         </h3>
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold">
-          <span>少</span>
-          <div className="w-3 h-3 rounded-sm bg-gray-100" />
-          <div className="w-3 h-3 rounded-sm bg-pink-200" />
-          <div className="w-3 h-3 rounded-sm bg-pink-300" />
-          <div className="w-3 h-3 rounded-sm bg-pink-500" />
-          <span>多</span>
-        </div>
+        {!loadError && (
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold">
+            <span>少</span>
+            <div className="w-3 h-3 rounded-sm bg-gray-100" />
+            <div className="w-3 h-3 rounded-sm bg-pink-200" />
+            <div className="w-3 h-3 rounded-sm bg-pink-300" />
+            <div className="w-3 h-3 rounded-sm bg-pink-500" />
+            <span>多</span>
+          </div>
+        )}
       </div>
 
-      <div className="flex gap-2 min-w-max">
-        {/* 左側の曜日ラベル */}
-        <div className="flex flex-col text-[10px] text-sky-600/60 font-bold justify-between py-[2px] pr-1">
-          <span>日</span>
-          <span>月</span>
-          <span>火</span>
-          <span>水</span>
-          <span>木</span>
-          <span>金</span>
-          <span>土</span>
-        </div>
+      {loadError ? (
+        <p
+          role="alert"
+          className="min-w-[300px] rounded-xl border border-red-100 bg-red-50/60 px-3 py-3 text-center text-xs font-bold leading-relaxed text-red-500"
+        >
+          {loadError}
+        </p>
+      ) : (
+        <div className="flex gap-2 min-w-max">
+          {/* 左側の曜日ラベル */}
+          <div className="flex flex-col text-[10px] text-sky-600/60 font-bold justify-between py-[2px] pr-1">
+            <span>日</span>
+            <span>月</span>
+            <span>火</span>
+            <span>水</span>
+            <span>木</span>
+            <span>金</span>
+            <span>土</span>
+          </div>
 
-        {/* 🌿 ここがプロの技！縦7行で折り返すグリッド */}
-        <div className="grid grid-rows-7 grid-flow-col gap-1">
-          {days.map((item) => {
-            const count = bloomData[item.date] || 0;
+          {/* 🌿 ここがプロの技！縦7行で折り返すグリッド */}
+          <div className="grid grid-rows-7 grid-flow-col gap-1">
+            {days.map((item) => {
+              const count = bloomData[item.date] || 0;
 
-            // まだ来ていない未来の日付は、マスを見えなくする（透明）
-            if (item.isFuture) {
+              // まだ来ていない未来の日付は、マスを見えなくする（透明）
+              if (item.isFuture) {
+                return (
+                  <div
+                    key={item.date}
+                    className="w-3 h-3 rounded-sm bg-transparent"
+                  />
+                );
+              }
+
+              // お花の数によって色の濃さを変える
+              let bgColor = "bg-gray-100";
+              if (count === 1) bgColor = "bg-pink-200";
+              if (count === 2) bgColor = "bg-pink-300";
+              if (count >= 3) bgColor = "bg-pink-500";
+
               return (
                 <div
                   key={item.date}
-                  className="w-3 h-3 rounded-sm bg-transparent"
+                  title={`${item.date} : ${count}回咲いた`}
+                  className={`w-3 h-3 rounded-sm ${bgColor} transition-all duration-300 hover:ring-2 hover:ring-pink-400 hover:ring-offset-1 cursor-pointer`}
                 />
               );
-            }
-
-            // お花の数によって色の濃さを変える
-            let bgColor = "bg-gray-100";
-            if (count === 1) bgColor = "bg-pink-200";
-            if (count === 2) bgColor = "bg-pink-300";
-            if (count >= 3) bgColor = "bg-pink-500";
-
-            return (
-              <div
-                key={item.date}
-                title={`${item.date} : ${count}回咲いた`}
-                className={`w-3 h-3 rounded-sm ${bgColor} transition-all duration-300 hover:ring-2 hover:ring-pink-400 hover:ring-offset-1 cursor-pointer`}
-              />
-            );
-          })}
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
