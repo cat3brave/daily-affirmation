@@ -64,30 +64,39 @@ export function useFavoriteAffirmations(
     let isMounted = true;
 
     const fetchFavoriteAffirmations = async () => {
-      const { data, error } = await supabase
-        .from("favorite_affirmations")
-        .select("text")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("favorite_affirmations")
+          .select("text")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (error) {
-        console.error(error);
-        setFavoriteError(
-          "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
-        );
-        return;
-      }
+        if (error) {
+          console.error(error);
+          setFavoriteError(
+            "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
+          );
+          return;
+        }
 
-      setFavoriteError("");
+        setFavoriteError("");
 
-      if (data) {
-        const fetchedFavorites = data
-          .map((favorite) => favorite.text)
-          .filter((text): text is string => typeof text === "string");
+        if (data) {
+          const fetchedFavorites = data
+            .map((favorite) => favorite.text)
+            .filter((text): text is string => typeof text === "string");
 
-        setFavoriteAffirmations(fetchedFavorites);
+          setFavoriteAffirmations(fetchedFavorites);
+        }
+      } catch (error) {
+        console.error("お気に入り読み込み中の想定外エラー:", error);
+        if (isMounted) {
+          setFavoriteError(
+            "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
+          );
+        }
       }
     };
 
@@ -111,12 +120,22 @@ export function useFavoriteAffirmations(
         return [favoriteText, ...prev];
       });
 
-      const { error } = await supabase
-        .from("favorite_affirmations")
-        .insert({ user_id: userId, text: favoriteText });
+      try {
+        const { error } = await supabase
+          .from("favorite_affirmations")
+          .insert({ user_id: userId, text: favoriteText });
 
-      if (error) {
-        console.error(error);
+        if (error) {
+          console.error(error);
+          setFavoriteError(
+            "お気に入りの保存に失敗しました。もう一度お試しください。",
+          );
+          setFavoriteAffirmations((prev) =>
+            prev.filter((affirmation) => affirmation !== favoriteText),
+          );
+        }
+      } catch (error) {
+        console.error("お気に入り保存中の想定外エラー:", error);
         setFavoriteError(
           "お気に入りの保存に失敗しました。もう一度お試しください。",
         );
@@ -140,14 +159,25 @@ export function useFavoriteAffirmations(
         prev.filter((affirmation) => affirmation !== removeText),
       );
 
-      const { error } = await supabase
-        .from("favorite_affirmations")
-        .delete()
-        .eq("user_id", userId)
-        .eq("text", removeText);
+      try {
+        const { error } = await supabase
+          .from("favorite_affirmations")
+          .delete()
+          .eq("user_id", userId)
+          .eq("text", removeText);
 
-      if (error) {
-        console.error(error);
+        if (error) {
+          console.error(error);
+          setFavoriteError(
+            "お気に入りの削除に失敗しました。もう一度お試しください。",
+          );
+          setFavoriteAffirmations((prev) => {
+            if (prev.includes(removeText)) return prev;
+            return [removeText, ...prev];
+          });
+        }
+      } catch (error) {
+        console.error("お気に入り削除中の想定外エラー:", error);
         setFavoriteError(
           "お気に入りの削除に失敗しました。もう一度お試しください。",
         );
