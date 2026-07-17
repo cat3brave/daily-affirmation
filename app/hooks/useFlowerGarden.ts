@@ -30,26 +30,35 @@ export function useFlowerGarden(
     let isMounted = true;
 
     const fetchBlooms = async () => {
-      const { count, error } = await supabase
-        .from("bloom_logs")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId);
+      try {
+        const { count, error } = await supabase
+          .from("bloom_logs")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId);
 
-      if (!isMounted) {
-        return;
-      }
+        if (!isMounted) {
+          return;
+        }
 
-      if (error) {
-        console.error("bloom_logs count fetch error:", error);
-        setFlowerError(
-          "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
-        );
-        return;
-      }
+        if (error) {
+          console.error("bloom_logs count fetch error:", error);
+          setFlowerError(
+            "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
+          );
+          return;
+        }
 
-      if (count !== null) {
-        setTotalBlooms(count);
-        setFlowerError("");
+        if (count !== null) {
+          setTotalBlooms(count);
+          setFlowerError("");
+        }
+      } catch (error) {
+        console.error("bloom_logs count fetch unexpected error:", error);
+        if (isMounted) {
+          setFlowerError(
+            "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
+          );
+        }
       }
     };
 
@@ -115,6 +124,11 @@ export function useFlowerGarden(
       setTotalBlooms((prev) => prev + 1);
       setBloomRefreshKey((prev) => prev + 1);
       setGrowth(nextGrowth);
+    } catch (error) {
+      console.error("ログ保存中の想定外エラー:", error);
+      setFlowerError(
+        "お花の記録を保存できませんでした。もう一度お試しください。",
+      );
     } finally {
       setIsBloomSaving(false);
     }
