@@ -9,10 +9,14 @@ type BloomCounts = {
   [date: string]: number;
 };
 
+type BloomGraphProps = {
+  refreshKey: number;
+};
+
 const BLOOM_LOGS_LOAD_ERROR_MESSAGE =
   "お花の成長記録を読み込めませんでした。時間をおいて、もう一度お試しください。";
 
-export default function BloomGraph() {
+export default function BloomGraph({ refreshKey }: BloomGraphProps) {
   const [bloomData, setBloomData] = useState<BloomCounts>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -128,7 +132,7 @@ export default function BloomGraph() {
     return () => {
       isMounted = false;
     };
-  }, [startDate]);
+  }, [refreshKey, startDate]);
 
   if (loading) {
     return (

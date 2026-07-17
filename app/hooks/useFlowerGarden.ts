@@ -16,6 +16,7 @@ export function useFlowerGarden(
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
   const [isBloomSaving, setIsBloomSaving] = useState<boolean>(false);
   const [flowerError, setFlowerError] = useState<string>("");
+  const [bloomRefreshKey, setBloomRefreshKey] = useState<number>(0);
 
   // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
   useEffect(() => {
@@ -112,6 +113,7 @@ export function useFlowerGarden(
 
       setCurrentFlower(nextFlower);
       setTotalBlooms((prev) => prev + 1);
+      setBloomRefreshKey((prev) => prev + 1);
       setGrowth(nextGrowth);
     } finally {
       setIsBloomSaving(false);
@@ -124,6 +126,7 @@ export function useFlowerGarden(
     currentFlower,
     isBloomSaving,
     flowerError,
+    bloomRefreshKey,
     handleWalk,
   };
 }

@@ -49,6 +49,7 @@ export default function Home() {
     currentFlower,
     isBloomSaving,
     flowerError,
+    bloomRefreshKey,
     handleWalk,
   } = useFlowerGarden(userId, supabase);
 
@@ -130,7 +131,7 @@ export default function Home() {
         {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
         {currentTab === "home" && (
           <div className="w-full mt-8">
-            <BloomGraph />
+            <BloomGraph refreshKey={bloomRefreshKey} />
           </div>
         )}
       </motion.div>
