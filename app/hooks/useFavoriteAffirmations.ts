@@ -19,19 +19,18 @@ export function useFavoriteAffirmations(
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasLoadedFavorites(false);
     setFavoriteAffirmations([]);
     setFavoriteError("");
 
     if (!userId) return;
 
-    const savedFavorites = localStorage.getItem(
-      getFavoriteAffirmationsStorageKey(userId),
-    );
+    try {
+      const savedFavorites = localStorage.getItem(
+        getFavoriteAffirmationsStorageKey(userId),
+      );
 
-    if (savedFavorites) {
-      try {
+      if (savedFavorites) {
         const parsedFavorites = JSON.parse(savedFavorites);
 
         if (Array.isArray(parsedFavorites)) {
@@ -41,21 +40,31 @@ export function useFavoriteAffirmations(
             ),
           );
         }
-      } catch {
-        console.error("お気に入りアファメーションの読み込みに失敗しました。");
       }
+    } catch (error) {
+      console.error(
+        "お気に入りアファメーションの読み込みに失敗しました。",
+        error,
+      );
+    } finally {
+      setHasLoadedFavorites(true);
     }
-
-    setHasLoadedFavorites(true);
   }, [userId]);
 
   useEffect(() => {
     if (!userId || !hasLoadedFavorites) return;
 
-    localStorage.setItem(
-      getFavoriteAffirmationsStorageKey(userId),
-      JSON.stringify(favoriteAffirmations),
-    );
+    try {
+      localStorage.setItem(
+        getFavoriteAffirmationsStorageKey(userId),
+        JSON.stringify(favoriteAffirmations),
+      );
+    } catch (error) {
+      console.error(
+        "お気に入りアファメーションの保存に失敗しました。",
+        error,
+      );
+    }
   }, [favoriteAffirmations, hasLoadedFavorites, userId]);
 
   useEffect(() => {
