@@ -16,7 +16,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "framer-motion": "^12.34.2",
-    "next": "16.1.6",
+    "next": "16.2.11",
     "react": "19.2.3",
     "react-confetti": "^6.4.0",
     "react-dom": "19.2.3"
@@ -31,7 +31,7 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.11",
     "jsdom": "^28.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
