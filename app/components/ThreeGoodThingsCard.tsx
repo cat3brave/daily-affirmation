@@ -172,6 +172,9 @@ export default function ThreeGoodThingsCard() {
       setTimeout(() => {
         setIsSaved(false);
       }, 3000);
+    } catch (error) {
+      console.error("記録保存中の想定外のエラー:", error);
+      setSaveError("記録を保存できませんでした。もう一度お試しください。");
     } finally {
       setIsSaving(false);
     }
@@ -225,6 +228,9 @@ export default function ThreeGoodThingsCard() {
 
       setSelectedDate(null);
       setDeleteError("");
+    } catch (error) {
+      console.error("記録削除中の想定外のエラー:", error);
+      setDeleteError("記録を削除できませんでした。もう一度お試しください。");
     } finally {
       setDeletingDate(null);
     }
