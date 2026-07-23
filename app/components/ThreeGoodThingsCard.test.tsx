@@ -199,6 +199,124 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("取得成功時に今日の記録を入力欄と詳細へ表示する", async () => {
+    const today = getTodayDate();
+    const firstThing = "朝ごはんをゆっくり食べた";
+    const secondThing = "仕事がひとつ片付いた";
+    const thirdThing = "夜に深呼吸できた";
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        {
+          date: today,
+          things1: firstThing,
+          things2: secondThing,
+          things3: thirdThing,
+        },
+      ]),
+    });
+
+    await renderLoadedCard();
+    const inputs = screen.getAllByRole("textbox");
+
+    expect(inputs[0]).toHaveValue(firstThing);
+    expect(inputs[1]).toHaveValue(secondThing);
+    expect(inputs[2]).toHaveValue(thirdThing);
+    expect(supabaseMocks.from).toHaveBeenCalledWith("three_good_things");
+    expect(supabaseMocks.select).toHaveBeenCalledWith("*");
+    expect(supabaseMocks.selectEq).toHaveBeenCalledWith("user_id", USER_ID);
+
+    fireEvent.click(screen.getByTitle(today));
+
+    expect(
+      await screen.findByText(`📅 ${today} のよかったこと`),
+    ).toBeInTheDocument();
+    const detailItems = screen.getAllByRole("listitem");
+    expect(detailItems).toHaveLength(3);
+    expect(detailItems[0]).toHaveTextContent(firstThing);
+    expect(detailItems[1]).toHaveTextContent(secondThing);
+    expect(detailItems[2]).toHaveTextContent(thirdThing);
+  });
+
+  it("保存成功時に入力内容を保存して成功メッセージと詳細へ表示する", async () => {
+    const today = getTodayDate();
+    const firstThing = "朝の散歩が気持ちよかった";
+    const secondThing = "お昼をおいしく食べた";
+    const thirdThing = "読みたかった本を開けた";
+    await renderLoadedCard();
+    const inputs = screen.getAllByRole("textbox");
+
+    fireEvent.change(inputs[0], { target: { value: firstThing } });
+    fireEvent.change(inputs[1], { target: { value: secondThing } });
+    fireEvent.change(inputs[2], { target: { value: thirdThing } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+
+    expect(
+      await screen.findByText("✨ 保存しました！今日もお疲れ様です ✨"),
+    ).toBeInTheDocument();
+    expect(supabaseMocks.upsert).toHaveBeenCalledWith(
+      {
+        date: today,
+        things1: firstThing,
+        things2: secondThing,
+        things3: thirdThing,
+        user_id: USER_ID,
+      },
+      { onConflict: "user_id,date" },
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(inputs[0]).toHaveValue(firstThing);
+    expect(inputs[1]).toHaveValue(secondThing);
+    expect(inputs[2]).toHaveValue(thirdThing);
+
+    expect(screen.getByText(`📅 ${today} のよかったこと`)).toBeInTheDocument();
+    const detailItems = screen.getAllByRole("listitem");
+    expect(detailItems).toHaveLength(3);
+    expect(detailItems[0]).toHaveTextContent(firstThing);
+    expect(detailItems[1]).toHaveTextContent(secondThing);
+    expect(detailItems[2]).toHaveTextContent(thirdThing);
+  });
+
+  it("削除成功時に今日の記録を削除して入力欄と詳細を空にする", async () => {
+    const today = getTodayDate();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        {
+          date: today,
+          things1: "朝に洗濯できた",
+          things2: "午後に集中できた",
+          things3: "夜に早めに休めた",
+        },
+      ]),
+    });
+    await renderLoadedCard();
+
+    fireEvent.click(screen.getByTitle(today));
+    expect(
+      await screen.findByText(`📅 ${today} のよかったこと`),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("この日の記録を削除"));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(`📅 ${today} のよかったこと`),
+      ).not.toBeInTheDocument();
+    });
+    expect(confirm).toHaveBeenCalledWith(
+      `${today} の記録を削除してもよろしいですか？`,
+    );
+    expect(supabaseMocks.deleteRecord).toHaveBeenCalled();
+    expect(supabaseMocks.deleteUserEq).toHaveBeenCalledWith("user_id", USER_ID);
+    expect(supabaseMocks.deleteDateEq).toHaveBeenCalledWith("date", today);
+
+    const inputs = screen.getAllByRole("textbox");
+    expect(inputs[0]).toHaveValue("");
+    expect(inputs[1]).toHaveValue("");
+    expect(inputs[2]).toHaveValue("");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("記録取得中に想定外の例外が発生した場合は読込エラーを表示する", async () => {
     const consoleError = vi
       .spyOn(console, "error")
