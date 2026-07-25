@@ -13,21 +13,29 @@ export function useAuthUser() {
     let isMounted = true;
 
     const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (error || !user) {
-        router.replace("/login");
-        return;
+        if (error || !user) {
+          router.replace("/login");
+          return;
+        }
+
+        setUserId(user.id);
+        setUserEmail(user.email ?? "");
+        setIsAuthChecked(true);
+      } catch (error) {
+        console.error("ユーザー情報取得中に想定外のエラー:", error);
+
+        if (isMounted) {
+          router.replace("/login");
+        }
       }
-
-      setUserId(user.id);
-      setUserEmail(user.email ?? "");
-      setIsAuthChecked(true);
     };
 
     fetchUser();
