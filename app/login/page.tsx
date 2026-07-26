@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
+const LOGIN_FAILURE_MESSAGE =
+  "ログインに失敗しました。メールアドレスとパスワードを確認してください。";
+const SIGN_UP_FAILURE_MESSAGE =
+  "登録に失敗しました。メールアドレスやパスワードを確認してください。";
+const GOOGLE_LOGIN_FAILURE_MESSAGE =
+  "Googleログインに失敗しました。もう一度お試しください。";
+
 export default function LoginPage() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const authInFlightRef = useRef(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -35,9 +43,10 @@ export default function LoginPage() {
   };
   // ログインの処理
   const handleLogin = async () => {
-    if (isLoading) return;
+    if (authInFlightRef.current) return;
     if (!validateEmailAndPassword()) return;
 
+    authInFlightRef.current = true;
     setIsLoading(true);
 
     try {
@@ -48,22 +57,26 @@ export default function LoginPage() {
 
       if (error) {
         setMessageType("error");
-        setMessage(
-          "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
-        );
+        setMessage(LOGIN_FAILURE_MESSAGE);
       } else {
         setMessage("");
         router.push("/dashboard");
       }
+    } catch (error) {
+      console.error("ログイン中に想定外のエラー:", error);
+      setMessageType("error");
+      setMessage(LOGIN_FAILURE_MESSAGE);
     } finally {
+      authInFlightRef.current = false;
       setIsLoading(false);
     }
   };
   // 新規登録の処理
   const handleSignUp = async () => {
-    if (isLoading) return;
+    if (authInFlightRef.current) return;
     if (!validateEmailAndPassword()) return;
 
+    authInFlightRef.current = true;
     setIsLoading(true);
 
     try {
@@ -74,9 +87,7 @@ export default function LoginPage() {
 
       if (error) {
         setMessageType("error");
-        setMessage(
-          "登録に失敗しました。メールアドレスやパスワードを確認してください。",
-        );
+        setMessage(SIGN_UP_FAILURE_MESSAGE);
       } else {
         setMessageType("success");
         setMessage(
@@ -84,14 +95,20 @@ export default function LoginPage() {
         );
         setIsSignUpMode(false);
       }
+    } catch (error) {
+      console.error("登録中に想定外のエラー:", error);
+      setMessageType("error");
+      setMessage(SIGN_UP_FAILURE_MESSAGE);
     } finally {
+      authInFlightRef.current = false;
       setIsLoading(false);
     }
   };
   // Googleログインの処理
   const handleGoogleLogin = async () => {
-    if (isLoading) return;
+    if (authInFlightRef.current) return;
 
+    authInFlightRef.current = true;
     setIsLoading(true);
 
     try {
@@ -105,13 +122,15 @@ export default function LoginPage() {
       if (error) {
         console.error("Googleログインエラー:", error.message);
         setMessageType("error");
-        setMessage("Googleログインに失敗しました。もう一度お試しください。");
+        setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
+        authInFlightRef.current = false;
         setIsLoading(false);
       }
     } catch (error) {
       console.error("Googleログインエラー:", error);
       setMessageType("error");
-      setMessage("Googleログインに失敗しました。もう一度お試しください。");
+      setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
+      authInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -154,6 +173,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           {message && (
             <div
+              role={messageType === "success" ? "status" : "alert"}
               className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
                 messageType === "success"
                   ? "bg-green-50 text-green-700 border border-green-100"
