@@ -6,12 +6,15 @@ import type { CookieOptions } from "@supabase/ssr";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const loginUrl = new URL("/login", requestUrl.origin);
 
-  if (code) {
-    // 👇 ここに await を追加しました！
+  if (!code) {
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
     const cookieStore = await cookies();
 
-    // 最新の道具（@supabase/ssr）を使って通信パイプを準備
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,10 +33,16 @@ export async function GET(request: Request) {
       },
     );
 
-    // 「仮のチケット」を「本物のカギ」に交換する
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error("OAuth code exchange failed:", error);
+      return NextResponse.redirect(loginUrl);
+    }
+  } catch (error) {
+    console.error("OAuth callback failed:", error);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // カギが手に入ったので、トップページ（ / ）へ案内する
   return NextResponse.redirect(new URL("/", requestUrl.origin));
 }
