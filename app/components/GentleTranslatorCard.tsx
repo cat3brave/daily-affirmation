@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { translateHarshVoice } from "../actions";
 
@@ -7,20 +7,26 @@ const MAX_HARSH_VOICE_LENGTH = 300;
 export default function GentleTranslatorCard() {
   const [harshVoice, setHarshVoice] = useState("");
   const [translatedVoice, setTranslatedVoice] = useState("");
+  const [translationError, setTranslationError] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
+  const isTranslatingRef = useRef(false);
 
   const handleTranslate = async () => {
-    if (!harshVoice.trim() || isTranslating) return;
+    if (!harshVoice.trim() || isTranslatingRef.current) return;
+    isTranslatingRef.current = true;
     setIsTranslating(true);
     setTranslatedVoice("");
+    setTranslationError("");
     try {
       const result = await translateHarshVoice(harshVoice);
       setTranslatedVoice(result);
-    } catch {
-      setTranslatedVoice(
+    } catch (error) {
+      console.error("優しい翻訳に失敗しました:", error);
+      setTranslationError(
         "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
       );
     } finally {
+      isTranslatingRef.current = false;
       setIsTranslating(false);
     }
   };
@@ -44,8 +50,9 @@ export default function GentleTranslatorCard() {
         value={harshVoice}
         onChange={(e) => setHarshVoice(e.target.value)}
         maxLength={MAX_HARSH_VOICE_LENGTH}
+        disabled={isTranslating}
         placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
-        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed"
+        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
       />
 
       <p className="w-full text-right text-xs text-sky-700/50 mb-4">
@@ -61,6 +68,7 @@ export default function GentleTranslatorCard() {
       <AnimatePresence mode="wait">
         {translatedVoice && (
           <motion.div
+            role="status"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
             className="bg-blue-50 border border-blue-200 text-blue-800 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
@@ -69,6 +77,16 @@ export default function GentleTranslatorCard() {
               🕊️ 翻訳結果：
             </span>
             {translatedVoice}
+          </motion.div>
+        )}
+        {translationError && (
+          <motion.div
+            role="alert"
+            initial={{ opacity: 0, y: 10, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            className="bg-red-50 border border-red-200 text-red-700 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
+          >
+            {translationError}
           </motion.div>
         )}
       </AnimatePresence>
