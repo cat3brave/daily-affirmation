@@ -1,36 +1,63 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "./lib/supabaseClient";
 
-const supabase = createSupabaseBrowserClient();
-
 export default function LandingPage() {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const router = useRouter();
 
   useEffect(() => {
-    const checkUser = async () => {
-      // ログイン状態を確認
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    let isMounted = true;
 
-      if (session) {
-        // ログインしていればダッシュボードへ
-        router.push("/dashboard");
-      } else {
-        // ログインしていなければログイン画面へ
-        router.push("/login");
+    const pushIfMounted = (path: string) => {
+      if (isMounted) {
+        router.push(path);
+      }
+    };
+
+    const checkUser = async () => {
+      try {
+        // ログイン状態を確認
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error("セッション確認に失敗しました:", error);
+          pushIfMounted("/login");
+          return;
+        }
+
+        if (session) {
+          // ログインしていればダッシュボードへ
+          pushIfMounted("/dashboard");
+        } else {
+          // ログインしていなければログイン画面へ
+          pushIfMounted("/login");
+        }
+      } catch (error) {
+        console.error("セッション確認中に想定外のエラー:", error);
+        pushIfMounted("/login");
       }
     };
 
     checkUser();
-  }, [router]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router, supabase]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-pink-50">
-      <p className="text-pink-400 font-bold animate-pulse">
+      <p
+        role="status"
+        aria-live="polite"
+        className="text-pink-400 font-bold animate-pulse"
+      >
         心の準備をしています...🌷
       </p>
     </div>
