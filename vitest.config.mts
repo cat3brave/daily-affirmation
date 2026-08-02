@@ -8,6 +8,17 @@ export default defineConfig({
   },
   test: {
     clearMocks: true,
+    coverage: {
+      provider: "v8",
+      reportsDirectory: "coverage",
+      reporter: ["text", "json-summary", "html"],
+      include: ["app/**/*.{ts,tsx}"],
+      exclude: [
+        "app/**/*.test.{ts,tsx}",
+        "app/**/*.spec.{ts,tsx}",
+        "app/**/*.d.ts",
+      ],
+    },
     environment: "jsdom",
     environmentOptions: {
       jsdom: {
