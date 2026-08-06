@@ -45,5 +45,11 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E smoke tests
+        run: npm run e2e
+
       - name: Build
         run: npm run build
