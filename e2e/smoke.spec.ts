@@ -148,3 +148,15 @@ test("未ログインでトップページへアクセスするとloginへ移動
     page.getByRole("heading", { name: "おかえりなさい🌷" }),
   ).toBeVisible();
 });
+
+test("存在しないURLではアプリ用の404案内を表示する", async ({ page }) => {
+  const response = await page.goto("/this-page-does-not-exist");
+
+  expect(response?.status()).toBe(404);
+  await expect(
+    page.getByRole("heading", { name: "ページが見つかりませんでした" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "最初の画面へ戻る" }),
+  ).toHaveAttribute("href", "/");
+});
