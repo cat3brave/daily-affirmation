@@ -67,6 +67,7 @@ const SIGN_UP_SUCCESS_MESSAGE =
 const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
 const AUTH_MESSAGE_ID = "auth-message";
+const AUTH_LOADING_MESSAGE = "認証処理中です。";
 const LOGIN_BUTTON_LABEL = "ログイン";
 const GOOGLE_LOGIN_BUTTON_LABEL = "Googleでログイン";
 const SIGN_UP_TOGGLE_LABEL = "はじめての方はこちら（新規登録）";
@@ -143,10 +144,14 @@ afterEach(() => {
 
 describe("LoginPage", () => {
   it("メールアドレスとパスワードの入力欄にラベルと認証向け属性を設定する", () => {
-    render(<LoginPage />);
+    const { container } = render(<LoginPage />);
 
     const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
     const passwordInput = screen.getByLabelText(PASSWORD_PLACEHOLDER);
+    const form = container.querySelector("form");
+
+    expect(form).toHaveAttribute("aria-busy", "false");
+    expect(screen.queryByText(AUTH_LOADING_MESSAGE)).not.toBeInTheDocument();
 
     expect(emailInput).toBeVisible();
     expect(emailInput).toHaveAttribute("id", "email");
@@ -174,6 +179,16 @@ describe("LoginPage", () => {
       "autocomplete",
       "current-password",
     );
+  });
+
+  it("Googleボタンのアクセシブルネームを正確に保つ", () => {
+    render(<LoginPage />);
+
+    const googleButton = screen.getByRole("button", {
+      name: GOOGLE_LOGIN_BUTTON_LABEL,
+    });
+
+    expect(googleButton).toHaveAccessibleName(GOOGLE_LOGIN_BUTTON_LABEL);
   });
 
   it("メール未入力とパスワード未入力では認証通信せず入力エラーを表示する", async () => {
@@ -280,9 +295,7 @@ describe("LoginPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      SIGN_UP_SUCCESS_MESSAGE,
-    );
+    expect(await screen.findByText(SIGN_UP_SUCCESS_MESSAGE)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }),
     ).toBeInTheDocument();
@@ -396,8 +409,9 @@ describe("LoginPage", () => {
   it("認証処理中は入力とボタンをdisabledにし連続操作でも通信を1回だけ実行する", async () => {
     const signInDeferred = createDeferred<AuthResult>();
     loginMocks.signInWithPassword.mockReturnValue(signInDeferred.promise);
-    render(<LoginPage />);
+    const { container } = render(<LoginPage />);
     fillEmailAndPassword();
+    const form = container.querySelector("form");
     const emailInput = screen.getByPlaceholderText(EMAIL_PLACEHOLDER);
     const passwordInput = screen.getByPlaceholderText(PASSWORD_PLACEHOLDER);
     const googleButton = screen.getByRole("button", {
@@ -411,6 +425,8 @@ describe("LoginPage", () => {
 
     expect(loginMocks.signInWithPassword).toHaveBeenCalledTimes(1);
     expect(loginMocks.signInWithOAuth).not.toHaveBeenCalled();
+    expect(form).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("status")).toHaveTextContent(AUTH_LOADING_MESSAGE);
     expect(emailInput).toBeDisabled();
     expect(passwordInput).toBeDisabled();
     expect(loginButton).toBeDisabled();
@@ -422,6 +438,8 @@ describe("LoginPage", () => {
     });
 
     expect(loginMocks.push).toHaveBeenCalledWith("/dashboard");
+    expect(form).toHaveAttribute("aria-busy", "false");
+    expect(screen.queryByText(AUTH_LOADING_MESSAGE)).not.toBeInTheDocument();
   });
 
   it("再レンダーしてもSupabaseクライアントを再作成しない", () => {

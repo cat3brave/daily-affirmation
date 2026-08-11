@@ -184,7 +184,13 @@ export default function LoginPage() {
             </>
           )}
         </p>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-busy={isLoading}>
+          {isLoading && (
+            <p role="status" aria-live="polite" className="sr-only">
+              認証処理中です。
+            </p>
+          )}
+
           {message && (
             <div
               id={AUTH_MESSAGE_ID}
@@ -260,7 +266,8 @@ export default function LoginPage() {
               >
                 <Image
                   src="https://www.google.com/favicon.ico"
-                  alt="Google"
+                  alt=""
+                  aria-hidden="true"
                   width={20}
                   height={20}
                   className="w-5 h-5"

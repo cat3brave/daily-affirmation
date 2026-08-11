@@ -84,8 +84,37 @@ test("公開ログイン画面をChromiumで表示できる", async ({ page }) =
     page.getByRole("button", { name: "ログイン", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Googleでログイン/ }),
+    page.getByRole("button", { name: "Googleでログイン", exact: true }),
   ).toBeVisible();
+});
+
+test("ログイン画面のTab移動順が入力から主要操作へ進む", async ({ page }) => {
+  await page.goto("/login");
+
+  const emailInput = page.getByLabel("メールアドレス");
+  const passwordInput = page.getByLabel("パスワード");
+  const googleButton = page.getByRole("button", {
+    name: "Googleでログイン",
+    exact: true,
+  });
+  const loginButton = page.getByRole("button", {
+    name: "ログイン",
+    exact: true,
+  });
+  const signUpToggle = page.getByRole("button", {
+    name: "はじめての方はこちら（新規登録）",
+  });
+
+  await page.keyboard.press("Tab");
+  await expect(emailInput).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(passwordInput).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(googleButton).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(loginButton).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(signUpToggle).toBeFocused();
 });
 
 test("メールアドレス未入力では認証通信せず入力エラーを表示する", async ({
