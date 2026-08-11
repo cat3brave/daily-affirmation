@@ -52,8 +52,34 @@ test("公開ログイン画面をChromiumで表示できる", async ({ page }) =
   await expect(
     page.getByRole("heading", { name: "おかえりなさい🌷" }),
   ).toBeVisible();
-  await expect(page.getByPlaceholder("メールアドレス")).toBeVisible();
-  await expect(page.getByPlaceholder("パスワード")).toBeVisible();
+  await expect(page.getByLabel("メールアドレス")).toBeVisible();
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute("id", "email");
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "name",
+    "email",
+  );
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "type",
+    "email",
+  );
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "inputmode",
+    "email",
+  );
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "autocomplete",
+    "email",
+  );
+  await expect(page.getByLabel("パスワード")).toBeVisible();
+  await expect(page.getByLabel("パスワード")).toHaveAttribute("id", "password");
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "name",
+    "password",
+  );
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "autocomplete",
+    "current-password",
+  );
   await expect(
     page.getByRole("button", { name: "ログイン", exact: true }),
   ).toBeVisible();
@@ -70,6 +96,18 @@ test("メールアドレス未入力では認証通信せず入力エラーを�
   await page.goto("/login");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
 
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByLabel("メールアドレス")).toHaveAttribute(
+    "aria-describedby",
+    "auth-message",
+  );
+  await expect(page.getByLabel("パスワード")).not.toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
   await expect(
     page
       .getByRole("alert")
@@ -83,9 +121,21 @@ test("パスワード未入力では認証通信せず入力エラーを表示�
   const supabaseAuthRequests = trackSupabaseAuthRequests(page);
 
   await page.goto("/login");
-  await page.getByPlaceholder("メールアドレス").fill("e2e-user@example.com");
+  await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
 
+  await expect(page.getByLabel("メールアドレス")).not.toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "aria-describedby",
+    "auth-message",
+  );
   await expect(
     page.getByRole("alert").filter({ hasText: "パスワードを入力してください。" }),
   ).toHaveText("パスワードを入力してください。");
@@ -106,6 +156,10 @@ test("新規登録モードへ切り替えられる", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "確認メールを送る" }),
   ).toBeVisible();
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "autocomplete",
+    "new-password",
+  );
   await expect(
     page.getByRole("button", { name: /Googleでログイン/ }),
   ).toBeHidden();
@@ -125,6 +179,10 @@ test("新規登録モードからログインモードへ戻せる", async ({ pa
   await expect(
     page.getByRole("button", { name: "ログイン", exact: true }),
   ).toBeVisible();
+  await expect(page.getByLabel("パスワード")).toHaveAttribute(
+    "autocomplete",
+    "current-password",
+  );
   await expect(
     page.getByRole("button", { name: /Googleでログイン/ }),
   ).toBeVisible();

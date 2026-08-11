@@ -11,6 +11,8 @@ const SIGN_UP_FAILURE_MESSAGE =
   "登録に失敗しました。メールアドレスやパスワードを確認してください。";
 const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
+const AUTH_MESSAGE_ID = "auth-message";
+type InvalidField = "email" | "password" | null;
 
 export default function LoginPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -19,6 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [message, setMessage] = useState("");
+  const [invalidField, setInvalidField] = useState<InvalidField>(null);
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success",
   );
@@ -28,16 +31,19 @@ export default function LoginPage() {
   const validateEmailAndPassword = () => {
     if (!email.trim()) {
       setMessageType("error");
+      setInvalidField("email");
       setMessage("メールアドレスを入力してください。");
       return false;
     }
 
     if (!password.trim()) {
       setMessageType("error");
+      setInvalidField("password");
       setMessage("パスワードを入力してください。");
       return false;
     }
 
+    setInvalidField(null);
     setMessage("");
     return true;
   };
@@ -57,14 +63,17 @@ export default function LoginPage() {
 
       if (error) {
         setMessageType("error");
+        setInvalidField(null);
         setMessage(LOGIN_FAILURE_MESSAGE);
       } else {
+        setInvalidField(null);
         setMessage("");
         router.push("/dashboard");
       }
     } catch (error) {
       console.error("ログイン中に想定外のエラー:", error);
       setMessageType("error");
+      setInvalidField(null);
       setMessage(LOGIN_FAILURE_MESSAGE);
     } finally {
       authInFlightRef.current = false;
@@ -87,9 +96,11 @@ export default function LoginPage() {
 
       if (error) {
         setMessageType("error");
+        setInvalidField(null);
         setMessage(SIGN_UP_FAILURE_MESSAGE);
       } else {
         setMessageType("success");
+        setInvalidField(null);
         setMessage(
           "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。",
         );
@@ -98,6 +109,7 @@ export default function LoginPage() {
     } catch (error) {
       console.error("登録中に想定外のエラー:", error);
       setMessageType("error");
+      setInvalidField(null);
       setMessage(SIGN_UP_FAILURE_MESSAGE);
     } finally {
       authInFlightRef.current = false;
@@ -122,6 +134,7 @@ export default function LoginPage() {
       if (error) {
         console.error("Googleログインエラー:", error.message);
         setMessageType("error");
+        setInvalidField(null);
         setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
         authInFlightRef.current = false;
         setIsLoading(false);
@@ -129,6 +142,7 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Googleログインエラー:", error);
       setMessageType("error");
+      setInvalidField(null);
       setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
       authInFlightRef.current = false;
       setIsLoading(false);
@@ -173,6 +187,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           {message && (
             <div
+              id={AUTH_MESSAGE_ID}
               role={messageType === "success" ? "status" : "alert"}
               className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
                 messageType === "success"
@@ -184,23 +199,56 @@ export default function LoginPage() {
             </div>
           )}
 
-          <input
-            type="email"
-            placeholder="メールアドレス"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-            className="w-full mb-4 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
-          />
+          <div className="mb-4">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-bold text-pink-600"
+            >
+              メールアドレス
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="メールアドレス"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              aria-invalid={invalidField === "email" ? "true" : undefined}
+              aria-describedby={
+                invalidField === "email" ? AUTH_MESSAGE_ID : undefined
+              }
+              className="w-full p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
 
-          <input
-            type="password"
-            placeholder="パスワード"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            className="w-full mb-6 p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
-          />
+          <div className="mb-6">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-bold text-pink-600"
+            >
+              パスワード
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete={
+                isSignUpMode ? "new-password" : "current-password"
+              }
+              placeholder="パスワード"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              aria-invalid={invalidField === "password" ? "true" : undefined}
+              aria-describedby={
+                invalidField === "password" ? AUTH_MESSAGE_ID : undefined
+              }
+              className="w-full p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+          </div>
 
           <div className="flex flex-col gap-3">
             {!isSignUpMode && (
@@ -237,6 +285,7 @@ export default function LoginPage() {
               onClick={() => {
                 if (isLoading) return;
                 setMessage("");
+                setInvalidField(null);
                 setIsSignUpMode((prev) => !prev);
               }}
               disabled={isLoading}

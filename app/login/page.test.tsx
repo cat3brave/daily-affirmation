@@ -66,9 +66,11 @@ const SIGN_UP_SUCCESS_MESSAGE =
   "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。";
 const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
+const AUTH_MESSAGE_ID = "auth-message";
 const LOGIN_BUTTON_LABEL = "ログイン";
 const GOOGLE_LOGIN_BUTTON_LABEL = "Googleでログイン";
 const SIGN_UP_TOGGLE_LABEL = "はじめての方はこちら（新規登録）";
+const LOGIN_MODE_TOGGLE_LABEL = "すでに登録済みの方はこちら";
 const SIGN_UP_SUBMIT_LABEL = "確認メールを送る";
 
 function createDeferred<T>(): Deferred<T> {
@@ -106,10 +108,10 @@ function configureLoginMock() {
 }
 
 function fillEmailAndPassword(email = " user@example.com ", password = "secret") {
-  fireEvent.change(screen.getByPlaceholderText(EMAIL_PLACEHOLDER), {
+  fireEvent.change(screen.getByLabelText(EMAIL_PLACEHOLDER), {
     target: { value: email },
   });
-  fireEvent.change(screen.getByPlaceholderText(PASSWORD_PLACEHOLDER), {
+  fireEvent.change(screen.getByLabelText(PASSWORD_PLACEHOLDER), {
     target: { value: password },
   });
 }
@@ -118,6 +120,14 @@ function switchToSignUpMode() {
   fireEvent.click(
     screen.getByRole("button", {
       name: SIGN_UP_TOGGLE_LABEL,
+    }),
+  );
+}
+
+function switchToLoginMode() {
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: LOGIN_MODE_TOGGLE_LABEL,
     }),
   );
 }
@@ -132,25 +142,74 @@ afterEach(() => {
 });
 
 describe("LoginPage", () => {
+  it("メールアドレスとパスワードの入力欄にラベルと認証向け属性を設定する", () => {
+    render(<LoginPage />);
+
+    const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
+    const passwordInput = screen.getByLabelText(PASSWORD_PLACEHOLDER);
+
+    expect(emailInput).toBeVisible();
+    expect(emailInput).toHaveAttribute("id", "email");
+    expect(emailInput).toHaveAttribute("name", "email");
+    expect(emailInput).toHaveAttribute("type", "email");
+    expect(emailInput).toHaveAttribute("inputmode", "email");
+    expect(emailInput).toHaveAttribute("autocomplete", "email");
+    expect(emailInput).not.toBeRequired();
+
+    expect(passwordInput).toBeVisible();
+    expect(passwordInput).toHaveAttribute("id", "password");
+    expect(passwordInput).toHaveAttribute("name", "password");
+    expect(passwordInput).toHaveAttribute("type", "password");
+    expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+    expect(passwordInput).not.toBeRequired();
+
+    switchToSignUpMode();
+    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
+
+    switchToLoginMode();
+    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
+      "autocomplete",
+      "current-password",
+    );
+  });
+
   it("メール未入力とパスワード未入力では認証通信せず入力エラーを表示する", async () => {
     render(<LoginPage />);
+    const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
+    const passwordInput = screen.getByLabelText(PASSWORD_PLACEHOLDER);
 
     fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      EMAIL_REQUIRED_MESSAGE,
-    );
+    const emailAlert = await screen.findByRole("alert");
+
+    expect(emailAlert).toHaveAttribute("id", AUTH_MESSAGE_ID);
+    expect(emailAlert).toHaveTextContent(EMAIL_REQUIRED_MESSAGE);
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
+    expect(emailInput).toHaveAttribute("aria-describedby", AUTH_MESSAGE_ID);
+    expect(passwordInput).not.toHaveAttribute("aria-invalid");
+    expect(passwordInput).not.toHaveAttribute("aria-describedby");
     expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
     expect(loginMocks.signUp).not.toHaveBeenCalled();
     expect(loginMocks.signInWithOAuth).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByPlaceholderText(EMAIL_PLACEHOLDER), {
+    fireEvent.change(emailInput, {
       target: { value: "user@example.com" },
     });
     fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      PASSWORD_REQUIRED_MESSAGE,
+    const passwordAlert = await screen.findByRole("alert");
+
+    expect(passwordAlert).toHaveAttribute("id", AUTH_MESSAGE_ID);
+    expect(passwordAlert).toHaveTextContent(PASSWORD_REQUIRED_MESSAGE);
+    expect(emailInput).not.toHaveAttribute("aria-invalid");
+    expect(emailInput).not.toHaveAttribute("aria-describedby");
+    expect(passwordInput).toHaveAttribute("aria-invalid", "true");
+    expect(passwordInput).toHaveAttribute(
+      "aria-describedby",
+      AUTH_MESSAGE_ID,
     );
     expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
     expect(loginMocks.signUp).not.toHaveBeenCalled();
