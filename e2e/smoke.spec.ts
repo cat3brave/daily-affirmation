@@ -28,6 +28,23 @@ const e2eSessionResponse = {
   refresh_token: "e2e-refresh-token",
   user: e2eUser,
 };
+const allowedDashboardRestTables = new Set([
+  "bloom_logs",
+  "favorite_affirmations",
+  "three_good_things",
+]);
+
+type LoginRequestBody = {
+  email?: unknown;
+  password?: unknown;
+};
+
+type AuthenticatedSupabaseMock = {
+  loginRequestBodies: LoginRequestBody[];
+  restWriteRequests: string[];
+  unexpectedAuthRequests: string[];
+  unexpectedRestRequests: string[];
+};
 
 async function stubExternalServices(page: Page) {
   await page.route("https://example.supabase.co/**", async (route) => {
@@ -55,7 +72,16 @@ async function stubExternalServices(page: Page) {
   await page.route("https://accounts.google.com/**", (route) => route.abort());
 }
 
-async function stubAuthenticatedSupabase(page: Page) {
+async function stubAuthenticatedSupabase(
+  page: Page,
+): Promise<AuthenticatedSupabaseMock> {
+  const mockState: AuthenticatedSupabaseMock = {
+    loginRequestBodies: [],
+    restWriteRequests: [],
+    unexpectedAuthRequests: [],
+    unexpectedRestRequests: [],
+  };
+
   await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -65,6 +91,8 @@ async function stubAuthenticatedSupabase(page: Page) {
       url.pathname === "/auth/v1/token" &&
       url.searchParams.get("grant_type") === "password"
     ) {
+      mockState.loginRequestBodies.push(request.postDataJSON());
+
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -82,15 +110,33 @@ async function stubAuthenticatedSupabase(page: Page) {
       return;
     }
 
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: "{}",
-    });
+    mockState.unexpectedAuthRequests.push(`${request.method()} ${url.href}`);
+    await route.abort();
   });
 
   await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
     const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method();
+    const table = url.pathname.replace("/rest/v1/", "").split("/")[0];
+
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(method)) {
+      mockState.restWriteRequests.push(`${method} ${url.href}`);
+      await route.abort();
+      return;
+    }
+
+    if (!["GET", "HEAD"].includes(method)) {
+      mockState.unexpectedRestRequests.push(`${method} ${url.href}`);
+      await route.abort();
+      return;
+    }
+
+    if (!allowedDashboardRestTables.has(table)) {
+      mockState.unexpectedRestRequests.push(`${method} ${url.href}`);
+      await route.abort();
+      return;
+    }
 
     await route.fulfill({
       status: 200,
@@ -101,6 +147,8 @@ async function stubAuthenticatedSupabase(page: Page) {
       body: request.method() === "HEAD" ? "" : "[]",
     });
   });
+
+  return mockState;
 }
 
 function trackSupabaseAuthRequests(page: Page) {
@@ -122,36 +170,46 @@ test.beforeEach(async ({ page }) => {
 test("login succeeds and authenticated dashboard tabs can be navigated", async ({
   page,
 }) => {
-  await stubAuthenticatedSupabase(page);
+  const supabaseMock = await stubAuthenticatedSupabase(page);
 
   await page.goto("/login");
-  await page.locator("#email").fill("e2e-user@example.com");
-  await page.locator("#password").fill("e2e-password");
-  await page.locator('form button[type="submit"]').click();
+  await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
+  await page.getByLabel("パスワード").fill("e2e-password");
+  await page.getByRole("button", { name: "ログイン", exact: true }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText("e2e-user")).toBeVisible();
+  await expect(page.getByText("ログイン情報を確認しています...")).toBeHidden();
+  await expect(page.getByText("e2e-user さん🌷")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "言葉を受け取る" }),
+  ).toBeVisible();
+  await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
 
-  const tabButtons = page.locator("div.fixed").getByRole("button");
-  const homeTabButton = tabButtons.nth(0);
-  const workTabButton = tabButtons.nth(1);
-  const amuletTabButton = tabButtons.nth(2);
+  await page.getByRole("button", { name: /ワーク/ }).click();
+  await expect(page.getByText("優しい翻訳機")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "言葉を受け取る" }),
+  ).toBeHidden();
 
-  await expect(tabButtons).toHaveCount(3);
-  await expect(homeTabButton).toHaveClass(/bg-sky-100\/80/);
-  await expect(page.locator('main button.bg-sky-500')).toBeVisible();
+  await page.getByRole("button", { name: /お守り/ }).click();
+  await expect(page.getByText("失敗の救急箱")).toBeVisible();
 
-  await workTabButton.click();
-  await expect(workTabButton).toHaveClass(/bg-sky-100\/80/);
-  await expect(page.locator('main input[type="range"]')).toBeVisible();
+  await page.getByRole("button", { name: /ホーム/ }).click();
+  await expect(
+    page.getByRole("button", { name: "言葉を受け取る" }),
+  ).toBeVisible();
+  await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
 
-  await amuletTabButton.click();
-  await expect(amuletTabButton).toHaveClass(/bg-yellow-100\/80/);
-  await expect(page.locator("main button.bg-yellow-400")).toBeVisible();
-
-  await homeTabButton.click();
-  await expect(homeTabButton).toHaveClass(/bg-sky-100\/80/);
-  await expect(page.locator('main button.bg-sky-500')).toBeVisible();
+  expect(supabaseMock.loginRequestBodies).toEqual([
+    {
+      email: "e2e-user@example.com",
+      password: "e2e-password",
+      gotrue_meta_security: {},
+    },
+  ]);
+  expect(supabaseMock.restWriteRequests).toEqual([]);
+  expect(supabaseMock.unexpectedAuthRequests).toEqual([]);
+  expect(supabaseMock.unexpectedRestRequests).toEqual([]);
 });
 
 test("公開ログイン画面をChromiumで表示できる", async ({ page }) => {
