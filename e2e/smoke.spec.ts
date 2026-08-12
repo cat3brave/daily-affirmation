@@ -2,6 +2,32 @@ import { expect, test, type Page } from "@playwright/test";
 
 const supabaseAuthRequestUrlPattern =
   /^https:\/\/example\.supabase\.co\/auth\/v1\//;
+const e2eUser = {
+  id: "e2e-user-id",
+  aud: "authenticated",
+  role: "authenticated",
+  email: "e2e-user@example.com",
+  email_confirmed_at: "2026-08-13T00:00:00.000Z",
+  phone: "",
+  confirmed_at: "2026-08-13T00:00:00.000Z",
+  last_sign_in_at: "2026-08-13T00:00:00.000Z",
+  app_metadata: {
+    provider: "email",
+    providers: ["email"],
+  },
+  user_metadata: {},
+  identities: [],
+  created_at: "2026-08-13T00:00:00.000Z",
+  updated_at: "2026-08-13T00:00:00.000Z",
+};
+const e2eSessionResponse = {
+  access_token: "e2e-access-token",
+  token_type: "bearer",
+  expires_in: 3600,
+  expires_at: 1786579200,
+  refresh_token: "e2e-refresh-token",
+  user: e2eUser,
+};
 
 async function stubExternalServices(page: Page) {
   await page.route("https://example.supabase.co/**", async (route) => {
@@ -29,6 +55,54 @@ async function stubExternalServices(page: Page) {
   await page.route("https://accounts.google.com/**", (route) => route.abort());
 }
 
+async function stubAuthenticatedSupabase(page: Page) {
+  await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (
+      request.method() === "POST" &&
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "password"
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(e2eSessionResponse),
+      });
+      return;
+    }
+
+    if (request.method() === "GET" && url.pathname === "/auth/v1/user") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(e2eUser),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{}",
+    });
+  });
+
+  await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
+    const request = route.request();
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: {
+        "content-range": request.method() === "HEAD" ? "0-0/0" : "*/0",
+      },
+      body: request.method() === "HEAD" ? "" : "[]",
+    });
+  });
+}
+
 function trackSupabaseAuthRequests(page: Page) {
   const requests: string[] = [];
 
@@ -43,6 +117,41 @@ function trackSupabaseAuthRequests(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   await stubExternalServices(page);
+});
+
+test("login succeeds and authenticated dashboard tabs can be navigated", async ({
+  page,
+}) => {
+  await stubAuthenticatedSupabase(page);
+
+  await page.goto("/login");
+  await page.locator("#email").fill("e2e-user@example.com");
+  await page.locator("#password").fill("e2e-password");
+  await page.locator('form button[type="submit"]').click();
+
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByText("e2e-user")).toBeVisible();
+
+  const tabButtons = page.locator("div.fixed").getByRole("button");
+  const homeTabButton = tabButtons.nth(0);
+  const workTabButton = tabButtons.nth(1);
+  const amuletTabButton = tabButtons.nth(2);
+
+  await expect(tabButtons).toHaveCount(3);
+  await expect(homeTabButton).toHaveClass(/bg-sky-100\/80/);
+  await expect(page.locator('main button.bg-sky-500')).toBeVisible();
+
+  await workTabButton.click();
+  await expect(workTabButton).toHaveClass(/bg-sky-100\/80/);
+  await expect(page.locator('main input[type="range"]')).toBeVisible();
+
+  await amuletTabButton.click();
+  await expect(amuletTabButton).toHaveClass(/bg-yellow-100\/80/);
+  await expect(page.locator("main button.bg-yellow-400")).toBeVisible();
+
+  await homeTabButton.click();
+  await expect(homeTabButton).toHaveClass(/bg-sky-100\/80/);
+  await expect(page.locator('main button.bg-sky-500')).toBeVisible();
 });
 
 test("公開ログイン画面をChromiumで表示できる", async ({ page }) => {
