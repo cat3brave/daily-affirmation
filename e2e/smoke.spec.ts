@@ -24,7 +24,6 @@ const e2eSessionResponse = {
   access_token: "e2e-access-token",
   token_type: "bearer",
   expires_in: 3600,
-  expires_at: 1786579200,
   refresh_token: "e2e-refresh-token",
   user: e2eUser,
 };
@@ -96,7 +95,10 @@ async function stubAuthenticatedSupabase(
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(e2eSessionResponse),
+        body: JSON.stringify({
+          ...e2eSessionResponse,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+        }),
       });
       return;
     }
