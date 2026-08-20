@@ -252,9 +252,19 @@ test("公開ログイン画面をChromiumで表示できる", async ({ page }) =
   await expect(
     page.getByRole("button", { name: "ログイン", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Googleでログイン", exact: true }),
-  ).toBeVisible();
+  const googleButton = page.getByRole("button", {
+    name: "Googleでログイン",
+    exact: true,
+  });
+  await expect(googleButton).toBeVisible();
+  await expect(googleButton.locator("img")).toHaveAttribute(
+    "src",
+    "/google-g.svg",
+  );
+  await expect(googleButton.locator("img")).not.toHaveAttribute(
+    "src",
+    "https://www.google.com/favicon.ico",
+  );
 });
 
 test("ログイン画面のTab移動順が入力から主要操作へ進む", async ({ page }) => {
