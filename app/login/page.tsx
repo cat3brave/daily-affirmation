@@ -265,7 +265,7 @@ export default function LoginPage() {
                 className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Image
-                  src="https://www.google.com/favicon.ico"
+                  src="/google-g.svg"
                   alt=""
                   aria-hidden="true"
                   width={20}
