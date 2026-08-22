@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Confetti from "react-confetti";
 
@@ -12,6 +13,32 @@ export default function TadaModal({
   setShowTada,
   windowSize,
 }: TadaModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!showTada) return;
+
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowTada(false);
+      }
+    };
+
+    closeButtonRef.current?.focus();
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElement?.focus();
+    };
+  }, [showTada, setShowTada]);
+
   return (
     <>
       {/* 🎊 紙吹雪 */}
@@ -45,6 +72,10 @@ export default function TadaModal({
             onClick={() => setShowTada(false)}
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              aria-describedby={descriptionId}
               initial={{ scale: 0.5, rotate: -10, y: 50 }}
               animate={{ scale: 1, rotate: 0, y: 0 }}
               exit={{ scale: 0.8, opacity: 0, y: 50 }}
@@ -59,13 +90,19 @@ export default function TadaModal({
               >
                 🎉
               </motion.div>
-              <h2 className="text-4xl font-black text-yellow-500 mb-4 tracking-widest drop-shadow-sm">
+              <h2
+                id={titleId}
+                className="text-4xl font-black text-yellow-500 mb-4 tracking-widest drop-shadow-sm"
+              >
                 Ta-Da!
               </h2>
               <p className="text-sky-800 font-extrabold text-xl mb-3">
                 ナイストライ！👏
               </p>
-              <p className="text-sky-700/80 text-base leading-relaxed mb-8 font-medium">
+              <p
+                id={descriptionId}
+                className="text-sky-700/80 text-base leading-relaxed mb-8 font-medium"
+              >
                 失敗は「挑戦した証拠」であり、
                 <br />
                 とても貴重なデータです。
@@ -73,6 +110,7 @@ export default function TadaModal({
                 完璧じゃないあなたも、最高に素晴らしい!
               </p>
               <motion.button
+                ref={closeButtonRef}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowTada(false)}
