@@ -101,11 +101,25 @@ Codex Cloud:
 
 - `main`へ直接commitまたはpushしない
 - 最新の`main`から作業ブランチを作成する
-- 検証成功後、作業ブランチへcommitしてpushする
-- `main`をbaseとする通常のPRを作成する
+- 必要な検証が成功した場合だけ、対象ファイルを明示して作業ブランチへcommit・pushする
+- Codex Cloud内のGitリポジトリに`origin`がない場合はterminal pushを繰り返さず、Codex CloudのGitHub連携またはPR作成機能を使用する
+- `origin`の不在だけでは停止しない
+- GitHub連携自体の認証または権限エラーが発生した場合だけ停止する
+- `main`をbaseとする通常のPRを作成し、Draft PRは作成しない
 - 同じ目的のPRがある場合は重複作成せず、既存PRを使用する
-- PRのCI結果を確認して報告する
-- PRはCodexがmergeせず、内容とCIを確認したユーザーがmergeする
+- PRのmerge方式にはSquashを使用する
+- PR作成後、auto-mergeを有効にする
+- 必須status checkの`Verify`を監視する
+- `Verify`が成功し、競合がない場合は、GitHubのauto-mergeによるmerge完了まで待つ
+- merge後、作業ブランチが自動削除されたことを確認する
+- 正常系ではユーザーの承認を待たずに進める
+- 次の場合だけ停止し、ユーザーへ報告する
+  - test、lint、build、E2E、CIの失敗
+  - merge conflict
+  - push、PR作成、auto-merge設定の認証失敗
+  - rulesetまたはGitHub設定によるブロック
+- `main`への直接push、rulesetのbypass、force push、失敗したcheckの無視、強制mergeは禁止する
+- 問題発生時も、許可された範囲を超えて修正対象を広げない
 
 Windowsローカル:
 
