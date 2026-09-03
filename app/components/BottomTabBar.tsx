@@ -11,6 +11,9 @@ export default function BottomTabBar({
     <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-50 px-6 pb-6 pt-2 pointer-events-none">
       <div className="bg-white/70 backdrop-blur-xl border-2 border-white shadow-[0_10px_40px_rgb(0,0,0,0.1)] rounded-[2rem] flex justify-around items-center p-2 pointer-events-auto">
         <button
+          type="button"
+          aria-label="ホーム"
+          aria-pressed={currentTab === "home"}
           onClick={() => setCurrentTab("home")}
           className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "home" ? "bg-sky-100/80 shadow-inner" : "hover:bg-sky-50"}`}
         >
@@ -26,6 +29,9 @@ export default function BottomTabBar({
           </span>
         </button>
         <button
+          type="button"
+          aria-label="ワーク"
+          aria-pressed={currentTab === "work"}
           onClick={() => setCurrentTab("work")}
           className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "work" ? "bg-sky-100/80 shadow-inner" : "hover:bg-sky-50"}`}
         >
@@ -41,6 +47,9 @@ export default function BottomTabBar({
           </span>
         </button>
         <button
+          type="button"
+          aria-label="お守り"
+          aria-pressed={currentTab === "amulet"}
           onClick={() => setCurrentTab("amulet")}
           className={`flex flex-col items-center justify-center w-24 h-16 rounded-2xl transition-all duration-300 ${currentTab === "amulet" ? "bg-yellow-100/80 shadow-inner" : "hover:bg-yellow-50"}`}
         >
