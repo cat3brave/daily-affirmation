@@ -39,6 +39,7 @@ export default function FavoriteAffirmationsList({
 
               <button
                 type="button"
+                aria-label={`「${affirmation}」を削除`}
                 onClick={() => handleRemoveFavoriteAffirmation(affirmation)}
                 className="shrink-0 text-xs text-pink-400 hover:text-pink-600 font-bold"
               >
