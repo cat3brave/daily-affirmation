@@ -6,15 +6,20 @@ export default function SixtyScoreCard() {
 
   return (
     <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm flex flex-col items-center mb-8">
-      <p className="text-sky-800/80 font-bold mb-4 tracking-wide text-center">
+      <label
+        htmlFor="target-score"
+        className="text-sky-800/80 font-bold mb-4 tracking-wide text-center"
+      >
         今日の目標ラインは？
-      </p>
+      </label>
       <input
+        id="target-score"
         type="range"
         min="0"
         max="100"
         step="10"
         value={targetScore}
+        aria-valuetext={`${targetScore}点`}
         onChange={(e) => setTargetScore(parseInt(e.target.value, 10))}
         className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
       />
@@ -37,6 +42,7 @@ export default function SixtyScoreCard() {
       </div>
       <AnimatePresence mode="wait">
         <motion.div
+          role="status"
           key={targetScore}
           initial={{ opacity: 0, y: -5 }}
           animate={{ opacity: 1, y: 0 }}
