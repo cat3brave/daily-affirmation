@@ -24,10 +24,14 @@ export default function AndBalanceCard() {
       </p>
       <div className="w-full flex flex-col gap-3 mb-6">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-bold text-sky-700 ml-2">
+          <label
+            htmlFor="left-fact"
+            className="text-xs font-bold text-sky-700 ml-2"
+          >
             起きた事実・ネガティブな思考
           </label>
           <input
+            id="left-fact"
             type="text"
             value={leftFact}
             onChange={(e) => {
@@ -44,10 +48,14 @@ export default function AndBalanceCard() {
           </span>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-bold text-sky-700 ml-2">
+          <label
+            htmlFor="right-fact"
+            className="text-xs font-bold text-sky-700 ml-2"
+          >
             並列する、もう一つの事実
           </label>
           <input
+            id="right-fact"
             type="text"
             value={rightFact}
             onChange={(e) => {
@@ -70,6 +78,7 @@ export default function AndBalanceCard() {
         ⚖️
       </motion.div>
       <button
+        type="button"
         onClick={handleBalance}
         disabled={!leftFact.trim() || !rightFact.trim() || isBalanced}
         className="px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-2 tracking-widest"
@@ -79,6 +88,7 @@ export default function AndBalanceCard() {
       <AnimatePresence>
         {isBalanced && (
           <motion.div
+            role="status"
             initial={{ opacity: 0, y: -10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
             className="mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-4 rounded-xl text-sm font-bold w-full text-center shadow-sm leading-relaxed"
