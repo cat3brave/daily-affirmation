@@ -5,20 +5,24 @@ on:
     types:
       - opened
       - reopened
+      - closed
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   configure:
     name: Configure Codex PR
     if: >-
+      github.event.action != 'closed' &&
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login == github.repository_owner &&
       startsWith(github.event.pull_request.head.ref, 'codex/') &&
       contains(github.event.pull_request.body, '[Codex Task](')
+    permissions:
+      contents: write
+      pull-requests: write
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -38,3 +42,37 @@ jobs:
         run: |
           set -euo pipefail
           gh pr merge --auto --squash "$PR_URL"
+
+  cleanup:
+    name: Delete merged Codex branch
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == github.repository_owner &&
+      startsWith(github.event.pull_request.head.ref, 'codex/')
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete head branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          ref="heads/${HEAD_REF}"
+
+          if ! response="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref}" 2>&1)"; then
+            if [[ "$response" == *"HTTP 404"* ]]; then
+              echo "Branch is already absent."
+              exit 0
+            fi
+
+            printf '%s\n' "$response" >&2
+            exit 1
+          fi
+
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/${ref}"
