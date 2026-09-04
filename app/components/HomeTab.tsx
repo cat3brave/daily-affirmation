@@ -66,6 +66,7 @@ export default function HomeTab({
       {/* 5. 失敗の告白ボタン */}
       <div className="mt-8 mb-4">
         <button
+          type="button"
           onClick={() => setShowTada(true)}
           className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors decoration-sky-300/50 underline underline-offset-4"
         >
