@@ -24,7 +24,10 @@ export default function FloatingCloudLayer({
         )}
       </AnimatePresence>
 
-      <div className="pointer-events-none fixed inset-0 z-20 overflow-hidden flex justify-center items-end pb-40">
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed inset-0 z-20 overflow-hidden flex justify-center items-end pb-40"
+      >
         <AnimatePresence>
           {floatingClouds.map((cloud) => (
             <motion.div

@@ -13,6 +13,8 @@ type WorkTabProps = {
 export default function WorkTab({ handleFloatCloud }: WorkTabProps) {
   return (
     <motion.div
+      aria-label="心を整えるワーク"
+      role="region"
       key="work"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
