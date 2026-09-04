@@ -24,7 +24,7 @@ export default function BirdViewPanel({
           className="absolute top-24 z-40 flex flex-col items-center"
         >
           <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-sky-100 text-center max-w-sm">
-            <p className="text-sky-800 font-bold mb-3">🕊️ 空からの景色</p>
+            <h2 className="text-sky-800 font-bold mb-3">🕊️ 空からの景色</h2>
             <p className="text-sky-700/80 text-sm leading-relaxed mb-4">
               少し離れて、深呼吸してみましょう。
               <br />
@@ -33,11 +33,20 @@ export default function BirdViewPanel({
               あなたは今日まで、こんなに素敵な軌跡を描いています。
             </p>
 
-            <div className="bg-pink-50 rounded-2xl p-4 inline-block border border-pink-100">
-              <p className="text-xs text-pink-400 font-bold mb-1">
+            <div
+              aria-label={`今までに咲かせたお花 ${totalBlooms}個`}
+              className="bg-pink-50 rounded-2xl p-4 inline-block border border-pink-100"
+            >
+              <p
+                aria-hidden="true"
+                className="text-xs text-pink-400 font-bold mb-1"
+              >
                 今までに咲かせたお花
               </p>
-              <p className="text-3xl text-pink-500 font-bold tracking-widest">
+              <p
+                aria-hidden="true"
+                className="text-3xl text-pink-500 font-bold tracking-widest"
+              >
                 🌸 {totalBlooms} <span className="text-lg">個 </span>
               </p>
             </div>

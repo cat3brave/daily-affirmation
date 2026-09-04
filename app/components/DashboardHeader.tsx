@@ -20,7 +20,9 @@ export default function DashboardHeader({
       {/* 👇 ホーム画面の時だけボタンを表示、それ以外は透明な空箱を置く */}
       {currentTab === "home" ? (
         <button
+          type="button"
           onClick={onToggleBirdView}
+          aria-pressed={isBirdView}
           className="bg-white/80 backdrop-blur-sm hover:bg-white text-sky-600 px-4 py-2 rounded-full shadow-sm border border-sky-100 font-bold tracking-wide transition-all text-sm"
         >
           {isBirdView ? "🌱 地上に戻る" : "🕊️ 鳥の目線になる"}
