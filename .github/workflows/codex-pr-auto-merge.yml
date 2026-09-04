@@ -1,0 +1,40 @@
+name: Codex PR auto-merge
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  configure:
+    name: Configure Codex PR
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == github.repository_owner &&
+      startsWith(github.event.pull_request.head.ref, 'codex/') &&
+      contains(github.event.pull_request.body, '[Codex Task](')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mark PR ready for review
+        if: github.event.pull_request.draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          gh pr ready "$PR_URL"
+
+      - name: Enable squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          gh pr merge --auto --squash "$PR_URL"
