@@ -177,8 +177,25 @@ test("login succeeds and authenticated dashboard tabs can be navigated", async (
   await page.goto("/login");
   await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
   await page.getByLabel("パスワード").fill("e2e-password");
+  const appOrigin = new URL(page.url()).origin;
+  const loginResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "POST" &&
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "password"
+    );
+  });
+  const dashboardResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return url.origin === appOrigin && url.pathname === "/dashboard";
+  });
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
 
+  expect((await loginResponsePromise).ok()).toBe(true);
+  expect((await dashboardResponsePromise).ok()).toBe(true);
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("ログイン情報を確認しています...")).toBeHidden();
   await expect(page.getByText("e2e-user さん🌷")).toBeVisible();
