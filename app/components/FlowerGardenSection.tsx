@@ -29,9 +29,12 @@ export default function FlowerGardenSection({
   return (
     <div className="relative flex flex-col items-center bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 shadow-sm w-full max-w-md">
       {totalBlooms > 0 && (
-        <div className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1">
-          <span>🌸</span>
-          <span>{totalBlooms}</span>
+        <div
+          aria-label={`今までに咲かせたお花 ${totalBlooms}個`}
+          className="absolute top-4 right-4 bg-pink-100 border border-pink-200 text-pink-500 px-3 py-1 rounded-full text-sm font-bold shadow-sm flex items-center gap-1"
+        >
+          <span aria-hidden="true">🌸</span>
+          <span aria-hidden="true">{totalBlooms}</span>
         </div>
       )}
       <p className="text-sky-700/80 font-bold mb-2 tracking-wide">
@@ -42,13 +45,18 @@ export default function FlowerGardenSection({
         initial={{ scale: 0.5, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        role="img"
+        aria-label={`花の成長状態: ${growthMessages[growth]}`}
         className="text-7xl my-4"
       >
         {growth === flowerStages.length - 1
           ? currentFlower
           : flowerStages[growth]}
       </motion.div>
-      <p className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5">
+      <p
+        aria-live="polite"
+        className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5"
+      >
         {growthMessages[growth]}
       </p>
       {flowerError && (
@@ -60,6 +68,7 @@ export default function FlowerGardenSection({
         </p>
       )}
       <motion.button
+        type="button"
         whileHover={{
           scale: isBloomSaving ? 1 : 1.05,
           backgroundColor: isBloomSaving ? "#ffffff" : "#f0fbf4",
