@@ -6,6 +6,11 @@ on:
       - opened
       - reopened
       - closed
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -46,33 +51,109 @@ jobs:
   cleanup:
     name: Delete merged Codex branch
     if: >-
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login == github.repository_owner &&
-      startsWith(github.event.pull_request.head.ref, 'codex/')
+      (github.event_name == 'pull_request' &&
+       github.event.action == 'closed' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'main' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.user.login == github.repository_owner &&
+       startsWith(github.event.pull_request.head.ref, 'codex/') &&
+       contains(github.event.pull_request.body, '[Codex Task](')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.name == 'CI' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       startsWith(github.event.workflow_run.head_branch, 'codex/'))
     permissions:
       contents: write
+      pull-requests: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Delete head branch
+      - name: Find merged PR and delete head branch
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           ref="heads/${HEAD_REF}"
 
-          if ! response="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref}" 2>&1)"; then
-            if [[ "$response" == *"HTTP 404"* ]]; then
-              echo "Branch is already absent."
-              exit 0
-            fi
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            merged=false
 
-            printf '%s\n' "$response" >&2
+            for attempt in {1..13}; do
+              pulls="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls")"
+              candidates="$(jq \
+                --arg repository "$GITHUB_REPOSITORY" \
+                --arg owner "$REPOSITORY_OWNER" \
+                --arg branch "$HEAD_REF" \
+                --arg sha "$HEAD_SHA" \
+                '[.[] | select(
+                  .base.ref == "main" and
+                  .head.repo.full_name == $repository and
+                  .head.ref == $branch and
+                  .head.sha == $sha and
+                  .user.login == $owner and
+                  (.body // "" | contains("[Codex Task]("))
+                )]' <<<"$pulls")"
+              candidate_count="$(jq 'length' <<<"$candidates")"
+
+              if (( candidate_count > 1 )); then
+                echo "Multiple matching pull requests found; refusing to delete ${HEAD_REF}." >&2
+                exit 1
+              fi
+
+              if (( candidate_count == 1 )) && [[ "$(jq -r '.[0].merged_at // empty' <<<"$candidates")" != "" ]]; then
+                merged=true
+                break
+              fi
+
+              if (( attempt < 13 )); then
+                echo "Pull request is not merged yet; retrying in 10 seconds (${attempt}/12)."
+                sleep 10
+              fi
+            done
+
+            if [[ "$merged" != "true" ]]; then
+              echo "No matching merged pull request found within 2 minutes; refusing to delete ${HEAD_REF}." >&2
+              exit 1
+            fi
+          fi
+
+          error_file="$(mktemp)"
+          if current_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref}" --jq '.object.sha' 2>"$error_file")"; then
+            :
+          elif grep -q "HTTP 404" "$error_file"; then
+            cat "$error_file"
+            rm -f "$error_file"
+            echo "Branch is already absent."
+            exit 0
+          else
+            cat "$error_file" >&2
+            rm -f "$error_file"
+            exit 1
+          fi
+          rm -f "$error_file"
+
+          if [[ "$current_sha" != "$HEAD_SHA" ]]; then
+            echo "Branch SHA changed from ${HEAD_SHA} to ${current_sha}; refusing to delete ${HEAD_REF}." >&2
             exit 1
           fi
 
-          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/${ref}"
+          error_file="$(mktemp)"
+          if gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/${ref}" 2>"$error_file"; then
+            rm -f "$error_file"
+          elif grep -q "HTTP 404" "$error_file"; then
+            cat "$error_file"
+            rm -f "$error_file"
+            echo "Branch is already absent."
+            exit 0
+          else
+            cat "$error_file" >&2
+            rm -f "$error_file"
+            exit 1
+          fi
