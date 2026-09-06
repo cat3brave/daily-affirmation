@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import {
   cleanup,
   fireEvent,
@@ -6,6 +7,37 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+type MotionProps<Element extends "button" | "div" | "p"> =
+  ComponentProps<Element> & {
+    animate?: unknown;
+    exit?: unknown;
+    initial?: unknown;
+  };
+
+vi.mock("framer-motion", () => ({
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
+  motion: {
+    button: ({ animate, exit, initial, ...props }: MotionProps<"button">) => {
+      void animate;
+      void exit;
+      void initial;
+      return <button {...props} />;
+    },
+    div: ({ animate, exit, initial, ...props }: MotionProps<"div">) => {
+      void animate;
+      void exit;
+      void initial;
+      return <div {...props} />;
+    },
+    p: ({ animate, exit, initial, ...props }: MotionProps<"p">) => {
+      void animate;
+      void exit;
+      void initial;
+      return <p {...props} />;
+    },
+  },
+}));
 
 type SupabaseError = { message: string };
 type UserResult = {
@@ -199,6 +231,70 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("表示ラベルで3つの入力欄を取得できる", async () => {
+    await renderLoadedCard();
+
+    expect(
+      screen.getByRole("textbox", { name: "1つ目のよかったこと" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "2つ目のよかったこと" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "3つ目のよかったこと" }),
+    ).toBeInTheDocument();
+  });
+
+  it("日付の記録状態と詳細の開閉状態を操作ボタンで伝える", async () => {
+    const today = getTodayDate();
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        {
+          date: today,
+          things1: "朝日がきれいだった",
+          things2: "昼食がおいしかった",
+          things3: "ゆっくり休めた",
+        },
+      ]),
+    });
+    await renderLoadedCard();
+
+    const saveButton = screen.getByRole("button", { name: "記録する" });
+    const recordedDateButton = screen.getByRole("button", {
+      name: `${today}、記録あり、詳細を開く`,
+    });
+    const emptyDateButtons = screen.getAllByRole("button", {
+      name: /記録なし/,
+    });
+
+    expect(saveButton).toHaveAttribute("type", "button");
+    expect(recordedDateButton).toHaveAttribute("type", "button");
+    expect(recordedDateButton).toHaveAttribute("aria-pressed", "false");
+    emptyDateButtons.forEach((button) => {
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("type", "button");
+    });
+
+    fireEvent.click(recordedDateButton);
+
+    const openDateButton = screen.getByRole("button", {
+      name: `${today}、記録あり、詳細を閉じる`,
+    });
+    expect(openDateButton).toHaveAttribute("aria-pressed", "true");
+    const deleteButton = screen.getByRole("button", {
+      name: `${today} の記録を削除`,
+    });
+    expect(deleteButton).toHaveAttribute("type", "button");
+
+    fireEvent.click(openDateButton);
+
+    expect(
+      screen.getByRole("button", {
+        name: `${today}、記録あり、詳細を開く`,
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("取得成功時に今日の記録を入力欄と詳細へ表示する", async () => {
     const today = getTodayDate();
     const firstThing = "朝ごはんをゆっくり食べた";
@@ -250,9 +346,9 @@ describe("ThreeGoodThingsCard", () => {
     fireEvent.change(inputs[2], { target: { value: thirdThing } });
     fireEvent.click(screen.getByRole("button", { name: "記録する" }));
 
-    expect(
-      await screen.findByText("✨ 保存しました！今日もお疲れ様です ✨"),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "✨ 保存しました！今日もお疲れ様です ✨",
+    );
     expect(supabaseMocks.upsert).toHaveBeenCalledWith(
       {
         date: today,
@@ -296,7 +392,9 @@ describe("ThreeGoodThingsCard", () => {
       await screen.findByText(`📅 ${today} のよかったこと`),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("この日の記録を削除"));
+    fireEvent.click(
+      screen.getByRole("button", { name: `${today} の記録を削除` }),
+    );
 
     await waitFor(() => {
       expect(
@@ -413,7 +511,9 @@ describe("ThreeGoodThingsCard", () => {
       await screen.findByText(`📅 ${today} のよかったこと`),
     ).toBeInTheDocument();
 
-    const deleteButton = screen.getByTitle("この日の記録を削除");
+    const deleteButton = screen.getByRole("button", {
+      name: `${today} の記録を削除`,
+    });
     fireEvent.click(deleteButton);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -423,7 +523,9 @@ describe("ThreeGoodThingsCard", () => {
     expect(screen.getAllByText(secondThing).length).toBeGreaterThan(0);
     expect(screen.getAllByText(thirdThing).length).toBeGreaterThan(0);
     expect(screen.getByText(`📅 ${today} のよかったこと`)).toBeInTheDocument();
-    expect(screen.getByTitle("この日の記録を削除")).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: `${today} の記録を削除` }),
+    ).toBeEnabled();
     expect(consoleError).toHaveBeenCalled();
     expect(confirm).toHaveBeenCalledWith(
       `${today} の記録を削除してもよろしいですか？`,

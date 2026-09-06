@@ -253,6 +253,7 @@ export default function ThreeGoodThingsCard() {
           <div key={index} className="flex items-start gap-2">
             <span className="text-pink-400 font-bold mt-2">{index + 1}.</span>
             <textarea
+              aria-label={`${["1つ目", "2つ目", "3つ目"][index]}のよかったこと`}
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
@@ -266,6 +267,7 @@ export default function ThreeGoodThingsCard() {
         <AnimatePresence mode="wait">
           {!isSaved ? (
             <motion.button
+              type="button"
               key="save-button"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -278,6 +280,7 @@ export default function ThreeGoodThingsCard() {
             </motion.button>
           ) : (
             <motion.p
+              role="status"
               key="saved-message"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -337,7 +340,11 @@ export default function ThreeGoodThingsCard() {
             return (
               <button
                 key={date}
+                type="button"
                 title={date}
+                aria-label={`${date}、${hasRecord ? `記録あり、詳細を${isSelected ? "閉じる" : "開く"}` : "記録なし"}`}
+                aria-pressed={hasRecord ? isSelected : undefined}
+                disabled={!hasRecord}
                 onClick={() => {
                   if (hasRecord) {
                     setSelectedDate(isSelected ? null : date);
@@ -366,6 +373,8 @@ export default function ThreeGoodThingsCard() {
                   📅 {selectedDate} のよかったこと
                 </p>
                 <button
+                  type="button"
+                  aria-label={`${selectedDate} の記録を削除`}
                   onClick={() => handleDelete(selectedDate)}
                   disabled={isDeletingSelectedDate}
                   className={`p-1 text-pink-300 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:hover:text-pink-300 ${
