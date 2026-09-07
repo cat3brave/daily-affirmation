@@ -10,7 +10,7 @@ function renderMaybeCloudCard() {
   return {
     button: screen.getByRole("button", { name: "放つ" }),
     handleFloatCloud,
-    input: screen.getByRole("textbox"),
+    input: screen.getByLabelText("空に放ちたい決めつけ"),
   };
 }
 
@@ -20,6 +20,13 @@ afterEach(() => {
 });
 
 describe("MaybeCloudCard", () => {
+  it("入力欄にラベルを関連付け、放つをbuttonとして扱う", () => {
+    const { button, input } = renderMaybeCloudCard();
+
+    expect(input).toBeInTheDocument();
+    expect(button).toHaveAttribute("type", "button");
+  });
+
   it("空文字・空白だけでは放つがdisabledでcallbackを呼ばない", () => {
     const { button, handleFloatCloud, input } = renderMaybeCloudCard();
 

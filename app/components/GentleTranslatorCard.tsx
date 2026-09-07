@@ -41,12 +41,20 @@ export default function GentleTranslatorCard() {
         <br />
         客観的な事実と労わりの言葉に翻訳します。
       </p>
-      <p className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-4 py-3 mb-4">
+      <p
+        id="gentle-translator-guidance"
+        className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-4 py-3 mb-4"
+      >
         入力した文章はAI処理のため外部APIに送信されます。
         <br />
         本名、住所、連絡先、医療情報などの個人情報は書かないでください。
       </p>
+      <label htmlFor="harsh-voice-input" className="sr-only">
+        優しい言葉に翻訳したい自分への厳しい声
+      </label>
       <textarea
+        id="harsh-voice-input"
+        aria-describedby="gentle-translator-guidance gentle-translator-character-count"
         value={harshVoice}
         onChange={(e) => setHarshVoice(e.target.value)}
         maxLength={MAX_HARSH_VOICE_LENGTH}
@@ -55,10 +63,14 @@ export default function GentleTranslatorCard() {
         className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
       />
 
-      <p className="w-full text-right text-xs text-sky-700/50 mb-4">
+      <p
+        id="gentle-translator-character-count"
+        className="w-full text-right text-xs text-sky-700/50 mb-4"
+      >
         {harshVoice.length} / {MAX_HARSH_VOICE_LENGTH}文字
       </p>
       <button
+        type="button"
         onClick={handleTranslate}
         disabled={!harshVoice.trim() || isTranslating}
         className="px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
