@@ -81,6 +81,14 @@ afterEach(() => {
 });
 
 describe("LogoutButton", () => {
+  it("ログアウトボタンはフォームを送信しないbutton型で表示する", () => {
+    render(<LogoutButton />);
+
+    expect(
+      screen.getByRole("button", { name: "👋 ログアウト" }),
+    ).toHaveAttribute("type", "button");
+  });
+
   it("ログアウト成功時にsignOutを呼びloginへ遷移してrefreshする", async () => {
     const signOutDeferred = createDeferred<SignOutResult>();
     logoutMocks.signOut.mockReturnValue(signOutDeferred.promise);

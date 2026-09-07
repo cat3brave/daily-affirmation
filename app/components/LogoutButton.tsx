@@ -44,6 +44,7 @@ export default function LogoutButton() {
   return (
     <div className="flex flex-col items-end gap-2">
       <button
+        type="button"
         onClick={handleLogout}
         disabled={isLoggingOut}
         className="text-sm font-medium text-gray-500 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:text-gray-500 transition-colors bg-white px-4 py-2 rounded-full shadow-sm"

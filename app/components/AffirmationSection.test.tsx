@@ -70,12 +70,14 @@ describe("AffirmationSection", () => {
       />,
     );
 
-    expect(
-      screen.getByText("ボタンを押して、言葉を受け取ってください"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "言葉を受け取る" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "ボタンを押して、言葉を受け取ってください",
+    );
+    const receiveButton = screen.getByRole("button", {
+      name: "言葉を受け取る",
+    });
+    expect(receiveButton).toBeEnabled();
+    expect(receiveButton).toHaveAttribute("type", "button");
   });
 
   it("受け取りボタンをクリックするとhandleClickを1回呼ぶ", () => {
@@ -106,7 +108,9 @@ describe("AffirmationSection", () => {
       />,
     );
 
-    expect(screen.getByText("言葉を紡いでいます...")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "言葉を紡いでいます...",
+    );
     expect(
       screen.getByRole("button", { name: "受け取り中..." }),
     ).toBeDisabled();
@@ -123,12 +127,16 @@ describe("AffirmationSection", () => {
       />,
     );
 
-    expect(
-      screen.getByText("あなたは今日も十分にがんばっています"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "お気に入りにする 🌷" }),
-    ).toBeEnabled();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(
+      "あなたは今日も十分にがんばっています",
+    );
+    const favoriteButton = screen.getByRole("button", {
+      name: "お気に入りにする 🌷",
+    });
+    expect(favoriteButton).toBeEnabled();
+    expect(favoriteButton).toHaveAttribute("type", "button");
+    expect(status).not.toContainElement(favoriteButton);
   });
 
   it("お気に入りボタンをクリックするとhandleFavoriteAffirmationを1回呼ぶ", () => {

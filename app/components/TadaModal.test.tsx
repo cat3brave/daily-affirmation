@@ -124,7 +124,9 @@ describe("TadaModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "ありがとう!🌟" })).toHaveFocus();
+    const closeButton = screen.getByRole("button", { name: "ありがとう!🌟" });
+    expect(closeButton).toHaveFocus();
+    expect(closeButton).toHaveAttribute("type", "button");
   });
 
   it("ありがとうボタンで閉じる", () => {

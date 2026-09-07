@@ -23,6 +23,8 @@ export default function AffirmationSection({
           {isLoading ? (
             <motion.p
               key="loading"
+              role="status"
+              aria-atomic="true"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -39,11 +41,16 @@ export default function AffirmationSection({
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="flex flex-col items-center gap-4"
             >
-              <p className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest">
+              <p
+                role="status"
+                aria-atomic="true"
+                className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest"
+              >
                 {text}
               </p>
 
               <button
+                type="button"
                 onClick={handleFavoriteAffirmation}
                 disabled={isFavoriteDisabled}
                 className="px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
@@ -54,7 +61,11 @@ export default function AffirmationSection({
               </button>
             </motion.div>
           ) : (
-            <p className="text-blue-400/70 text-lg">
+            <p
+              role="status"
+              aria-atomic="true"
+              className="text-blue-400/70 text-lg"
+            >
               ボタンを押して、言葉を受け取ってください
             </p>
           )}
@@ -64,6 +75,7 @@ export default function AffirmationSection({
       {/* 2. アファメーションを受け取るボタン */}
       <div className="mb-10 w-full flex justify-center">
         <motion.button
+          type="button"
           whileHover={{
             scale: isLoading ? 1 : 1.05,
             backgroundColor: isLoading ? "#0ea5e9" : "#0284c7",

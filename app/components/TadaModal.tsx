@@ -110,6 +110,7 @@ export default function TadaModal({
                 完璧じゃないあなたも、最高に素晴らしい!
               </p>
               <motion.button
+                type="button"
                 ref={closeButtonRef}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
