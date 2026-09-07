@@ -111,12 +111,17 @@ export default function BreathingCard() {
         </div>
       </div>
 
-      <p className="text-sky-700 font-bold mb-6 h-6 text-center text-sm">
+      <p
+        role="status"
+        aria-live="polite"
+        className="text-sky-700 font-bold mb-6 h-6 text-center text-sm"
+      >
         {messages[phase]}
       </p>
 
       {phase === "idle" ? (
         <button
+          type="button"
           onClick={() => {
             setCycleCount(0);
             setPhase("inhale");
@@ -128,6 +133,7 @@ export default function BreathingCard() {
         </button>
       ) : phase === "completed" ? (
         <button
+          type="button"
           onClick={() => {
             setCycleCount(0);
             setPhase("idle");
@@ -138,6 +144,7 @@ export default function BreathingCard() {
         </button>
       ) : (
         <button
+          type="button"
           onClick={() => {
             setPhase("idle");
             setCycleCount(0);

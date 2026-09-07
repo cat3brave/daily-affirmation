@@ -22,7 +22,11 @@ export default function MaybeCloudCard({ handleFloatCloud }: Props) {
         「絶対～だ」という考えを書いて、空に浮かべてみましょう
       </p>
       <div className="flex w-full gap-2">
+        <label htmlFor="maybe-cloud-input" className="sr-only">
+          空に放ちたい決めつけ
+        </label>
         <input
+          id="maybe-cloud-input"
           type="text"
           value={maybeInput}
           onChange={(e) => setMaybeInput(e.target.value)}
@@ -31,6 +35,7 @@ export default function MaybeCloudCard({ handleFloatCloud }: Props) {
           className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
         />
         <button
+          type="button"
           onClick={onReleaseCloud}
           disabled={!maybeInput.trim()}
           className="px-5 py-3 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm whitespace-nowrap"

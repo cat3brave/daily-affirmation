@@ -62,7 +62,7 @@ function createDeferred<T>(): Deferred<T> {
 }
 
 function getTextbox() {
-  return screen.getByRole("textbox");
+  return screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声");
 }
 
 function getTranslateButton() {
@@ -82,6 +82,20 @@ afterEach(() => {
 });
 
 describe("GentleTranslatorCard", () => {
+  it("textareaに案内と文字数を関連付け、翻訳操作をbuttonとして扱う", () => {
+    render(<GentleTranslatorCard />);
+
+    const textbox = getTextbox();
+    const guidance = screen.getByText(/入力した文章はAI処理/);
+    const characterCount = screen.getByText("0 / 300文字");
+
+    expect(textbox).toHaveAttribute(
+      "aria-describedby",
+      `${guidance.id} ${characterCount.id}`,
+    );
+    expect(getTranslateButton()).toHaveAttribute("type", "button");
+  });
+
   it("空文字・空白だけではボタンがdisabledで通信しない", () => {
     render(<GentleTranslatorCard />);
 
