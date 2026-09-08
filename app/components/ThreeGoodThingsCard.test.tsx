@@ -231,6 +231,13 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("記録ボタンに高コントラストの背景色を使用する", async () => {
+    await renderLoadedCard();
+
+    expect(screen.getByRole("button", { name: "記録する" })).toHaveClass(
+      "bg-pink-700",
+    );
+  });
   it("表示ラベルで3つの入力欄を取得できる", async () => {
     await renderLoadedCard();
 

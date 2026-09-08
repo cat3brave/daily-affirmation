@@ -59,6 +59,21 @@ import AffirmationSection from "./AffirmationSection";
 afterEach(cleanup);
 
 describe("AffirmationSection", () => {
+  it("生成ボタンに高コントラストの背景色を使用する", () => {
+    render(
+      <AffirmationSection
+        isLoading={false}
+        text=""
+        handleClick={vi.fn()}
+        handleFavoriteAffirmation={vi.fn()}
+        isFavoriteDisabled={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "言葉を受け取る" }),
+    ).toHaveClass("bg-sky-700");
+  });
   it("初期状態で待機メッセージと有効な受け取りボタンを表示する", () => {
     render(
       <AffirmationSection

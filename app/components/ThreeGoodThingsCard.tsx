@@ -274,7 +274,7 @@ export default function ThreeGoodThingsCard() {
               exit={{ opacity: 0, y: -10 }}
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-pink-400 hover:bg-pink-500 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
+              className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
             >
               {isSaving ? "保存中..." : "記録する"}
             </motion.button>

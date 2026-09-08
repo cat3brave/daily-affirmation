@@ -48,6 +48,13 @@ const renderGarden = (overrides: Partial<ComponentProps<typeof FlowerGardenSecti
 };
 
 describe("FlowerGardenSection", () => {
+  it("散歩ボタンに高コントラストの文字色を使用する", () => {
+    renderGarden();
+
+    expect(
+      screen.getByRole("button", { name: "今日もお散歩した！ 💧" }),
+    ).toHaveClass("text-green-700");
+  });
   it("初期成長状態を案内とともに表示する", () => {
     renderGarden();
     expect(screen.getByRole("img", { name: "花の成長状態: 種を植えました。お散歩して育てよう！" })).toHaveTextContent("🌰");

@@ -24,6 +24,13 @@ import AmuletTab from "./AmuletTab";
 afterEach(cleanup);
 
 describe("AmuletTab", () => {
+  it("失敗ボタンに高コントラストの背景色を使用する", () => {
+    render(<AmuletTab setShowTada={vi.fn()} />);
+
+    expect(
+      screen.getByRole("button", { name: "今日、失敗しちゃった！" }),
+    ).toHaveClass("bg-yellow-700");
+  });
   it("救急箱の見出し、説明文、操作ボタンを表示する", () => {
     render(<AmuletTab setShowTada={vi.fn()} />);
 

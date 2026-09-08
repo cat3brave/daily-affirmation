@@ -167,7 +167,7 @@ export default function LoginPage() {
           {isSignUpMode ? "はじめての登録🌱" : "おかえりなさい🌷"}
         </h1>
 
-        <p className="text-sm text-pink-500/80 text-center leading-relaxed mb-6">
+        <p className="text-sm text-pink-700 text-center leading-relaxed mb-6">
           {isSignUpMode ? (
             <>
               メールアドレスとパスワードを入力すると、
@@ -226,7 +226,7 @@ export default function LoginPage() {
               aria-describedby={
                 invalidField === "email" ? AUTH_MESSAGE_ID : undefined
               }
-              className="w-full p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -252,7 +252,7 @@ export default function LoginPage() {
               aria-describedby={
                 invalidField === "password" ? AUTH_MESSAGE_ID : undefined
               }
-              className="w-full p-3 border border-pink-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -279,7 +279,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-pink-400 text-white py-3 rounded-full font-bold hover:bg-pink-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-pink-700 text-white py-3 rounded-full font-bold hover:bg-pink-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isLoading
                 ? "送信中..."
@@ -296,7 +296,7 @@ export default function LoginPage() {
                 setIsSignUpMode((prev) => !prev);
               }}
               disabled={isLoading}
-              className="w-full text-pink-400 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full text-pink-700 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSignUpMode
                 ? "すでに登録済みの方はこちら"
