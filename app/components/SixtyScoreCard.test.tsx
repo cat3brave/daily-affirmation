@@ -23,6 +23,11 @@ import SixtyScoreCard from "./SixtyScoreCard";
 afterEach(cleanup);
 
 describe("SixtyScoreCard", () => {
+  it("スコア案内に高コントラストの文字色を使用する", () => {
+    render(<SixtyScoreCard />);
+
+    expect(screen.getByRole("status")).toHaveClass("text-green-700");
+  });
   it("表示ラベルでrange入力を取得でき、初期値60点と案内を表示する", () => {
     render(<SixtyScoreCard />);
 

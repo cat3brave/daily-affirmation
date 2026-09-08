@@ -52,6 +52,13 @@ afterEach(() => {
 });
 
 describe("BreathingCard", () => {
+  it("開始ボタンに高コントラストの背景色を使用する", () => {
+    render(<BreathingCard />);
+
+    expect(
+      screen.getByRole("button", { name: "深呼吸をはじめる" }),
+    ).toHaveClass("bg-sky-700");
+  });
   it("初期状態で開始案内と深呼吸をはじめるを表示する", () => {
     render(<BreathingCard />);
 

@@ -86,7 +86,7 @@ export default function AffirmationSection({
           whileTap={{ scale: isLoading ? 1 : 0.95 }}
           onClick={handleClick}
           disabled={isLoading}
-          className={`px-12 py-5 bg-sky-500 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-500 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
+          className={`px-12 py-5 bg-sky-700 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-700 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
         >
           {isLoading ? "受け取り中..." : "言葉を受け取る"}
         </motion.button>

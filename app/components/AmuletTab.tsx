@@ -30,7 +30,7 @@ export default function AmuletTab({ setShowTada }: AmuletTabProps) {
         <button
           type="button"
           onClick={() => setShowTada(true)}
-          className="px-8 py-4 bg-yellow-400 text-white rounded-full shadow-md hover:bg-yellow-500 transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-yellow-300"
+          className="px-8 py-4 bg-yellow-700 text-white rounded-full shadow-md hover:bg-yellow-800 transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-yellow-700"
         >
           今日、失敗しちゃった！
         </button>

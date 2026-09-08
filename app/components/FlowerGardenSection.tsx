@@ -76,7 +76,7 @@ export default function FlowerGardenSection({
         whileTap={{ scale: isBloomSaving ? 1 : 0.95 }}
         onClick={handleWalk}
         disabled={isBloomSaving}
-        className="px-8 py-3 bg-white text-green-600 rounded-full shadow-sm transition-colors duration-300 text-base font-bold tracking-widest border-2 border-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
+        className="px-8 py-3 bg-white text-green-700 rounded-full shadow-sm transition-colors duration-300 text-base font-bold tracking-widest border-2 border-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {isBloomSaving
           ? "お花を記録中... 🌸"

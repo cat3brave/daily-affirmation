@@ -127,7 +127,7 @@ export default function BreathingCard() {
             setPhase("inhale");
             setTimeLeft(4); // 🔴 ボタンを押した時に最初の4秒をセットする
           }}
-          className="bg-sky-400 hover:bg-sky-500 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm"
+          className="bg-sky-700 hover:bg-sky-800 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm"
         >
           深呼吸をはじめる
         </button>

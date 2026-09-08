@@ -143,6 +143,20 @@ afterEach(() => {
 });
 
 describe("LoginPage", () => {
+  it("主要なログイン要素に高コントラストの色を使用する", () => {
+    render(<LoginPage />);
+
+    expect(screen.getByText(/登録済みのメールアドレス/)).toHaveClass(
+      "text-pink-700",
+    );
+    expect(screen.getByLabelText("メールアドレス")).toHaveClass(
+      "text-slate-700",
+      "placeholder:text-slate-600",
+    );
+    expect(screen.getByRole("button", { name: "ログイン" })).toHaveClass(
+      "bg-pink-700",
+    );
+  });
   it("メールアドレスとパスワードの入力欄にラベルと認証向け属性を設定する", () => {
     const { container } = render(<LoginPage />);
 
