@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import Confetti from "react-confetti";
 
 type TadaModalProps = {
@@ -16,6 +16,7 @@ export default function TadaModal({
   const titleId = useId();
   const descriptionId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!showTada) return;
@@ -42,7 +43,7 @@ export default function TadaModal({
   return (
     <>
       {/* 🎊 紙吹雪 */}
-      {showTada && (
+      {showTada && !shouldReduceMotion && (
         <Confetti
           style={{ zIndex: 150 }}
           width={windowSize.width}

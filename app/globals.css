@@ -6,3 +6,17 @@ body {
   color: #4a8ab7; /* 文字色を優しい青色に */
   min-height: 100vh;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
