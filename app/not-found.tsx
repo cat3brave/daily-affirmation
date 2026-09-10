@@ -12,7 +12,7 @@ export default function NotFound() {
         </p>
         <Link
           href="/"
-          className="inline-flex w-full justify-center rounded-full bg-sky-400 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+          className="inline-flex w-full justify-center rounded-full bg-sky-400 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
         >
           最初の画面へ戻る
         </Link>

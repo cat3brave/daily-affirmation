@@ -32,7 +32,7 @@ export default function MaybeCloudCard({ handleFloatCloud }: Props) {
           onChange={(e) => setMaybeInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onReleaseCloud()}
           placeholder="例: 絶対に嫌われた..."
-          className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
+          className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
         />
         <button
           type="button"

@@ -60,7 +60,7 @@ export default function GentleTranslatorCard() {
         maxLength={MAX_HARSH_VOICE_LENGTH}
         disabled={isTranslating}
         placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
-        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
       />
 
       <p

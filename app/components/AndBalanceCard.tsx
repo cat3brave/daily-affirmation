@@ -39,7 +39,7 @@ export default function AndBalanceCard() {
               setIsBalanced(false);
             }}
             placeholder="例: 今日は何もできなかった..."
-            className="w-full px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
+            className="w-full px-4 py-3 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
           />
         </div>
         <div className="flex justify-center my-1">
@@ -63,7 +63,7 @@ export default function AndBalanceCard() {
               setIsBalanced(false);
             }}
             placeholder="例: でも、温かいお茶は飲めた"
-            className="w-full px-4 py-3 rounded-2xl border border-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
+            className="w-full px-4 py-3 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
           />
         </div>
       </div>
