@@ -107,7 +107,12 @@ test("ログイン画面のTab移動順が入力から主要操作へ進む", as
   const signUpToggle = page.getByRole("button", {
     name: "はじめての方はこちら（新規登録）",
   });
+  const skipLink = page.getByRole("link", {
+    name: "メインコンテンツへ移動",
+  });
 
+  await page.keyboard.press("Tab");
+  await expect(skipLink).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(emailInput).toBeFocused();
   await page.keyboard.press("Tab");

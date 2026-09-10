@@ -61,7 +61,11 @@ export default function Home() {
 
   if (!isAuthChecked) {
     return (
-      <main className="relative flex min-h-screen flex-col items-center justify-center p-6 bg-sky-50 text-sky-700">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="relative flex min-h-screen flex-col items-center justify-center p-6 bg-sky-50 text-sky-700"
+      >
         <p className="bg-white/80 backdrop-blur-sm rounded-full px-6 py-4 shadow-sm border border-sky-100 font-bold tracking-wide">
           ログイン情報を確認しています...
         </p>
@@ -91,6 +95,8 @@ export default function Home() {
       />
 
       <motion.div
+        id="main-content"
+        tabIndex={-1}
         animate={{
           scale: isBirdView ? 0.75 : 1,
           opacity: isBirdView ? 0.3 : 1,

@@ -14,7 +14,11 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
   }, [error]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sky-50 p-6 text-sky-700">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-screen items-center justify-center bg-sky-50 p-6 text-sky-700"
+    >
       <section
         role="alert"
         className="w-full max-w-md rounded-[2rem] border border-sky-100 bg-white/90 p-8 text-center shadow-sm"

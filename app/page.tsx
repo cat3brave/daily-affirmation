@@ -52,7 +52,11 @@ export default function LandingPage() {
   }, [router, supabase]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-pink-50">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="min-h-screen flex items-center justify-center bg-pink-50"
+    >
       <p
         role="status"
         aria-live="polite"
@@ -60,6 +64,6 @@ export default function LandingPage() {
       >
         心の準備をしています...🌷
       </p>
-    </div>
+    </main>
   );
 }
