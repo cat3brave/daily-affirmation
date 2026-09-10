@@ -161,7 +161,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex flex-col items-center justify-center min-h-screen bg-pink-50 p-4"
+    >
       <div className="bg-white p-8 rounded-[2rem] shadow-sm w-full max-w-md">
         <h1 className="text-2xl font-bold text-pink-600 mb-2 text-center">
           {isSignUpMode ? "はじめての登録🌱" : "おかえりなさい🌷"}
@@ -305,6 +309,6 @@ export default function LoginPage() {
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

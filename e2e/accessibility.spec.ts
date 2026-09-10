@@ -100,6 +100,10 @@ test("キーボードだけでログインしダッシュボードのタブを�
   });
 
   await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "メインコンテンツへ移動" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(emailInput).toBeFocused();
   await page.keyboard.type("e2e-user@example.com");
   await page.keyboard.press("Tab");

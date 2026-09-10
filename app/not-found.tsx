@@ -2,7 +2,11 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sky-50 p-6 text-sky-700">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-screen items-center justify-center bg-sky-50 p-6 text-sky-700"
+    >
       <section className="w-full max-w-md rounded-[2rem] border border-sky-100 bg-white/90 p-8 text-center shadow-sm">
         <h1 className="mb-3 text-2xl font-bold text-sky-700">
           ページが見つかりませんでした

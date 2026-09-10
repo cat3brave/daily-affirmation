@@ -30,6 +30,9 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={inter.className}>
+        <a className="skip-link" href="#main-content">
+          メインコンテンツへ移動
+        </a>
         <ReducedMotionProvider>{children}</ReducedMotionProvider>
       </body>
     </html>

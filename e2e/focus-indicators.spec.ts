@@ -57,6 +57,10 @@ test("Tab操作でログイン画面とダッシュボードの主要操作に�
   });
 
   await page.keyboard.press("Tab");
+  await expectVisibleKeyboardFocus(
+    page.getByRole("link", { name: "メインコンテンツへ移動" }),
+  );
+  await page.keyboard.press("Tab");
   await expectVisibleKeyboardFocus(emailInput);
   await page.keyboard.press("Tab");
   await expectVisibleKeyboardFocus(passwordInput);
@@ -111,6 +115,10 @@ test("reduced-motionでもTabフォーカスの輪郭が表示される", async 
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
+  await page.keyboard.press("Tab");
+  await expectVisibleKeyboardFocus(
+    page.getByRole("link", { name: "メインコンテンツへ移動" }),
+  );
   await page.keyboard.press("Tab");
   await expectVisibleKeyboardFocus(page.getByLabel("メールアドレス"));
 });
