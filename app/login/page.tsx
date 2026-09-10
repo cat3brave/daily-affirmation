@@ -226,7 +226,7 @@ export default function LoginPage() {
               aria-describedby={
                 invalidField === "email" ? AUTH_MESSAGE_ID : undefined
               }
-              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -252,7 +252,7 @@ export default function LoginPage() {
               aria-describedby={
                 invalidField === "password" ? AUTH_MESSAGE_ID : undefined
               }
-              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full p-3 border border-pink-100 rounded-xl text-slate-700 placeholder:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
 

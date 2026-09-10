@@ -29,13 +29,13 @@ export default function DashboardError({ error, reset }: DashboardErrorProps) {
           <button
             type="button"
             onClick={reset}
-            className="w-full rounded-full bg-sky-400 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+            className="w-full rounded-full bg-sky-400 px-5 py-3 font-bold text-white shadow-sm transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
           >
             もう一度試す
           </button>
           <Link
             href="/login"
-            className="w-full rounded-full border border-sky-100 bg-white px-5 py-3 text-sm font-bold text-sky-500 transition-colors hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+            className="w-full rounded-full border border-sky-100 bg-white px-5 py-3 text-sm font-bold text-sky-500 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 focus-visible:ring-offset-2"
           >
             ログイン画面へ戻る
           </Link>

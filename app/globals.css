@@ -7,6 +7,20 @@ body {
   min-height: 100vh;
 }
 
+/* キーボード操作中の現在地を、画面や背景色を問わず同じ輪郭で示す */
+:where(
+    a[href],
+    button,
+    input,
+    textarea,
+    select,
+    summary,
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+  outline: 3px solid #6d28d9 !important;
+  outline-offset: 3px !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

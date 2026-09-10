@@ -257,7 +257,7 @@ export default function ThreeGoodThingsCard() {
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
-              className="w-full bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-pink-200 resize-none h-16"
+              className="w-full bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none h-16"
             />
           </div>
         ))}
