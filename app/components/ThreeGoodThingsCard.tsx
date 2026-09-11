@@ -330,8 +330,13 @@ export default function ThreeGoodThingsCard() {
             {deleteError}
           </p>
         )}
-        <div className="flex gap-1 mb-2">
-          {past14Days.map((date) => {
+        <div
+          aria-label="最近2週間の記録"
+          tabIndex={0}
+          className="w-full max-w-full overflow-x-auto mb-2 rounded-md focus-visible:ring-2 focus-visible:ring-pink-300"
+        >
+          <div className="flex w-max gap-1 px-0.5 py-1">
+            {past14Days.map((date) => {
             const hasRecord =
               allRecords[date] &&
               allRecords[date].some((text) => text.trim() !== "");
@@ -350,14 +355,15 @@ export default function ThreeGoodThingsCard() {
                     setSelectedDate(isSelected ? null : date);
                   }
                 }}
-                className={`w-4 h-4 rounded-[4px] transition-all ${
+                className={`h-4 w-4 shrink-0 rounded-[4px] transition-all ${
                   hasRecord
                     ? "bg-green-400 hover:bg-green-500 cursor-pointer shadow-sm"
                     : "bg-gray-100 cursor-default"
                 } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`}
               />
             );
-          })}
+            })}
+          </div>
         </div>
 
         <AnimatePresence>
