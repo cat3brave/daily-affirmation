@@ -355,12 +355,17 @@ export default function ThreeGoodThingsCard() {
                     setSelectedDate(isSelected ? null : date);
                   }
                 }}
-                className={`h-4 w-4 shrink-0 rounded-[4px] transition-all ${
-                  hasRecord
-                    ? "bg-green-400 hover:bg-green-500 cursor-pointer shadow-sm"
-                    : "bg-gray-100 cursor-default"
-                } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`}
-              />
+                className="group flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`h-4 w-4 rounded-[4px] transition-all ${
+                    hasRecord
+                      ? "bg-green-400 group-hover:bg-green-500 shadow-sm"
+                      : "bg-gray-100"
+                  } ${isSelected ? "ring-2 ring-pink-400 ring-offset-1 scale-110" : ""}`}
+                />
+              </button>
             );
             })}
           </div>

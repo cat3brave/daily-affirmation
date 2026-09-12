@@ -123,7 +123,7 @@ test("320 CSS pxで全ダッシュボード画面と固定タブがリフロー�
     )
     .toEqual({
       hasInternalOverflow: true,
-      buttonWidths: Array(14).fill(16),
+        buttonWidths: Array(14).fill(24),
     });
   await expectNoPageHorizontalScroll(page);
 
