@@ -68,7 +68,7 @@ export default function HomeTab({
         <button
           type="button"
           onClick={() => setShowTada(true)}
-          className="text-sm text-sky-500/60 hover:text-sky-500 transition-colors decoration-sky-300/50 underline underline-offset-4"
+          className="inline-flex min-h-6 items-center text-sm text-sky-500/60 hover:text-sky-500 transition-colors decoration-sky-300/50 underline underline-offset-4"
         >
           今日、ちょっと失敗しちゃった...
         </button>

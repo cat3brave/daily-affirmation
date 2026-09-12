@@ -39,6 +39,10 @@ export type AuthenticatedSupabaseMock = {
   unexpectedRestRequests: string[];
 };
 
+type DashboardMockData = Partial<
+  Record<"bloom_logs" | "favorite_affirmations" | "three_good_things", unknown[]>
+>;
+
 export async function stubExternalServices(page: Page) {
   await page.route("https://example.supabase.co/**", async (route) => {
     const url = new URL(route.request().url());
@@ -60,6 +64,7 @@ export async function stubExternalServices(page: Page) {
 
 export async function stubAuthenticatedSupabase(
   page: Page,
+  restData: DashboardMockData = {},
 ): Promise<AuthenticatedSupabaseMock> {
   const mockState: AuthenticatedSupabaseMock = {
     loginRequestBodies: [],
@@ -123,7 +128,12 @@ export async function stubAuthenticatedSupabase(
       status: 200,
       contentType: "application/json",
       headers: { "content-range": method === "HEAD" ? "0-0/0" : "*/0" },
-      body: method === "HEAD" ? "" : "[]",
+      body:
+        method === "HEAD"
+          ? ""
+          : JSON.stringify(
+              restData[table as keyof DashboardMockData] ?? [],
+            ),
     });
   });
 
@@ -138,8 +148,11 @@ export function trackSupabaseAuthRequests(page: Page) {
   return requests;
 }
 
-export async function loginToDashboard(page: Page) {
-  const supabaseMock = await stubAuthenticatedSupabase(page);
+export async function loginToDashboard(
+  page: Page,
+  restData: DashboardMockData = {},
+) {
+  const supabaseMock = await stubAuthenticatedSupabase(page, restData);
   await page.goto("/login");
   await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
   await page.getByLabel("パスワード").fill("e2e-password");
