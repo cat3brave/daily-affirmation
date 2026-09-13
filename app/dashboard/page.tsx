@@ -79,70 +79,74 @@ export default function Home() {
         isBirdView ? "bg-sky-100" : "bg-transparent"
       }`}
     >
-      <DashboardHeader
-        currentTab={currentTab}
-        isBirdView={isBirdView}
-        onToggleBirdView={() => setIsBirdView(!isBirdView)}
-        userEmail={userEmail}
-      />
+      <div className="contents" inert={showTada ? true : undefined}>
+        <DashboardHeader
+          currentTab={currentTab}
+          isBirdView={isBirdView}
+          onToggleBirdView={() => setIsBirdView(!isBirdView)}
+          userEmail={userEmail}
+        />
 
-      <FloatingCloudLayer floatingClouds={floatingClouds} />
+        <FloatingCloudLayer floatingClouds={floatingClouds} />
 
-      <BirdViewPanel
-        currentTab={currentTab}
-        isBirdView={isBirdView}
-        totalBlooms={totalBlooms}
-      />
+        <BirdViewPanel
+          currentTab={currentTab}
+          isBirdView={isBirdView}
+          totalBlooms={totalBlooms}
+        />
 
-      <motion.div
-        id="main-content"
-        tabIndex={-1}
-        animate={{
-          scale: isBirdView ? 0.75 : 1,
-          opacity: isBirdView ? 0.3 : 1,
-          y: isBirdView ? 120 : 0,
-        }}
-        transition={{ duration: 1, ease: "easeInOut" }}
-        className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
-      >
-        <AnimatePresence mode="wait">
+        <motion.div
+          id="main-content"
+          tabIndex={-1}
+          animate={{
+            scale: isBirdView ? 0.75 : 1,
+            opacity: isBirdView ? 0.3 : 1,
+            y: isBirdView ? 120 : 0,
+          }}
+          transition={{ duration: 1, ease: "easeInOut" }}
+          className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
+        >
+          <AnimatePresence mode="wait">
+            {currentTab === "home" && (
+              <HomeTab
+                isLoading={isLoading}
+                text={text}
+                handleClick={handleGenerateAffirmation}
+                handleFavoriteAffirmation={handleFavoriteAffirmation}
+                isFavoriteDisabled={isFavoriteDisabled}
+                favoriteAffirmations={favoriteAffirmations}
+                favoriteError={favoriteError}
+                handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
+                totalBlooms={totalBlooms}
+                growth={growth}
+                currentFlower={currentFlower}
+                isBloomSaving={isBloomSaving}
+                flowerError={flowerError}
+                handleWalk={handleWalk}
+                setShowTada={setShowTada}
+              />
+            )}
+
+            {currentTab === "work" && (
+              <WorkTab handleFloatCloud={handleFloatCloud} />
+            )}
+
+            {currentTab === "amulet" && (
+              <AmuletTab setShowTada={setShowTada} />
+            )}
+          </AnimatePresence>
+
+          {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+          {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
           {currentTab === "home" && (
-            <HomeTab
-              isLoading={isLoading}
-              text={text}
-              handleClick={handleGenerateAffirmation}
-              handleFavoriteAffirmation={handleFavoriteAffirmation}
-              isFavoriteDisabled={isFavoriteDisabled}
-              favoriteAffirmations={favoriteAffirmations}
-              favoriteError={favoriteError}
-              handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
-              totalBlooms={totalBlooms}
-              growth={growth}
-              currentFlower={currentFlower}
-              isBloomSaving={isBloomSaving}
-              flowerError={flowerError}
-              handleWalk={handleWalk}
-              setShowTada={setShowTada}
-            />
+            <div className="w-full mt-8">
+              <BloomGraph refreshKey={bloomRefreshKey} />
+            </div>
           )}
+        </motion.div>
 
-          {currentTab === "work" && (
-            <WorkTab handleFloatCloud={handleFloatCloud} />
-          )}
-
-          {currentTab === "amulet" && <AmuletTab setShowTada={setShowTada} />}
-        </AnimatePresence>
-
-        {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
-        {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
-        {currentTab === "home" && (
-          <div className="w-full mt-8">
-            <BloomGraph refreshKey={bloomRefreshKey} />
-          </div>
-        )}
-      </motion.div>
-
-      <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      </div>
 
       <TadaModal
         showTada={showTada}

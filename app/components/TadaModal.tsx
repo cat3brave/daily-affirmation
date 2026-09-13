@@ -28,6 +28,9 @@ export default function TadaModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowTada(false);
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        closeButtonRef.current?.focus();
       }
     };
 

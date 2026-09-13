@@ -190,6 +190,26 @@ describe("TadaModal", () => {
     expect(setShowTada).toHaveBeenCalledWith(false);
   });
 
+  it.each([false, true])(
+    "Tabキーでありがとうボタンからフォーカスを移動させない (shiftKey=%s)",
+    (shiftKey) => {
+      render(
+        <TadaModal
+          showTada
+          setShowTada={vi.fn()}
+          windowSize={windowSize}
+        />,
+      );
+      const closeButton = screen.getByRole("button", {
+        name: "ありがとう!🌟",
+      });
+
+      fireEvent.keyDown(document, { key: "Tab", shiftKey });
+
+      expect(closeButton).toHaveFocus();
+    },
+  );
+
   it("閉じた時に元の要素へフォーカスを戻す", () => {
     const originalButton = document.createElement("button");
     document.body.append(originalButton);
