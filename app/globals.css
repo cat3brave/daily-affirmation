@@ -51,3 +51,65 @@ body {
     transition-delay: 0ms !important;
   }
 }
+
+@media (forced-colors: active) {
+  /* システム配色でも、操作対象と状態を輪郭で見分けられるようにする */
+  :where(button, input, textarea, select) {
+    border: 2px solid ButtonText;
+  }
+
+  :where(input, textarea, select) {
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  :where(button):disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+
+  :where([role="alert"], [role="status"]):not(.sr-only) {
+    border: 2px solid CanvasText;
+  }
+
+  [aria-pressed="true"] {
+    border: 3px solid Highlight;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  [role="dialog"] {
+    background: Canvas;
+    color: CanvasText;
+    border-color: Highlight;
+  }
+
+  [role="dialog"] button:focus {
+    outline: 3px solid Highlight !important;
+    outline-offset: 3px !important;
+  }
+
+  .bloom-day,
+  .good-thing-day {
+    background: Canvas;
+    outline: 1px solid CanvasText;
+  }
+
+  .bloom-day[data-bloom-recorded="true"],
+  .good-thing-day[data-recorded="true"] {
+    background: Highlight;
+    outline: 2px solid Highlight;
+  }
+
+  :where(
+      a[href],
+      button,
+      input,
+      textarea,
+      select,
+      summary,
+      [tabindex]:not([tabindex="-1"])
+    ):focus-visible {
+    outline-color: Highlight !important;
+  }
+}
