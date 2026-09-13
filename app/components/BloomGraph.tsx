@@ -256,7 +256,8 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
                   <div
                     key={item.date}
                     title={`${item.date} : ${count}回咲いた`}
-                    className={`w-3 h-3 rounded-sm ${bgColor} transition-all duration-300 hover:ring-2 hover:ring-pink-400 hover:ring-offset-1 cursor-pointer`}
+                    data-bloom-recorded={count > 0 ? "true" : "false"}
+                    className={`bloom-day w-3 h-3 rounded-sm ${bgColor} transition-all duration-300 hover:ring-2 hover:ring-pink-400 hover:ring-offset-1 cursor-pointer`}
                   />
                 );
               })}

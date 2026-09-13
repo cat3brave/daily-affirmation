@@ -359,7 +359,8 @@ export default function ThreeGoodThingsCard() {
               >
                 <span
                   aria-hidden="true"
-                  className={`h-4 w-4 rounded-[4px] transition-all ${
+                  data-recorded={hasRecord ? "true" : "false"}
+                  className={`good-thing-day h-4 w-4 rounded-[4px] transition-all ${
                     hasRecord
                       ? "bg-green-400 group-hover:bg-green-500 shadow-sm"
                       : "bg-gray-100"
