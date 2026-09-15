@@ -32,6 +32,14 @@ const allowedDashboardRestTables = new Set([
 
 type LoginRequestBody = { email?: unknown; password?: unknown };
 
+export type RejectedAuthSupabaseMock = {
+  loginRequestBodies: LoginRequestBody[];
+  signUpRequestBodies: LoginRequestBody[];
+  restWriteRequests: string[];
+  unexpectedAuthRequests: string[];
+  unexpectedRestRequests: string[];
+};
+
 export type AuthenticatedSupabaseMock = {
   loginRequestBodies: LoginRequestBody[];
   restWriteRequests: string[];
@@ -60,6 +68,71 @@ export async function stubExternalServices(page: Page) {
   });
   await page.route("https://generativelanguage.googleapis.com/**", (route) => route.abort());
   await page.route("https://accounts.google.com/**", (route) => route.abort());
+}
+
+export async function stubRejectedAuthSupabase(
+  page: Page,
+): Promise<RejectedAuthSupabaseMock> {
+  const mockState: RejectedAuthSupabaseMock = {
+    loginRequestBodies: [],
+    signUpRequestBodies: [],
+    restWriteRequests: [],
+    unexpectedAuthRequests: [],
+    unexpectedRestRequests: [],
+  };
+
+  await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (
+      request.method() === "POST" &&
+      url.pathname === "/auth/v1/token" &&
+      url.searchParams.get("grant_type") === "password"
+    ) {
+      mockState.loginRequestBodies.push(request.postDataJSON());
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "invalid_grant",
+          error_description: "Invalid login credentials",
+        }),
+      });
+      return;
+    }
+
+    if (request.method() === "POST" && url.pathname === "/auth/v1/signup") {
+      mockState.signUpRequestBodies.push(request.postDataJSON());
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "user_already_exists",
+          message: "User already registered",
+        }),
+      });
+      return;
+    }
+
+    mockState.unexpectedAuthRequests.push(`${request.method()} ${url.href}`);
+    await route.abort();
+  });
+
+  await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
+    const request = route.request();
+    const method = request.method();
+    const url = request.url();
+
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(method)) {
+      mockState.restWriteRequests.push(`${method} ${url}`);
+    } else {
+      mockState.unexpectedRestRequests.push(`${method} ${url}`);
+    }
+    await route.abort();
+  });
+
+  return mockState;
 }
 
 export async function stubAuthenticatedSupabase(

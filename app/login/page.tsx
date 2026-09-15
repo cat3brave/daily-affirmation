@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -13,10 +13,14 @@ const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
 const AUTH_MESSAGE_ID = "auth-message";
 type InvalidField = "email" | "password" | null;
+type ErrorFocusTarget = "email" | "password" | "summary";
 
 export default function LoginPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const authInFlightRef = useRef(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -26,13 +30,42 @@ export default function LoginPage() {
     "success",
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [errorFocusRequest, setErrorFocusRequest] = useState<{
+    target: ErrorFocusTarget;
+    sequence: number;
+  } | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!errorFocusRequest) return;
+
+    const targets = {
+      email: emailInputRef,
+      password: passwordInputRef,
+      summary: errorSummaryRef,
+    };
+    targets[errorFocusRequest.target].current?.focus();
+  }, [errorFocusRequest]);
+
+  const requestErrorFocus = (target: ErrorFocusTarget) => {
+    setErrorFocusRequest((current) => ({
+      target,
+      sequence: (current?.sequence ?? 0) + 1,
+    }));
+  };
+
+  const clearError = () => {
+    if (messageType !== "error") return;
+    setMessage("");
+    setInvalidField(null);
+  };
   // 入力チェック
   const validateEmailAndPassword = () => {
     if (!email.trim()) {
       setMessageType("error");
       setInvalidField("email");
       setMessage("メールアドレスを入力してください。");
+      requestErrorFocus("email");
       return false;
     }
 
@@ -40,6 +73,7 @@ export default function LoginPage() {
       setMessageType("error");
       setInvalidField("password");
       setMessage("パスワードを入力してください。");
+      requestErrorFocus("password");
       return false;
     }
 
@@ -65,6 +99,7 @@ export default function LoginPage() {
         setMessageType("error");
         setInvalidField(null);
         setMessage(LOGIN_FAILURE_MESSAGE);
+        requestErrorFocus("summary");
       } else {
         setInvalidField(null);
         setMessage("");
@@ -75,6 +110,7 @@ export default function LoginPage() {
       setMessageType("error");
       setInvalidField(null);
       setMessage(LOGIN_FAILURE_MESSAGE);
+      requestErrorFocus("summary");
     } finally {
       authInFlightRef.current = false;
       setIsLoading(false);
@@ -98,6 +134,7 @@ export default function LoginPage() {
         setMessageType("error");
         setInvalidField(null);
         setMessage(SIGN_UP_FAILURE_MESSAGE);
+        requestErrorFocus("summary");
       } else {
         setMessageType("success");
         setInvalidField(null);
@@ -111,6 +148,7 @@ export default function LoginPage() {
       setMessageType("error");
       setInvalidField(null);
       setMessage(SIGN_UP_FAILURE_MESSAGE);
+      requestErrorFocus("summary");
     } finally {
       authInFlightRef.current = false;
       setIsLoading(false);
@@ -136,6 +174,7 @@ export default function LoginPage() {
         setMessageType("error");
         setInvalidField(null);
         setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
+        requestErrorFocus("summary");
         authInFlightRef.current = false;
         setIsLoading(false);
       }
@@ -144,6 +183,7 @@ export default function LoginPage() {
       setMessageType("error");
       setInvalidField(null);
       setMessage(GOOGLE_LOGIN_FAILURE_MESSAGE);
+      requestErrorFocus("summary");
       authInFlightRef.current = false;
       setIsLoading(false);
     }
@@ -198,7 +238,11 @@ export default function LoginPage() {
           {message && (
             <div
               id={AUTH_MESSAGE_ID}
+              ref={errorSummaryRef}
               role={messageType === "success" ? "status" : "alert"}
+              tabIndex={
+                messageType === "error" && invalidField === null ? -1 : undefined
+              }
               className={`mb-4 rounded-xl px-4 py-3 text-sm leading-relaxed ${
                 messageType === "success"
                   ? "bg-green-50 text-green-700 border border-green-100"
@@ -218,13 +262,17 @@ export default function LoginPage() {
             </label>
             <input
               id="email"
+              ref={emailInputRef}
               name="email"
               type="email"
               inputMode="email"
               autoComplete="email"
               placeholder="メールアドレス"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearError();
+              }}
               disabled={isLoading}
               aria-invalid={invalidField === "email" ? "true" : undefined}
               aria-describedby={
@@ -243,6 +291,7 @@ export default function LoginPage() {
             </label>
             <input
               id="password"
+              ref={passwordInputRef}
               name="password"
               type="password"
               autoComplete={
@@ -250,7 +299,10 @@ export default function LoginPage() {
               }
               placeholder="パスワード"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearError();
+              }}
               disabled={isLoading}
               aria-invalid={invalidField === "password" ? "true" : undefined}
               aria-describedby={

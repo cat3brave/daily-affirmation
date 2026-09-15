@@ -218,6 +218,7 @@ describe("LoginPage", () => {
     expect(emailAlert).toHaveTextContent(EMAIL_REQUIRED_MESSAGE);
     expect(emailInput).toHaveAttribute("aria-invalid", "true");
     expect(emailInput).toHaveAttribute("aria-describedby", AUTH_MESSAGE_ID);
+    expect(emailInput).toHaveFocus();
     expect(passwordInput).not.toHaveAttribute("aria-invalid");
     expect(passwordInput).not.toHaveAttribute("aria-describedby");
     expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
@@ -227,6 +228,9 @@ describe("LoginPage", () => {
     fireEvent.change(emailInput, {
       target: { value: "user@example.com" },
     });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(emailInput).not.toHaveAttribute("aria-invalid");
+    expect(emailInput).not.toHaveAttribute("aria-describedby");
     fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
 
     const passwordAlert = await screen.findByRole("alert");
@@ -240,9 +244,49 @@ describe("LoginPage", () => {
       "aria-describedby",
       AUTH_MESSAGE_ID,
     );
+    expect(passwordInput).toHaveFocus();
     expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
     expect(loginMocks.signUp).not.toHaveBeenCalled();
     expect(loginMocks.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it("Enter送信でも入力エラーへフォーカスし、修正時に古いエラーを消す", async () => {
+    const { container } = render(<LoginPage />);
+    const form = container.querySelector("form");
+    const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
+    const passwordInput = screen.getByLabelText(PASSWORD_PLACEHOLDER);
+
+    fireEvent.submit(form!);
+    await screen.findByText(EMAIL_REQUIRED_MESSAGE);
+    expect(emailInput).toHaveFocus();
+
+    fireEvent.change(emailInput, { target: { value: "user@example.com" } });
+    fireEvent.submit(form!);
+    await screen.findByText(PASSWORD_REQUIRED_MESSAGE);
+    expect(passwordInput).toHaveFocus();
+
+    fireEvent.change(passwordInput, { target: { value: "secret" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(passwordInput).not.toHaveAttribute("aria-invalid");
+    expect(passwordInput).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("モード切り替え時に入力エラーと入力欄の参照を消す", async () => {
+    render(<LoginPage />);
+    const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
+
+    fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
+    await screen.findByText(EMAIL_REQUIRED_MESSAGE);
+    switchToSignUpMode();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(emailInput).not.toHaveAttribute("aria-invalid");
+    expect(emailInput).not.toHaveAttribute("aria-describedby");
+    expect(emailInput).toHaveAttribute("autocomplete", "email");
+    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
   });
 
   it("ログイン成功時にtrimしたメールとパスワードを渡しdashboardへ遷移する", async () => {
@@ -268,8 +312,17 @@ describe("LoginPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
       LOGIN_FAILURE_MESSAGE,
+    );
+    expect(alert).toHaveAttribute("tabindex", "-1");
+    expect(alert).toHaveFocus();
+    expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toHaveValue(
+      "user@example.com",
+    );
+    expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).not.toHaveAttribute(
+      "aria-invalid",
     );
     expect(loginMocks.push).not.toHaveBeenCalled();
   });
@@ -325,8 +378,13 @@ describe("LoginPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
       SIGN_UP_FAILURE_MESSAGE,
+    );
+    expect(alert).toHaveFocus();
+    expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toHaveValue(
+      "user@example.com",
     );
   });
 
