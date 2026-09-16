@@ -15,6 +15,7 @@ import HomeTab from "../components/HomeTab";
 import WorkTab from "../components/WorkTab";
 import AmuletTab from "../components/AmuletTab";
 import BottomTabBar, {
+  dashboardTabs,
   getDashboardPanelId,
   getDashboardTabId,
 } from "../components/BottomTabBar";
@@ -109,52 +110,56 @@ export default function Home() {
           transition={{ duration: 1, ease: "easeInOut" }}
           className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
         >
-          <div
-            id={getDashboardPanelId(currentTab)}
-            role="tabpanel"
-            aria-labelledby={getDashboardTabId(currentTab)}
-            className="w-full"
-          >
-            <AnimatePresence mode="wait">
-              {currentTab === "home" && (
-                <HomeTab
-                  isLoading={isLoading}
-                  text={text}
-                  handleClick={handleGenerateAffirmation}
-                  handleFavoriteAffirmation={handleFavoriteAffirmation}
-                  isFavoriteDisabled={isFavoriteDisabled}
-                  favoriteAffirmations={favoriteAffirmations}
-                  favoriteError={favoriteError}
-                  handleRemoveFavoriteAffirmation={
-                    handleRemoveFavoriteAffirmation
-                  }
-                  totalBlooms={totalBlooms}
-                  growth={growth}
-                  currentFlower={currentFlower}
-                  isBloomSaving={isBloomSaving}
-                  flowerError={flowerError}
-                  handleWalk={handleWalk}
-                  setShowTada={setShowTada}
-                />
-              )}
+          {dashboardTabs.map(({ id }) => (
+            <div
+              key={id}
+              id={getDashboardPanelId(id)}
+              role="tabpanel"
+              aria-labelledby={getDashboardTabId(id)}
+              hidden={currentTab !== id}
+              className="w-full"
+            >
+              <AnimatePresence mode="wait">
+                {id === "home" && currentTab === id && (
+                  <HomeTab
+                    isLoading={isLoading}
+                    text={text}
+                    handleClick={handleGenerateAffirmation}
+                    handleFavoriteAffirmation={handleFavoriteAffirmation}
+                    isFavoriteDisabled={isFavoriteDisabled}
+                    favoriteAffirmations={favoriteAffirmations}
+                    favoriteError={favoriteError}
+                    handleRemoveFavoriteAffirmation={
+                      handleRemoveFavoriteAffirmation
+                    }
+                    totalBlooms={totalBlooms}
+                    growth={growth}
+                    currentFlower={currentFlower}
+                    isBloomSaving={isBloomSaving}
+                    flowerError={flowerError}
+                    handleWalk={handleWalk}
+                    setShowTada={setShowTada}
+                  />
+                )}
 
-              {currentTab === "work" && (
-                <WorkTab handleFloatCloud={handleFloatCloud} />
-              )}
+                {id === "work" && currentTab === id && (
+                  <WorkTab handleFloatCloud={handleFloatCloud} />
+                )}
 
-              {currentTab === "amulet" && (
-                <AmuletTab setShowTada={setShowTada} />
-              )}
-            </AnimatePresence>
+                {id === "amulet" && currentTab === id && (
+                  <AmuletTab setShowTada={setShowTada} />
+                )}
+              </AnimatePresence>
 
-            {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
-            {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
-            {currentTab === "home" && (
-              <div className="w-full mt-8">
-                <BloomGraph refreshKey={bloomRefreshKey} />
-              </div>
-            )}
-          </div>
+              {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+              {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
+              {id === "home" && currentTab === id && (
+                <div className="w-full mt-8">
+                  <BloomGraph refreshKey={bloomRefreshKey} />
+                </div>
+              )}
+            </div>
+          ))}
         </motion.div>
 
         <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
