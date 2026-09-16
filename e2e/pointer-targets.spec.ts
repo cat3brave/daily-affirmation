@@ -72,7 +72,7 @@ for (const viewport of viewports) {
       page.getByRole("button", { name: "「テスト用のお守りの言葉」を削除" }),
     );
 
-    await page.getByRole("button", { name: "ワーク", exact: true }).click();
+    await page.getByRole("tab", { name: "ワーク", exact: true }).click();
     await expect(page.getByText("🌷 3つのよかったこと")).toBeVisible();
     await expectAllEnabledButtonsMeetMinimum(page);
 
@@ -99,7 +99,7 @@ for (const viewport of viewports) {
       )
       .toEqual({ internalScroll: viewport.width === 320, pageScroll: false });
 
-    await page.getByRole("button", { name: "お守り", exact: true }).click();
+    await page.getByRole("tab", { name: "お守り", exact: true }).click();
     await expectAllEnabledButtonsMeetMinimum(page);
     await page.getByRole("button", { name: "今日、失敗しちゃった！" }).click();
     await expectMinimumTarget(

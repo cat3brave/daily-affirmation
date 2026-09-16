@@ -72,7 +72,8 @@ body {
     border: 2px solid CanvasText;
   }
 
-  [aria-pressed="true"] {
+  [aria-pressed="true"],
+  [role="tab"][aria-selected="true"] {
     border: 3px solid Highlight;
     text-decoration: underline;
     text-underline-offset: 0.2em;

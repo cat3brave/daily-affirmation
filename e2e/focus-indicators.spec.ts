@@ -71,15 +71,16 @@ test("Tab操作でログイン画面とダッシュボードの主要操作に�
 
   const supabaseMock = await loginToDashboard(page);
   const tabs = ["ホーム", "ワーク", "お守り"].map((name) =>
-    page.getByRole("button", { name, exact: true }),
+    page.getByRole("tab", { name, exact: true }),
   );
 
   await tabUntilFocused(page, tabs[0]);
-  for (const tab of tabs) {
+  for (const [index, tab] of tabs.entries()) {
     await expectVisibleKeyboardFocus(tab);
-    if (tab !== tabs.at(-1)) await page.keyboard.press("Tab");
+    if (index < tabs.length - 1) await page.keyboard.press("ArrowRight");
   }
 
+  await tabs[1].focus();
   await tabs[1].press("Enter");
   const translatorInput = page.getByLabel(
     "優しい言葉に翻訳したい自分への厳しい声",

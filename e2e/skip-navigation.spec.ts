@@ -84,10 +84,11 @@ test("認証済みダッシュボードで現在のタブ内容へ移動後も�
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "言葉を受け取る" })).toBeFocused();
 
-  const workTab = page.getByRole("button", { name: "ワーク" });
-  await tabUntilFocused(page, workTab);
-  await page.keyboard.press("Enter");
-  await expect(workTab).toHaveAttribute("aria-pressed", "true");
+  const homeTab = page.getByRole("tab", { name: "ホーム" });
+  const workTab = page.getByRole("tab", { name: "ワーク" });
+  await tabUntilFocused(page, homeTab);
+  await page.keyboard.press("ArrowRight");
+  await expect(workTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("優しい翻訳機")).toBeVisible();
 
   expectSafeAuthenticatedRequests(supabaseMock);

@@ -414,7 +414,7 @@ function getLastTadaModalProps() {
 }
 
 function clickTab(tabLabel: "ホーム" | "ワーク" | "お守り") {
-  fireEvent.click(screen.getByRole("button", { name: new RegExp(tabLabel) }));
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(tabLabel) }));
 }
 
 beforeEach(() => {
@@ -436,9 +436,9 @@ describe("DashboardPage", () => {
       screen.getByText("ログイン情報を確認しています..."),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("dashboard-header")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "ホーム" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "ワーク" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "お守り" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "ホーム" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "ワーク" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "お守り" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("bloom-graph")).not.toBeInTheDocument();
     expect(dashboardMocks.createSupabaseBrowserClient).not.toHaveBeenCalled();
   });
@@ -457,6 +457,14 @@ describe("DashboardPage", () => {
       refreshKey: 12,
     });
     expect(dashboardMocks.createSupabaseBrowserClient).not.toHaveBeenCalled();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "id",
+      "dashboard-panel-home",
+    );
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "dashboard-tab-home",
+    );
   });
 
   it("ワークボタンでWorkTabへ切り替え成長記録を非表示にする", () => {
@@ -467,6 +475,10 @@ describe("DashboardPage", () => {
     expect(screen.queryByTestId("home-tab")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("bloom-graph")).not.toBeInTheDocument();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "dashboard-tab-work",
+    );
   });
 
   it("お守りボタンでAmuletTabへ切り替える", () => {
