@@ -86,9 +86,9 @@ test("320 CSS pxで全ダッシュボード画面と固定タブがリフロー�
   page,
 }) => {
   const supabaseMock = await loginToDashboard(page);
-  const homeTab = page.getByRole("button", { name: "ホーム", exact: true });
-  const workTab = page.getByRole("button", { name: "ワーク", exact: true });
-  const amuletTab = page.getByRole("button", { name: "お守り", exact: true });
+  const homeTab = page.getByRole("tab", { name: "ホーム", exact: true });
+  const workTab = page.getByRole("tab", { name: "ワーク", exact: true });
+  const amuletTab = page.getByRole("tab", { name: "お守り", exact: true });
 
   await expectInsideViewport(page.getByText("🌸 デジタル花壇 🌸"));
   await expectInsideViewport(

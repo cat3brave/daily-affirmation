@@ -25,7 +25,7 @@ test("動きを減らしても主要な画面と操作を利用できる", async
     page.getByRole("img", { name: /花の成長状態/ }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: /ワーク/ }).click();
+  await page.getByRole("tab", { name: /ワーク/ }).click();
   await expect(
     page.getByRole("region", { name: "心を整えるワーク" }),
   ).toBeVisible();
@@ -45,7 +45,7 @@ test("動きを減らしても主要な画面と操作を利用できる", async
   await page.getByRole("button", { name: "放つ", exact: true }).click();
   await expect(page.getByText(/「失敗する」/)).toBeVisible();
 
-  await page.getByRole("button", { name: /お守り/ }).click();
+  await page.getByRole("tab", { name: /お守り/ }).click();
   await page.getByRole("button", { name: "今日、失敗しちゃった！" }).click();
   const dialog = page.getByRole("dialog", { name: "Ta-Da!" });
   await expect(dialog).toBeVisible();

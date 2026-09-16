@@ -20,16 +20,16 @@ test("login succeeds and authenticated dashboard tabs can be navigated", async (
   ).toBeVisible();
   await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
 
-  await page.getByRole("button", { name: /ワーク/ }).click();
+  await page.getByRole("tab", { name: /ワーク/ }).click();
   await expect(page.getByText("優しい翻訳機")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "言葉を受け取る" }),
   ).toBeHidden();
 
-  await page.getByRole("button", { name: /お守り/ }).click();
+  await page.getByRole("tab", { name: /お守り/ }).click();
   await expect(page.getByText("失敗の救急箱")).toBeVisible();
 
-  await page.getByRole("button", { name: /ホーム/ }).click();
+  await page.getByRole("tab", { name: /ホーム/ }).click();
   await expect(
     page.getByRole("button", { name: "言葉を受け取る" }),
   ).toBeVisible();

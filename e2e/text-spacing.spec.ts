@@ -180,10 +180,10 @@ for (const viewport of viewports) {
       });
       await applyTextSpacing(page);
 
-      const bottomBar = page.getByRole("button", { name: "ホーム" }).locator("..");
-      const homeTab = page.getByRole("button", { name: "ホーム" });
-      const workTab = page.getByRole("button", { name: "ワーク" });
-      const amuletTab = page.getByRole("button", { name: "お守り" });
+      const bottomBar = page.getByRole("tab", { name: "ホーム" }).locator("..");
+      const homeTab = page.getByRole("tab", { name: "ホーム" });
+      const workTab = page.getByRole("tab", { name: "ワーク" });
+      const amuletTab = page.getByRole("tab", { name: "お守り" });
 
       await expectFullyVisible(page.getByText("🌷 お気に入りの言葉"));
       await expectFullyVisible(page.getByText(favorite));
@@ -206,7 +206,7 @@ for (const viewport of viewports) {
       }
 
       await workTab.click();
-      await expect(workTab).toHaveAttribute("aria-pressed", "true");
+      await expect(workTab).toHaveAttribute("aria-selected", "true");
       await expectFullyVisible(page.getByText("🌷 3つのよかったこと"));
       const inputs = ["1つ目", "2つ目", "3つ目"].map((ordinal) =>
         page.getByLabel(`${ordinal}のよかったこと`),
@@ -246,7 +246,7 @@ for (const viewport of viewports) {
       }
 
       await amuletTab.click();
-      await expect(amuletTab).toHaveAttribute("aria-pressed", "true");
+      await expect(amuletTab).toHaveAttribute("aria-selected", "true");
       await expectFullyVisible(page.getByText("失敗の救急箱"));
       const tadaButton = page.getByRole("button", {
         name: "今日、失敗しちゃった！",
@@ -277,7 +277,7 @@ for (const viewport of viewports) {
       await expect(dialog).toBeHidden();
       await expect(tadaButton).toBeFocused();
       await homeTab.click();
-      await expect(homeTab).toHaveAttribute("aria-pressed", "true");
+      await expect(homeTab).toHaveAttribute("aria-selected", "true");
       expectSafeAuthenticatedRequests(supabaseMock);
     });
   });

@@ -133,36 +133,32 @@ test("キーボードだけでログインしダッシュボードのタブを�
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("ログイン情報を確認しています...")).toBeHidden();
 
-  const homeTab = page.getByRole("button", { name: "ホーム" });
-  const workTab = page.getByRole("button", { name: "ワーク" });
-  const amuletTab = page.getByRole("button", { name: "お守り" });
+  const homeTab = page.getByRole("tab", { name: "ホーム" });
+  const workTab = page.getByRole("tab", { name: "ワーク" });
+  const amuletTab = page.getByRole("tab", { name: "お守り" });
 
   await tabUntilFocused(page, homeTab);
   await expect(homeTab).toBeFocused();
   await page.keyboard.press("Space");
   await expect(homeTab).toBeFocused();
-  await expect(homeTab).toHaveAttribute("aria-pressed", "true");
+  await expect(homeTab).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("ArrowRight");
   await expect(workTab).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(workTab).toBeFocused();
-  await expect(workTab).toHaveAttribute("aria-pressed", "true");
-  await expect(homeTab).toHaveAttribute("aria-pressed", "false");
+  await expect(workTab).toHaveAttribute("aria-selected", "true");
+  await expect(homeTab).toHaveAttribute("aria-selected", "false");
   await expect(page.getByText("優しい翻訳機")).toBeVisible();
 
-  await page.keyboard.press("Tab");
+  await page.keyboard.press("ArrowRight");
   await expect(amuletTab).toBeFocused();
-  await page.keyboard.press("Space");
-  await expect(amuletTab).toBeFocused();
-  await expect(amuletTab).toHaveAttribute("aria-pressed", "true");
-  await expect(workTab).toHaveAttribute("aria-pressed", "false");
+  await expect(amuletTab).toHaveAttribute("aria-selected", "true");
+  await expect(workTab).toHaveAttribute("aria-selected", "false");
   await expect(page.getByText("失敗の救急箱")).toBeVisible();
 
-  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("ArrowLeft");
   await expect(workTab).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Home");
   await expect(homeTab).toBeFocused();
 
   expectSafeAuthenticatedRequests(supabaseMock);
@@ -174,8 +170,8 @@ test("認証済みダッシュボードの各タブにWCAG A・AA違反がない
   const supabaseMock = await loginToDashboard(page);
 
   await expect(page.getByText("e2e-user さん🌷")).toBeVisible();
-  await expect(page.getByRole("button", { name: "ホーム" })).toHaveAttribute(
-    "aria-pressed",
+  await expect(page.getByRole("tab", { name: "ホーム" })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await expect(
@@ -184,17 +180,17 @@ test("認証済みダッシュボードの各タブにWCAG A・AA違反がない
   await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
   await expectNoAccessibilityViolations(page, "ダッシュボードのホームタブ");
 
-  await page.getByRole("button", { name: "ワーク" }).click();
-  await expect(page.getByRole("button", { name: "ワーク" })).toHaveAttribute(
-    "aria-pressed",
+  await page.getByRole("tab", { name: "ワーク" }).click();
+  await expect(page.getByRole("tab", { name: "ワーク" })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await expect(page.getByText("優しい翻訳機")).toBeVisible();
   await expectNoAccessibilityViolations(page, "ダッシュボードのワークタブ");
 
-  await page.getByRole("button", { name: "お守り" }).click();
-  await expect(page.getByRole("button", { name: "お守り" })).toHaveAttribute(
-    "aria-pressed",
+  await page.getByRole("tab", { name: "お守り" }).click();
+  await expect(page.getByRole("tab", { name: "お守り" })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await expect(page.getByText("失敗の救急箱")).toBeVisible();

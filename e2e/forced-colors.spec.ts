@@ -129,13 +129,13 @@ for (const viewport of viewports) {
       });
       await expectForcedColors(page);
 
-      const home = page.getByRole("button", { name: "ホーム", exact: true });
-      const work = page.getByRole("button", { name: "ワーク", exact: true });
-      const amulet = page.getByRole("button", { name: "お守り", exact: true });
+      const home = page.getByRole("tab", { name: "ホーム", exact: true });
+      const work = page.getByRole("tab", { name: "ワーク", exact: true });
+      const amulet = page.getByRole("tab", { name: "お守り", exact: true });
       const bottomBar = home.locator("..");
-      await expect(home).toHaveAttribute("aria-pressed", "true");
+      await expect(home).toHaveAttribute("aria-selected", "true");
       await expect(home).toHaveCSS("text-decoration-line", "underline");
-      await expect(work).toHaveAttribute("aria-pressed", "false");
+      await expect(work).toHaveAttribute("aria-selected", "false");
       await expect(page.getByText(favorite)).toBeVisible();
 
       const birdView = page.getByRole("button", { name: /鳥の目線になる|地上に戻る/ });
@@ -156,7 +156,7 @@ for (const viewport of viewports) {
       if (viewport.width === 320) await page.screenshot({ path: "/tmp/forced-colors-home-320.png", fullPage: true });
 
       await work.click();
-      await expect(work).toHaveAttribute("aria-pressed", "true");
+      await expect(work).toHaveAttribute("aria-selected", "true");
       await expect(work).toHaveCSS("text-decoration-line", "underline");
       const recordedDay = page.getByRole("button", { name: new RegExp(`^${date}、記録あり`) });
       const emptyDay = page.getByRole("button", { name: /記録なし/ }).first();
@@ -171,7 +171,7 @@ for (const viewport of viewports) {
       if (viewport.width === 320) await page.screenshot({ path: "/tmp/forced-colors-work-320.png", fullPage: true });
 
       await amulet.click();
-      await expect(amulet).toHaveAttribute("aria-pressed", "true");
+      await expect(amulet).toHaveAttribute("aria-selected", "true");
       const openModal = page.getByRole("button", { name: "今日、失敗しちゃった！" });
       await expectAboveBottomBar(openModal, bottomBar);
       if (viewport.width === 320) await page.screenshot({ path: "/tmp/forced-colors-amulet-320.png", fullPage: true });

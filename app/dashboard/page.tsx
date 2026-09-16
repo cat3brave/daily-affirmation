@@ -14,7 +14,10 @@ import { useWindowSize } from "../hooks/useWindowSize";
 import HomeTab from "../components/HomeTab";
 import WorkTab from "../components/WorkTab";
 import AmuletTab from "../components/AmuletTab";
-import BottomTabBar from "../components/BottomTabBar";
+import BottomTabBar, {
+  getDashboardPanelId,
+  getDashboardTabId,
+} from "../components/BottomTabBar";
 import TadaModal from "../components/TadaModal";
 import BloomGraph from "../components/BloomGraph";
 import FloatingCloudLayer from "../components/FloatingCloudLayer";
@@ -106,43 +109,52 @@ export default function Home() {
           transition={{ duration: 1, ease: "easeInOut" }}
           className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
         >
-          <AnimatePresence mode="wait">
+          <div
+            id={getDashboardPanelId(currentTab)}
+            role="tabpanel"
+            aria-labelledby={getDashboardTabId(currentTab)}
+            className="w-full"
+          >
+            <AnimatePresence mode="wait">
+              {currentTab === "home" && (
+                <HomeTab
+                  isLoading={isLoading}
+                  text={text}
+                  handleClick={handleGenerateAffirmation}
+                  handleFavoriteAffirmation={handleFavoriteAffirmation}
+                  isFavoriteDisabled={isFavoriteDisabled}
+                  favoriteAffirmations={favoriteAffirmations}
+                  favoriteError={favoriteError}
+                  handleRemoveFavoriteAffirmation={
+                    handleRemoveFavoriteAffirmation
+                  }
+                  totalBlooms={totalBlooms}
+                  growth={growth}
+                  currentFlower={currentFlower}
+                  isBloomSaving={isBloomSaving}
+                  flowerError={flowerError}
+                  handleWalk={handleWalk}
+                  setShowTada={setShowTada}
+                />
+              )}
+
+              {currentTab === "work" && (
+                <WorkTab handleFloatCloud={handleFloatCloud} />
+              )}
+
+              {currentTab === "amulet" && (
+                <AmuletTab setShowTada={setShowTada} />
+              )}
+            </AnimatePresence>
+
+            {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+            {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
             {currentTab === "home" && (
-              <HomeTab
-                isLoading={isLoading}
-                text={text}
-                handleClick={handleGenerateAffirmation}
-                handleFavoriteAffirmation={handleFavoriteAffirmation}
-                isFavoriteDisabled={isFavoriteDisabled}
-                favoriteAffirmations={favoriteAffirmations}
-                favoriteError={favoriteError}
-                handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
-                totalBlooms={totalBlooms}
-                growth={growth}
-                currentFlower={currentFlower}
-                isBloomSaving={isBloomSaving}
-                flowerError={flowerError}
-                handleWalk={handleWalk}
-                setShowTada={setShowTada}
-              />
+              <div className="w-full mt-8">
+                <BloomGraph refreshKey={bloomRefreshKey} />
+              </div>
             )}
-
-            {currentTab === "work" && (
-              <WorkTab handleFloatCloud={handleFloatCloud} />
-            )}
-
-            {currentTab === "amulet" && (
-              <AmuletTab setShowTada={setShowTada} />
-            )}
-          </AnimatePresence>
-
-          {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
-          {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
-          {currentTab === "home" && (
-            <div className="w-full mt-8">
-              <BloomGraph refreshKey={bloomRefreshKey} />
-            </div>
-          )}
+          </div>
         </motion.div>
 
         <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />

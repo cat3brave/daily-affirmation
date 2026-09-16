@@ -65,8 +65,8 @@ for (const viewport of viewports) {
       const homeOpenButton = page.getByRole("button", {
         name: "今日、ちょっと失敗しちゃった...",
       });
-      const homeTab = page.getByRole("button", { name: "ホーム", exact: true });
-      const amuletTab = page.getByRole("button", { name: "お守り", exact: true });
+      const homeTab = page.getByRole("tab", { name: "ホーム", exact: true });
+      const amuletTab = page.getByRole("tab", { name: "お守り", exact: true });
 
       await homeOpenButton.click();
       let dialog = page.getByRole("dialog", { name: "Ta-Da!" });
