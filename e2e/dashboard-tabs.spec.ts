@@ -29,6 +29,28 @@ async function expectNoHorizontalScroll(page: Page) {
     .toBe(true);
 }
 
+async function expectPanelRelationships(
+  page: Page,
+  selectedId: "home" | "work" | "amulet",
+) {
+  await expect(page.locator('[role="tabpanel"]')).toHaveCount(3);
+
+  for (const id of ["home", "work", "amulet"] as const) {
+    const tab = page.locator(`#dashboard-tab-${id}`);
+    const panel = page.locator(`#dashboard-panel-${id}`);
+
+    await expect(tab).toHaveAttribute("aria-controls", `dashboard-panel-${id}`);
+    await expect(panel).toHaveAttribute("aria-labelledby", `dashboard-tab-${id}`);
+    if (id === selectedId) {
+      await expect(panel).toBeVisible();
+      await expect(panel).not.toHaveAttribute("hidden");
+    } else {
+      await expect(panel).toBeHidden();
+      await expect(panel).toHaveAttribute("hidden", "");
+    }
+  }
+}
+
 for (const viewport of viewports) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {
     test.use({ viewport });
@@ -55,6 +77,7 @@ for (const viewport of viewports) {
           `dashboard-panel-${id}`,
         );
       }
+      await expectPanelRelationships(page, "home");
 
       let panel = page.getByRole("tabpanel");
       await expect(panel).toHaveAttribute("id", "dashboard-panel-home");
@@ -70,6 +93,9 @@ for (const viewport of viewports) {
       await expectSelected(amulet, true);
       await expect(amulet).toBeFocused();
       await expect(page.getByText("失敗の救急箱")).toBeVisible();
+      await expect(page.getByText("🌸 デジタル花壇 🌸")).toHaveCount(0);
+      await expect(page.getByText("優しい翻訳機")).toHaveCount(0);
+      await expectPanelRelationships(page, "amulet");
 
       await page.keyboard.press("ArrowRight");
       await expectSelected(home, true);
@@ -84,6 +110,9 @@ for (const viewport of viewports) {
       await expectSelected(work, true);
       await expect(work).toBeFocused();
       await expect(page.getByText("優しい翻訳機")).toBeVisible();
+      await expect(page.getByText("🌸 デジタル花壇 🌸")).toHaveCount(0);
+      await expect(page.getByText("失敗の救急箱")).toHaveCount(0);
+      await expectPanelRelationships(page, "work");
 
       panel = page.getByRole("tabpanel");
       await expect(panel).toHaveAttribute("id", "dashboard-panel-work");

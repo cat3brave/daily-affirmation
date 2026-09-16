@@ -417,6 +417,28 @@ function clickTab(tabLabel: "ホーム" | "ワーク" | "お守り") {
   fireEvent.click(screen.getByRole("tab", { name: new RegExp(tabLabel) }));
 }
 
+function expectTabPanelRelationships(selectedTab: DashboardTab) {
+  const tabs = screen.getAllByRole("tab");
+  const panels = screen.getAllByRole("tabpanel", { hidden: true });
+
+  expect(tabs).toHaveLength(3);
+  expect(panels).toHaveLength(3);
+
+  for (const tab of tabs) {
+    const panelId = tab.getAttribute("aria-controls");
+    const panel = panels.find(({ id }) => id === panelId);
+
+    expect(panelId).toBeTruthy();
+    expect(panel).toBeDefined();
+    expect(panel).toHaveAttribute("aria-labelledby", tab.id);
+    if (tab.id.endsWith(selectedTab)) {
+      expect(panel).not.toHaveAttribute("hidden");
+    } else {
+      expect(panel).toHaveAttribute("hidden");
+    }
+  }
+}
+
 beforeEach(() => {
   configureDashboardMocks();
 });
@@ -446,6 +468,7 @@ describe("DashboardPage", () => {
   it("認証確認後はホームタブと成長記録を初期表示する", () => {
     render(<DashboardPage />);
 
+    expectTabPanelRelationships("home");
     expect(screen.getByTestId("home-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("work-tab")).not.toBeInTheDocument();
     expect(screen.queryByTestId("amulet-tab")).not.toBeInTheDocument();
@@ -472,6 +495,7 @@ describe("DashboardPage", () => {
 
     clickTab("ワーク");
 
+    expectTabPanelRelationships("work");
     expect(screen.queryByTestId("home-tab")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("bloom-graph")).not.toBeInTheDocument();
