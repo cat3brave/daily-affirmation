@@ -231,6 +231,27 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("空または空白だけの入力では保存できず、文字を入力すると保存できる", async () => {
+    await renderLoadedCard();
+    const inputs = screen.getAllByRole("textbox");
+    const saveButton = screen.getByRole("button", { name: "記録する" });
+
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(inputs[0], { target: { value: "  \n " } });
+    expect(saveButton).toBeDisabled();
+
+    supabaseMocks.getUser.mockClear();
+    supabaseMocks.from.mockClear();
+    fireEvent.click(saveButton);
+    expect(supabaseMocks.getUser).not.toHaveBeenCalled();
+    expect(supabaseMocks.from).not.toHaveBeenCalled();
+    expect(supabaseMocks.upsert).not.toHaveBeenCalled();
+
+    fireEvent.change(inputs[1], { target: { value: "うれしいこと" } });
+    expect(saveButton).toBeEnabled();
+  });
+
   it("記録ボタンに高コントラストの背景色を使用する", async () => {
     await renderLoadedCard();
 
@@ -377,6 +398,53 @@ describe("ThreeGoodThingsCard", () => {
     expect(detailItems[0]).toHaveTextContent(firstThing);
     expect(detailItems[1]).toHaveTextContent(secondThing);
     expect(detailItems[2]).toHaveTextContent(thirdThing);
+  });
+
+  it("保存中は入力を固定し、正規化した部分入力を保存後の入力欄と履歴へ反映する", async () => {
+    const today = getTodayDate();
+    let finishUpsert: ((result: MutationResult) => void) | undefined;
+    supabaseMocks.upsert.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpsert = resolve;
+        }),
+    );
+    await renderLoadedCard();
+    const inputs = screen.getAllByRole("textbox");
+
+    fireEvent.change(inputs[0], {
+      target: { value: "  朝の散歩が気持ちよかった  " },
+    });
+    fireEvent.change(inputs[1], { target: { value: " \n  " } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "保存中..." })).toBeDisabled();
+    });
+    inputs.forEach((input) => expect(input).toBeDisabled());
+    expect(supabaseMocks.upsert).toHaveBeenCalledWith(
+      {
+        date: today,
+        things1: "朝の散歩が気持ちよかった",
+        things2: "",
+        things3: "",
+        user_id: USER_ID,
+      },
+      { onConflict: "user_id,date" },
+    );
+
+    finishUpsert?.({ error: null });
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "✨ 保存しました！今日もお疲れ様です ✨",
+    );
+    expect(inputs[0]).toHaveValue("朝の散歩が気持ちよかった");
+    expect(inputs[1]).toHaveValue("");
+    expect(inputs[2]).toHaveValue("");
+    expect(screen.getByText(`📅 ${today} のよかったこと`)).toBeInTheDocument();
+    const detailItems = screen.getAllByRole("listitem");
+    expect(detailItems).toHaveLength(1);
+    expect(detailItems[0]).toHaveTextContent("朝の散歩が気持ちよかった");
   });
 
   it("削除成功時に今日の記録を削除して入力欄と詳細を空にする", async () => {
