@@ -125,6 +125,9 @@ export default function ThreeGoodThingsCard() {
   const handleSave = async () => {
     if (isSaving) return;
 
+    const normalizedThings = things.map((thing) => thing.trim());
+    if (!normalizedThings.some((thing) => thing !== "")) return;
+
     const today = getTodayDate();
     setSaveError("");
     setIsSaving(true);
@@ -150,9 +153,9 @@ export default function ThreeGoodThingsCard() {
           {
             user_id: user.id,
             date: today,
-            things1: things[0],
-            things2: things[1],
-            things3: things[2],
+            things1: normalizedThings[0],
+            things2: normalizedThings[1],
+            things3: normalizedThings[2],
           },
           { onConflict: "user_id,date" },
         );
@@ -163,7 +166,8 @@ export default function ThreeGoodThingsCard() {
         return;
       }
 
-      const updatedRecords = { ...allRecords, [today]: things };
+      const updatedRecords = { ...allRecords, [today]: normalizedThings };
+      setThings(normalizedThings);
       setAllRecords(updatedRecords);
       setSelectedDate(today);
       setIsSaved(true);
@@ -238,6 +242,7 @@ export default function ThreeGoodThingsCard() {
   const past14Days = getPast14Days();
   const isDeletingSelectedDate =
     selectedDate !== null && deletingDate === selectedDate;
+  const hasThingToSave = things.some((thing) => thing.trim() !== "");
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
@@ -256,6 +261,7 @@ export default function ThreeGoodThingsCard() {
               aria-label={`${["1つ目", "2つ目", "3つ目"][index]}のよかったこと`}
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
+              disabled={isSaving}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
               className="w-full min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
             />
@@ -273,7 +279,7 @@ export default function ThreeGoodThingsCard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !hasThingToSave}
               className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
             >
               {isSaving ? "保存中..." : "記録する"}
