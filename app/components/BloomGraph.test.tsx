@@ -35,7 +35,7 @@ vi.mock("../lib/supabaseClient", () => ({
 import BloomGraph from "./BloomGraph";
 
 const USER_ID = "user-bloom-1";
-const NOW = new Date("2026-06-17T12:00:00.000Z");
+const NOW = new Date(2026, 5, 17, 12);
 const GRAPH_NAME = "お花の成長記録（過去3ヶ月）";
 const LOADING_MESSAGE = "成長記録を読み込み中...🌱";
 const LOAD_ERROR_MESSAGE =
@@ -63,6 +63,15 @@ function createSessionErrorResult(error: SupabaseError): SessionResult {
 
 function createBloomLogsResult(data: BloomLog[] = []): BloomLogsResult {
   return { data, error: null };
+}
+
+function localDateTimeIso(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+) {
+  return new Date(year, monthIndex, day, hour).toISOString();
 }
 
 function configureSupabaseMock({
@@ -119,9 +128,10 @@ describe("BloomGraph", () => {
   it("名前付きの領域で期間、合計、日別の集計を自然な日付として伝える", async () => {
     configureSupabaseMock({
       bloomLogsResult: createBloomLogsResult([
-        { created_at: "2026-06-15T01:00:00.000Z" },
-        { created_at: "2026-06-15T10:00:00.000Z" },
-        { created_at: "2026-06-16T12:00:00.000Z" },
+        { created_at: localDateTimeIso(2026, 2, 22, 1) },
+        { created_at: localDateTimeIso(2026, 5, 15, 1) },
+        { created_at: localDateTimeIso(2026, 5, 15, 10) },
+        { created_at: localDateTimeIso(2026, 5, 16, 12) },
       ]),
     });
 
@@ -130,8 +140,9 @@ describe("BloomGraph", () => {
     const graph = await screen.findByRole("region", { name: GRAPH_NAME });
     expect(within(graph).getByRole("heading", { name: GRAPH_NAME })).toBeVisible();
     expect(graph).toHaveTextContent(
-      /対象期間は2026年3月22日日曜日から2026年6月17日水曜日までです。\s*期間内の合計開花数は3回です。/,
+      /対象期間は2026年3月22日日曜日から2026年6月17日水曜日までです。\s*期間内の合計開花数は4回です。/,
     );
+    expect(within(graph).getByText("2026年3月22日日曜日：1回")).toBeInTheDocument();
     expect(within(graph).getByText("2026年6月15日月曜日：2回")).toBeInTheDocument();
     expect(within(graph).getByText("2026年6月16日火曜日：1回")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -141,7 +152,7 @@ describe("BloomGraph", () => {
     expect(supabaseMocks.eq).toHaveBeenCalledWith("user_id", USER_ID);
     expect(supabaseMocks.gte).toHaveBeenCalledWith(
       "created_at",
-      "2026-03-22T12:00:00.000Z",
+      new Date(2026, 2, 22).toISOString(),
     );
   });
 
@@ -156,8 +167,8 @@ describe("BloomGraph", () => {
   it("未来の記録を集計せず、視覚用グリッドを読み上げとTab移動から除外する", async () => {
     configureSupabaseMock({
       bloomLogsResult: createBloomLogsResult([
-        { created_at: "2026-06-16T12:00:00.000Z" },
-        { created_at: "2026-06-18T12:00:00.000Z" },
+        { created_at: localDateTimeIso(2026, 5, 16, 12) },
+        { created_at: localDateTimeIso(2026, 5, 18, 12) },
       ]),
     });
 
