@@ -40,6 +40,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
     // 始まりの日を直近の「日曜日」に巻き戻す
     const startDayOfWeek = startDate.getDay();
     startDate.setDate(startDate.getDate() - startDayOfWeek);
+    startDate.setHours(0, 0, 0, 0);
 
     // 終わりの日（今日）が属する週の「土曜日」までマスを作る
     const endDayOfWeek = endDate.getDay();
