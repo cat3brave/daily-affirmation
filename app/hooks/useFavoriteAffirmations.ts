@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX = "favoriteAffirmations";
@@ -17,10 +17,23 @@ export function useFavoriteAffirmations(
   );
   const [favoriteError, setFavoriteError] = useState("");
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
+  const favoriteAffirmationsRef = useRef<string[]>([]);
+  const pendingFavoriteAffirmationsRef = useRef(new Set<string>());
+
+  const updateFavoriteAffirmations = useCallback(
+    (update: (favorites: string[]) => string[]) => {
+      const next = update(favoriteAffirmationsRef.current);
+      favoriteAffirmationsRef.current = next;
+      setFavoriteAffirmations(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     setHasLoadedFavorites(false);
     setFavoriteAffirmations([]);
+    favoriteAffirmationsRef.current = [];
+    pendingFavoriteAffirmationsRef.current.clear();
     setFavoriteError("");
 
     if (!userId) return;
@@ -34,11 +47,11 @@ export function useFavoriteAffirmations(
         const parsedFavorites = JSON.parse(savedFavorites);
 
         if (Array.isArray(parsedFavorites)) {
-          setFavoriteAffirmations(
-            parsedFavorites.filter(
-              (favorite): favorite is string => typeof favorite === "string",
-            ),
+          const favorites = parsedFavorites.filter(
+            (favorite): favorite is string => typeof favorite === "string",
           );
+          favoriteAffirmationsRef.current = favorites;
+          setFavoriteAffirmations(favorites);
         }
       }
     } catch (error) {
@@ -97,6 +110,7 @@ export function useFavoriteAffirmations(
             .map((favorite) => favorite.text)
             .filter((text): text is string => typeof text === "string");
 
+          favoriteAffirmationsRef.current = fetchedFavorites;
           setFavoriteAffirmations(fetchedFavorites);
         }
       } catch (error) {
@@ -121,10 +135,17 @@ export function useFavoriteAffirmations(
       const favoriteText = affirmationText.trim();
 
       if (!favoriteText || !userId) return;
+      if (
+        favoriteAffirmationsRef.current.includes(favoriteText) ||
+        pendingFavoriteAffirmationsRef.current.has(favoriteText)
+      ) {
+        return;
+      }
 
       setFavoriteError("");
+      pendingFavoriteAffirmationsRef.current.add(favoriteText);
 
-      setFavoriteAffirmations((prev) => {
+      updateFavoriteAffirmations((prev) => {
         if (prev.includes(favoriteText)) return prev;
         return [favoriteText, ...prev];
       });
@@ -139,7 +160,7 @@ export function useFavoriteAffirmations(
           setFavoriteError(
             "お気に入りの保存に失敗しました。もう一度お試しください。",
           );
-          setFavoriteAffirmations((prev) =>
+          updateFavoriteAffirmations((prev) =>
             prev.filter((affirmation) => affirmation !== favoriteText),
           );
         }
@@ -148,12 +169,14 @@ export function useFavoriteAffirmations(
         setFavoriteError(
           "お気に入りの保存に失敗しました。もう一度お試しください。",
         );
-        setFavoriteAffirmations((prev) =>
+        updateFavoriteAffirmations((prev) =>
           prev.filter((affirmation) => affirmation !== favoriteText),
         );
+      } finally {
+        pendingFavoriteAffirmationsRef.current.delete(favoriteText);
       }
     },
-    [supabase, userId],
+    [supabase, updateFavoriteAffirmations, userId],
   );
 
   const handleRemoveFavoriteAffirmation = useCallback(
@@ -164,7 +187,7 @@ export function useFavoriteAffirmations(
 
       setFavoriteError("");
 
-      setFavoriteAffirmations((prev) =>
+      updateFavoriteAffirmations((prev) =>
         prev.filter((affirmation) => affirmation !== removeText),
       );
 
@@ -180,7 +203,7 @@ export function useFavoriteAffirmations(
           setFavoriteError(
             "お気に入りの削除に失敗しました。もう一度お試しください。",
           );
-          setFavoriteAffirmations((prev) => {
+          updateFavoriteAffirmations((prev) => {
             if (prev.includes(removeText)) return prev;
             return [removeText, ...prev];
           });
@@ -190,13 +213,13 @@ export function useFavoriteAffirmations(
         setFavoriteError(
           "お気に入りの削除に失敗しました。もう一度お試しください。",
         );
-        setFavoriteAffirmations((prev) => {
+        updateFavoriteAffirmations((prev) => {
           if (prev.includes(removeText)) return prev;
           return [removeText, ...prev];
         });
       }
     },
-    [supabase, userId],
+    [supabase, updateFavoriteAffirmations, userId],
   );
 
   const isFavorite = useCallback(
