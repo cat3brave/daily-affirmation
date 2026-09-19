@@ -22,10 +22,12 @@ const DELETE_ERROR_MESSAGE =
 function createSupabaseMock({
   fetchedFavorites = [],
   insertError,
+  insertResults,
   deleteError,
 }: {
   fetchedFavorites?: string[];
   insertError?: Error;
+  insertResults?: MutationResult[];
   deleteError?: Error;
 } = {}) {
   const order = vi.fn<() => Promise<FavoriteQueryResult>>(async () => ({
@@ -39,7 +41,7 @@ function createSupabaseMock({
       throw insertError;
     }
 
-    return { error: null };
+    return insertResults?.shift() ?? { error: null };
   });
   const secondDeleteEq = vi.fn<() => Promise<MutationResult>>(async () => {
     if (deleteError) {
@@ -102,6 +104,82 @@ describe("useFavoriteAffirmations", () => {
     });
     expect(result.current.favoriteError).toBe("");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
+  });
+
+  it("既存のお気に入りを再保存しても重複insertせず一覧とエラー表示を保つ", async () => {
+    const favorite = "朝の光";
+    const { insert, supabase } = createSupabaseMock({
+      fetchedFavorites: [favorite],
+    });
+    const { result } = await renderFavoriteHook(supabase);
+
+    await waitFor(() => {
+      expect(result.current.favoriteAffirmations).toEqual([favorite]);
+    });
+
+    await act(async () => {
+      await result.current.handleFavoriteAffirmation(favorite);
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+    expect(result.current.favoriteAffirmations).toEqual([favorite]);
+    expect(result.current.favoriteError).toBe("");
+  });
+
+  it("保存応答前に同じ言葉を続けて保存してもinsertは一度だけ実行する", async () => {
+    let resolveInsert: ((result: MutationResult) => void) | undefined;
+    const { insert, supabase } = createSupabaseMock();
+    insert.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInsert = resolve;
+        }),
+    );
+    const { result } = await renderFavoriteHook(supabase);
+
+    let firstSave: Promise<void>;
+    await act(async () => {
+      firstSave = result.current.handleFavoriteAffirmation("深呼吸する");
+      await result.current.handleFavoriteAffirmation("深呼吸する");
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(result.current.favoriteAffirmations).toEqual(["深呼吸する"]);
+
+    await act(async () => {
+      resolveInsert?.({ error: null });
+      await firstSave!;
+    });
+
+    expect(result.current.favoriteError).toBe("");
+  });
+
+  it("新規保存が失敗した場合はロールバックし、同じ言葉を再試行できる", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const { insert, supabase } = createSupabaseMock({
+      insertResults: [
+        { error: { message: "insert failed" } },
+        { error: null },
+      ],
+    });
+    const { result } = await renderFavoriteHook(supabase);
+
+    await act(async () => {
+      await result.current.handleFavoriteAffirmation("小さく進む");
+    });
+    expect(result.current.favoriteAffirmations).toEqual([]);
+    expect(result.current.favoriteError).toBe(SAVE_ERROR_MESSAGE);
+
+    await act(async () => {
+      await result.current.handleFavoriteAffirmation("小さく進む");
+    });
+
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(result.current.favoriteAffirmations).toEqual(["小さく進む"]);
+    expect(result.current.favoriteError).toBe("");
+    expect(consoleError).toHaveBeenCalledTimes(1);
   });
 
   it("保存中に想定外の例外が発生した場合は追加したお気に入りをロールバックする", async () => {
