@@ -118,6 +118,7 @@ vi.mock("../lib/supabaseClient", () => ({
 }));
 
 import ThreeGoodThingsCard from "./ThreeGoodThingsCard";
+import { getThreeGoodThingsDraftKey } from "../lib/threeGoodThingsDraft";
 
 const USER_ID = "user-three-good-1";
 const LOAD_ERROR_MESSAGE =
@@ -221,6 +222,7 @@ async function renderLoadedCard() {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
   configureSupabaseMock();
 });
@@ -231,6 +233,99 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("タブ移動で再マウントしても未保存の入力を復元する", async () => {
+    const firstRender = render(<ThreeGoodThingsCard />);
+    await waitFor(() => {
+      expect(screen.queryByText(LOADING_MESSAGE)).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "途中まで書いたよかったこと" },
+    });
+    firstRender.unmount();
+
+    await renderLoadedCard();
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue(
+      "途中まで書いたよかったこと",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "この端末に一時保存した今日の入力を復元しました。",
+    );
+  });
+
+  it("今日の有効な下書きを保存済みデータより優先して復元する", async () => {
+    const today = getTodayDate();
+    window.localStorage.setItem(
+      getThreeGoodThingsDraftKey(USER_ID),
+      JSON.stringify({ date: today, things: ["下書き", "", ""] }),
+    );
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        {
+          date: today,
+          things1: "保存済み",
+          things2: "保存済み2",
+          things3: "保存済み3",
+        },
+      ]),
+    });
+
+    await renderLoadedCard();
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("下書き");
+    expect(screen.getByRole("status")).toHaveTextContent("復元しました");
+  });
+
+  it.each([
+    ["別ユーザー", getThreeGoodThingsDraftKey("another-user"), () => ({ date: getTodayDate(), things: ["別ユーザーの下書き", "", ""] })],
+    ["過去日", getThreeGoodThingsDraftKey(USER_ID), () => ({ date: "2000-01-01", things: ["古い下書き", "", ""] })],
+    ["形式不正", getThreeGoodThingsDraftKey(USER_ID), () => ({ date: getTodayDate(), things: ["2要素", "だけ"] })],
+    ["空白だけ", getThreeGoodThingsDraftKey(USER_ID), () => ({ date: getTodayDate(), things: [" ", "\n", "\t"] })],
+  ])("%sの下書きを復元しない", async (_label, key, createDraft) => {
+    window.localStorage.setItem(key, JSON.stringify(createDraft()));
+
+    await renderLoadedCard();
+
+    screen.getAllByRole("textbox").forEach((input) =>
+      expect(input).toHaveValue(""),
+    );
+    expect(screen.queryByText(/今日の入力を復元しました/)).not.toBeInTheDocument();
+  });
+
+  it("保存済みデータを読み込んだだけでは下書きを作らない", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        { date: getTodayDate(), things1: "保存済み", things2: "", things3: "" },
+      ]),
+    });
+
+    await renderLoadedCard();
+
+    expect(setItem).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBeNull();
+  });
+
+  it("入力変更で下書きを保存し、保存済み状態へ戻すと削除する", async () => {
+    const today = getTodayDate();
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        { date: today, things1: "保存済み", things2: "", things3: "" },
+      ]),
+    });
+    await renderLoadedCard();
+    const firstInput = screen.getAllByRole("textbox")[0];
+
+    fireEvent.change(firstInput, { target: { value: "編集中" } });
+    expect(JSON.parse(window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)) ?? "null")).toEqual({
+      date: today,
+      things: ["編集中", "", ""],
+    });
+
+    fireEvent.change(firstInput, { target: { value: "保存済み" } });
+    expect(window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBeNull();
+  });
+
   it("空または空白だけの入力では保存できず、文字を入力すると保存できる", async () => {
     await renderLoadedCard();
     const inputs = screen.getAllByRole("textbox");
@@ -372,6 +467,9 @@ describe("ThreeGoodThingsCard", () => {
     fireEvent.change(inputs[0], { target: { value: firstThing } });
     fireEvent.change(inputs[1], { target: { value: secondThing } });
     fireEvent.change(inputs[2], { target: { value: thirdThing } });
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "記録する" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(
@@ -391,6 +489,9 @@ describe("ThreeGoodThingsCard", () => {
     expect(inputs[0]).toHaveValue(firstThing);
     expect(inputs[1]).toHaveValue(secondThing);
     expect(inputs[2]).toHaveValue(thirdThing);
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).toBeNull();
 
     expect(screen.getByText(`📅 ${today} のよかったこと`)).toBeInTheDocument();
     const detailItems = screen.getAllByRole("listitem");
@@ -462,6 +563,13 @@ describe("ThreeGoodThingsCard", () => {
     });
     await renderLoadedCard();
 
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "削除前の下書き" },
+    });
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).not.toBeNull();
+
     fireEvent.click(screen.getByTitle(today));
     expect(
       await screen.findByText(`📅 ${today} のよかったこと`),
@@ -487,7 +595,59 @@ describe("ThreeGoodThingsCard", () => {
     expect(inputs[0]).toHaveValue("");
     expect(inputs[1]).toHaveValue("");
     expect(inputs[2]).toHaveValue("");
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).toBeNull();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("過去日の記録を削除しても今日の下書きを残す", async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const pastDate = [
+      yesterday.getFullYear(),
+      String(yesterday.getMonth() + 1).padStart(2, "0"),
+      String(yesterday.getDate()).padStart(2, "0"),
+    ].join("-");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        { date: pastDate, things1: "過去の記録", things2: "", things3: "" },
+      ]),
+    });
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "今日の下書き" },
+    });
+
+    fireEvent.click(screen.getByTitle(pastDate));
+    fireEvent.click(
+      await screen.findByRole("button", { name: `${pastDate} の記録を削除` }),
+    );
+
+    await waitFor(() => expect(supabaseMocks.deleteDateEq).toHaveBeenCalled());
+    expect(confirm).toHaveBeenCalled();
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).not.toBeNull();
+  });
+
+  it("取得失敗時も認証済みユーザーの有効な下書きを復元する", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    window.localStorage.setItem(
+      getThreeGoodThingsDraftKey(USER_ID),
+      JSON.stringify({ date: getTodayDate(), things: ["取得失敗でも復元", "", ""] }),
+    );
+    configureSupabaseMock({
+      selectResult: { data: null, error: { message: "select failed" } },
+    });
+
+    await renderLoadedCard();
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("取得失敗でも復元");
+    expect(screen.getByRole("status")).toHaveTextContent("復元しました");
+    expect(screen.getByRole("alert")).toHaveTextContent(LOAD_ERROR_MESSAGE);
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it("記録取得中に想定外の例外が発生した場合は読込エラーを表示する", async () => {
@@ -547,6 +707,9 @@ describe("ThreeGoodThingsCard", () => {
     expect(inputs[0]).toHaveValue("朝の空気が気持ちよかった");
     expect(inputs[1]).toHaveValue("温かいお茶を飲めた");
     expect(inputs[2]).toHaveValue("少しだけ片付けできた");
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).not.toBeNull();
     expect(consoleError).toHaveBeenCalled();
     expect(supabaseMocks.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -557,6 +720,54 @@ describe("ThreeGoodThingsCard", () => {
       }),
       { onConflict: "user_id,date" },
     );
+  });
+
+  it("localStorageの読み書きと削除の例外を画面操作へ伝播させない", async () => {
+    const getItem = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("getItem unavailable");
+      });
+    await renderLoadedCard();
+    getItem.mockRestore();
+
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("setItem unavailable");
+      });
+    const input = screen.getAllByRole("textbox")[0];
+    expect(() =>
+      fireEvent.change(input, { target: { value: "入力は続けられる" } }),
+    ).not.toThrow();
+    expect(input).toHaveValue("入力は続けられる");
+    setItem.mockRestore();
+
+    const removeItem = vi
+      .spyOn(Storage.prototype, "removeItem")
+      .mockImplementation(() => {
+        throw new Error("removeItem unavailable");
+      });
+    expect(() => fireEvent.click(screen.getByRole("button", { name: "記録する" }))).not.toThrow();
+    expect(await screen.findByText(/保存しました/)).toBeInTheDocument();
+    expect(supabaseMocks.upsert).toHaveBeenCalled();
+    removeItem.mockRestore();
+  });
+
+  it("アンマウント後に未完了の取得結果で更新しない", async () => {
+    let finishGetUser: ((result: UserResult) => void) | undefined;
+    supabaseMocks.getUser.mockImplementation(
+      () => new Promise((resolve) => { finishGetUser = resolve; }),
+    );
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    const rendered = render(<ThreeGoodThingsCard />);
+
+    rendered.unmount();
+    finishGetUser?.(createUserResult());
+    await Promise.resolve();
+
+    expect(getItem).not.toHaveBeenCalled();
+    expect(supabaseMocks.from).not.toHaveBeenCalled();
   });
 
   it("削除中に想定外の例外が発生した場合は記録を残して再操作可能に戻る", async () => {
