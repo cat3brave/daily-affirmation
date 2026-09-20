@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
+import {
+  readThreeGoodThingsDraft,
+  removeThreeGoodThingsDraft,
+  writeThreeGoodThingsDraft,
+} from "../lib/threeGoodThingsDraft";
 
 const loadErrorMessage =
   "記録を読み込めませんでした。時間をおいて、もう一度お試しください。";
@@ -20,6 +25,13 @@ export default function ThreeGoodThingsCard() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const savedThingsRef = useRef<string[]>(["", "", ""]);
+  const isMountedRef = useRef(true);
+  const savedMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const getTodayDate = () => {
     const d = new Date();
@@ -44,6 +56,7 @@ export default function ThreeGoodThingsCard() {
 
   useEffect(() => {
     let isMounted = true;
+    isMountedRef.current = true;
 
     const fetchRecords = async () => {
       if (isMounted) {
@@ -63,6 +76,16 @@ export default function ThreeGoodThingsCard() {
             setLoadError(loadErrorMessage);
           }
           return;
+        }
+
+        if (!isMounted) return;
+
+        const today = getTodayDate();
+        const draft = readThreeGoodThingsDraft(user.id, today);
+        setUserId(user.id);
+        if (draft) {
+          setThings(draft);
+          setDraftRestored(true);
         }
 
         const { data, error } = await supabase
@@ -93,10 +116,9 @@ export default function ThreeGoodThingsCard() {
 
           setAllRecords(recordsObj);
 
-          const today = getTodayDate();
-          if (recordsObj[today]) {
-            setThings(recordsObj[today]);
-          }
+          const savedThings = recordsObj[today] ?? ["", "", ""];
+          savedThingsRef.current = savedThings;
+          setThings(draft ?? savedThings);
         }
       } catch (error) {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
@@ -114,12 +136,27 @@ export default function ThreeGoodThingsCard() {
 
     return () => {
       isMounted = false;
+      isMountedRef.current = false;
+      if (savedMessageTimeoutRef.current) {
+        clearTimeout(savedMessageTimeoutRef.current);
+      }
     };
   }, [supabase]);
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
     setThings(newThings);
+    setDraftRestored(false);
+
+    if (!userId) return;
+    if (
+      !newThings.some((thing) => thing.trim() !== "") ||
+      newThings.every((thing, thingIndex) => thing === savedThingsRef.current[thingIndex])
+    ) {
+      removeThreeGoodThingsDraft(userId);
+    } else {
+      writeThreeGoodThingsDraft(userId, getTodayDate(), newThings);
+    }
   };
 
   const handleSave = async () => {
@@ -137,6 +174,8 @@ export default function ThreeGoodThingsCard() {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
+
+      if (!isMountedRef.current) return;
 
       if (userError || !user) {
         console.error("ユーザー情報が取得できませんでした", userError);
@@ -162,25 +201,33 @@ export default function ThreeGoodThingsCard() {
 
       if (insertError) {
         console.error("保存エラー:", insertError);
-        setSaveError("記録を保存できませんでした。もう一度お試しください。");
+        if (isMountedRef.current) {
+          setSaveError("記録を保存できませんでした。もう一度お試しください。");
+        }
         return;
       }
 
       const updatedRecords = { ...allRecords, [today]: normalizedThings };
+      removeThreeGoodThingsDraft(user.id);
+      savedThingsRef.current = normalizedThings;
+      if (!isMountedRef.current) return;
+
       setThings(normalizedThings);
       setAllRecords(updatedRecords);
       setSelectedDate(today);
       setIsSaved(true);
       setSaveError("");
 
-      setTimeout(() => {
-        setIsSaved(false);
+      savedMessageTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) setIsSaved(false);
       }, 3000);
     } catch (error) {
       console.error("記録保存中の想定外のエラー:", error);
-      setSaveError("記録を保存できませんでした。もう一度お試しください。");
+      if (isMountedRef.current) {
+        setSaveError("記録を保存できませんでした。もう一度お試しください。");
+      }
     } finally {
-      setIsSaving(false);
+      if (isMountedRef.current) setIsSaving(false);
     }
   };
 
@@ -199,6 +246,8 @@ export default function ThreeGoodThingsCard() {
         error: userError,
       } = await supabase.auth.getUser();
 
+      if (!isMountedRef.current) return;
+
       if (userError || !user) {
         console.error("ユーザー情報が取得できませんでした", userError);
         setDeleteError(
@@ -214,6 +263,8 @@ export default function ThreeGoodThingsCard() {
         .eq("user_id", user.id)
         .eq("date", dateToDelete);
 
+      if (!isMountedRef.current) return;
+
       if (error) {
         console.error("削除エラー:", error);
         setDeleteError("記録を削除できませんでした。もう一度お試しください。");
@@ -227,6 +278,8 @@ export default function ThreeGoodThingsCard() {
       });
 
       if (dateToDelete === getTodayDate()) {
+        removeThreeGoodThingsDraft(user.id);
+        savedThingsRef.current = ["", "", ""];
         setThings(["", "", ""]);
       }
 
@@ -234,9 +287,11 @@ export default function ThreeGoodThingsCard() {
       setDeleteError("");
     } catch (error) {
       console.error("記録削除中の想定外のエラー:", error);
-      setDeleteError("記録を削除できませんでした。もう一度お試しください。");
+      if (isMountedRef.current) {
+        setDeleteError("記録を削除できませんでした。もう一度お試しください。");
+      }
     } finally {
-      setDeletingDate(null);
+      if (isMountedRef.current) setDeletingDate(null);
     }
   };
   const past14Days = getPast14Days();
@@ -252,6 +307,17 @@ export default function ThreeGoodThingsCard() {
         <br />
         よかったことや、感謝したいことを3つ書いてみましょう。
       </p>
+      <p className="text-[0.65rem] text-pink-400 text-center -mt-3 mb-4">
+        入力内容はこの端末に一時保存されます。
+      </p>
+      {draftRestored && (
+        <p
+          role="status"
+          className="w-full mb-4 rounded-xl bg-pink-50/60 px-3 py-2 text-center text-xs text-pink-500"
+        >
+          この端末に一時保存した今日の入力を復元しました。
+        </p>
+      )}
 
       <div className="w-full flex flex-col gap-3 mb-6">
         {[0, 1, 2].map((index) => (
@@ -261,7 +327,7 @@ export default function ThreeGoodThingsCard() {
               aria-label={`${["1つ目", "2つ目", "3つ目"][index]}のよかったこと`}
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
-              disabled={isSaving}
+              disabled={isLoadingRecords || isSaving}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
               className="w-full min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
             />
