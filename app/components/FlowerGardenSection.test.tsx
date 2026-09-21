@@ -40,6 +40,9 @@ const renderGarden = (overrides: Partial<ComponentProps<typeof FlowerGardenSecti
     currentFlower: "🌻",
     isBloomSaving: false,
     flowerError: "",
+    flowerLoadError: "",
+    isReloadingBlooms: false,
+    reloadBlooms: vi.fn(),
     handleWalk: vi.fn(),
     ...overrides,
   };

@@ -45,11 +45,18 @@ export type AuthenticatedSupabaseMock = {
   restWriteRequests: string[];
   unexpectedAuthRequests: string[];
   unexpectedRestRequests: string[];
+  allowConfiguredLoads: () => void;
+  allowConfiguredLoad: (table: keyof DashboardMockData) => void;
+  failedLoadRequests: string[];
 };
 
 type DashboardMockData = Partial<
   Record<"bloom_logs" | "favorite_affirmations" | "three_good_things", unknown[]>
 >;
+
+type DashboardMockOptions = {
+  failFirstLoadFor?: Array<"bloom_logs" | "favorite_affirmations" | "three_good_things">;
+};
 
 export async function stubExternalServices(page: Page) {
   await page.route("https://example.supabase.co/**", async (route) => {
@@ -138,13 +145,18 @@ export async function stubRejectedAuthSupabase(
 export async function stubAuthenticatedSupabase(
   page: Page,
   restData: DashboardMockData = {},
+  options: DashboardMockOptions = {},
 ): Promise<AuthenticatedSupabaseMock> {
   const mockState: AuthenticatedSupabaseMock = {
     loginRequestBodies: [],
     restWriteRequests: [],
     unexpectedAuthRequests: [],
     unexpectedRestRequests: [],
+    allowConfiguredLoads: () => failingLoads.clear(),
+    allowConfiguredLoad: (table) => failingLoads.delete(table),
+    failedLoadRequests: [],
   };
+  const failingLoads = new Set(options.failFirstLoadFor ?? []);
 
   await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
     const request = route.request();
@@ -197,10 +209,22 @@ export async function stubAuthenticatedSupabase(
       return;
     }
 
+    if (failingLoads.has(table as keyof DashboardMockData)) {
+      mockState.failedLoadRequests.push(`${method} ${table}`);
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Temporary dashboard load failure" }),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      headers: { "content-range": method === "HEAD" ? "0-0/0" : "*/0" },
+      headers: {
+        "content-range": `0-0/${restData[table as keyof DashboardMockData]?.length ?? 0}`,
+      },
       body:
         method === "HEAD"
           ? ""
@@ -224,8 +248,9 @@ export function trackSupabaseAuthRequests(page: Page) {
 export async function loginToDashboard(
   page: Page,
   restData: DashboardMockData = {},
+  options: DashboardMockOptions = {},
 ) {
-  const supabaseMock = await stubAuthenticatedSupabase(page, restData);
+  const supabaseMock = await stubAuthenticatedSupabase(page, restData, options);
   await page.goto("/login");
   await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
   await page.getByLabel("パスワード").fill("e2e-password");

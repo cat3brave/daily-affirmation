@@ -215,7 +215,7 @@ describe("useFlowerGarden", () => {
     const { result } = await renderFlowerGardenHook(supabase);
 
     await waitFor(() => {
-      expect(result.current.flowerError).toBe(COUNT_ERROR_MESSAGE);
+      expect(result.current.flowerLoadError).toBe(COUNT_ERROR_MESSAGE);
     });
     expect(result.current.totalBlooms).toBe(0);
     expect(consoleError).toHaveBeenCalled();

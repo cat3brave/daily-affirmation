@@ -10,6 +10,9 @@ describe("FavoriteAffirmationsList", () => {
     const { container } = render(
       <FavoriteAffirmationsList
         favoriteAffirmations={[]}
+        favoriteLoadError=""
+        isReloading={false}
+        onReload={vi.fn()}
         favoriteError=""
         handleRemoveFavoriteAffirmation={vi.fn()}
       />,
@@ -22,6 +25,9 @@ describe("FavoriteAffirmationsList", () => {
     render(
       <FavoriteAffirmationsList
         favoriteAffirmations={[]}
+        favoriteLoadError=""
+        isReloading={false}
+        onReload={vi.fn()}
         favoriteError="お気に入りを読み込めませんでした。"
         handleRemoveFavoriteAffirmation={vi.fn()}
       />,
@@ -36,6 +42,9 @@ describe("FavoriteAffirmationsList", () => {
     render(
       <FavoriteAffirmationsList
         favoriteAffirmations={["焦らなくても大丈夫", "今日もよく頑張った"]}
+        favoriteLoadError=""
+        isReloading={false}
+        onReload={vi.fn()}
         favoriteError=""
         handleRemoveFavoriteAffirmation={vi.fn()}
       />,
@@ -56,6 +65,9 @@ describe("FavoriteAffirmationsList", () => {
     render(
       <FavoriteAffirmationsList
         favoriteAffirmations={["焦らなくても大丈夫", "今日もよく頑張った"]}
+        favoriteLoadError=""
+        isReloading={false}
+        onReload={vi.fn()}
         favoriteError=""
         handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
       />,

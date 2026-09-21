@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const supabase = createSupabaseBrowserClient();
@@ -31,6 +31,9 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
   const [bloomData, setBloomData] = useState<BloomCounts>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
+  const requestRef = useRef(0);
+  const inFlightRef = useRef(false);
   const { days, startDate } = useMemo(() => {
     // 🗓️ GitHubのようにはじめを「日曜日」に揃えるための計算
     const endDate = new Date();
@@ -66,14 +69,11 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
     return { days: daysArray, startDate };
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchLogs = async () => {
-      if (isMounted) {
-        setLoadError("");
-        setLoading(true);
-      }
+  const fetchLogs = useCallback(async () => {
+      if (inFlightRef.current) return;
+      const requestId = ++requestRef.current;
+      inFlightRef.current = true;
+      setLoading(true);
 
       try {
         const {
@@ -83,7 +83,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
 
         if (sessionError) {
           console.error("セッション取得エラー:", sessionError);
-          if (isMounted) {
+          if (requestId === requestRef.current) {
             setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
           }
           return;
@@ -91,7 +91,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
 
         if (!session?.user) {
           console.error("ログインユーザーが確認できませんでした。");
-          if (isMounted) {
+          if (requestId === requestRef.current) {
             setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
           }
           return;
@@ -107,7 +107,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
 
         if (error) {
           console.error("ログ取得エラー:", error);
-          if (isMounted) {
+          if (requestId === requestRef.current) {
             setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
           }
           return;
@@ -124,27 +124,31 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
           counts[dateStr] = (counts[dateStr] || 0) + 1;
         });
 
-        if (isMounted) {
+        if (requestId === requestRef.current) {
           setBloomData(counts);
+          setLoadError("");
         }
       } catch (error) {
         console.error("成長記録取得中に想定外のエラー:", error);
-        if (isMounted) {
+        if (requestId === requestRef.current) {
           setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
         }
       } finally {
-        if (isMounted) {
+        if (requestId === requestRef.current) {
           setLoading(false);
+          inFlightRef.current = false;
         }
       }
-    };
+  }, [startDate]);
 
+  useEffect(() => {
     fetchLogs();
 
     return () => {
-      isMounted = false;
+      requestRef.current += 1;
+      inFlightRef.current = false;
     };
-  }, [refreshKey, startDate]);
+  }, [fetchLogs, refreshKey, retryKey]);
 
   const pastDays = days.filter((day) => !day.isFuture);
   const recordedDays = pastDays.filter((day) => (bloomData[day.date] || 0) > 0);
@@ -153,7 +157,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
     0,
   );
 
-  if (loading) {
+  if (loading && Object.keys(bloomData).length === 0 && !loadError) {
     return (
       <div
         role="status"
@@ -193,14 +197,14 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
         )}
       </div>
 
-      {loadError ? (
-        <p
-          role="alert"
-          className="min-w-[300px] rounded-xl border border-red-100 bg-red-50/60 px-3 py-3 text-center text-xs font-bold leading-relaxed text-red-500"
-        >
-          {loadError}
-        </p>
-      ) : (
+      {loadError && (
+        <div role="alert" className="mb-3 min-w-[300px] rounded-xl border border-red-100 bg-red-50/60 px-3 py-3 text-center text-xs font-bold leading-relaxed text-red-500">
+          <p>{loadError}</p>
+          <button type="button" disabled={loading} onClick={() => setRetryKey((key) => key + 1)} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
+            {loading ? "再読み込み中..." : "成長記録を再読み込み"}
+          </button>
+        </div>
+      )}
         <>
           <div className="sr-only">
             <p>
@@ -265,7 +269,6 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
             </div>
           </div>
         </>
-      )}
     </section>
   );
 }

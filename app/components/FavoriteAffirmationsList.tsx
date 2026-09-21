@@ -1,15 +1,21 @@
 type FavoriteAffirmationsListProps = {
   favoriteAffirmations: string[];
   favoriteError: string;
+  favoriteLoadError: string;
+  isReloading: boolean;
+  onReload: () => void;
   handleRemoveFavoriteAffirmation: (affirmation: string) => void;
 };
 
 export default function FavoriteAffirmationsList({
   favoriteAffirmations,
   favoriteError,
+  favoriteLoadError,
+  isReloading,
+  onReload,
   handleRemoveFavoriteAffirmation,
 }: FavoriteAffirmationsListProps) {
-  if (favoriteAffirmations.length === 0 && !favoriteError) {
+  if (favoriteAffirmations.length === 0 && !favoriteError && !favoriteLoadError) {
     return null;
   }
 
@@ -26,6 +32,14 @@ export default function FavoriteAffirmationsList({
         >
           {favoriteError}
         </p>
+      )}
+      {favoriteLoadError && (
+        <div role="alert" className="mb-3 rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3 text-center text-sm leading-relaxed text-rose-600">
+          <p>{favoriteLoadError}</p>
+          <button type="button" onClick={onReload} disabled={isReloading} className="mt-2 rounded-full border border-rose-200 bg-white px-4 py-2 font-bold disabled:opacity-60">
+            {isReloading ? "再読み込み中..." : "お気に入りを再読み込み"}
+          </button>
+        </div>
       )}
 
       {favoriteAffirmations.length > 0 && (

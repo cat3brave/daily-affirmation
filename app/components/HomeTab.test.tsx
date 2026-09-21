@@ -26,11 +26,17 @@ function renderHomeTab(setShowTada = vi.fn()) {
       isFavoriteDisabled={false}
       favoriteAffirmations={[]}
       favoriteError=""
+      favoriteLoadError=""
+      isReloadingFavorites={false}
+      reloadFavoriteAffirmations={vi.fn()}
       totalBlooms={0}
       growth={0}
       currentFlower="🌱"
       isBloomSaving={false}
       flowerError=""
+      flowerLoadError=""
+      isReloadingBlooms={false}
+      reloadBlooms={vi.fn()}
       handleWalk={vi.fn()}
       setShowTada={setShowTada}
     />,

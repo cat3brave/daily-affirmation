@@ -16,9 +16,13 @@ export function useFavoriteAffirmations(
     [],
   );
   const [favoriteError, setFavoriteError] = useState("");
+  const [favoriteLoadError, setFavoriteLoadError] = useState("");
+  const [isReloadingFavorites, setIsReloadingFavorites] = useState(false);
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
   const favoriteAffirmationsRef = useRef<string[]>([]);
   const pendingFavoriteAffirmationsRef = useRef(new Set<string>());
+  const loadRequestRef = useRef(0);
+  const loadInFlightRef = useRef(false);
 
   const updateFavoriteAffirmations = useCallback(
     (update: (favorites: string[]) => string[]) => {
@@ -35,6 +39,9 @@ export function useFavoriteAffirmations(
     favoriteAffirmationsRef.current = [];
     pendingFavoriteAffirmationsRef.current.clear();
     setFavoriteError("");
+    setFavoriteLoadError("");
+    loadRequestRef.current += 1;
+    loadInFlightRef.current = false;
 
     if (!userId) return;
 
@@ -80,12 +87,11 @@ export function useFavoriteAffirmations(
     }
   }, [favoriteAffirmations, hasLoadedFavorites, userId]);
 
-  useEffect(() => {
-    if (!userId || !hasLoadedFavorites) return;
-
-    let isMounted = true;
-
-    const fetchFavoriteAffirmations = async () => {
+  const fetchFavoriteAffirmations = useCallback(async () => {
+      if (!userId || !hasLoadedFavorites || loadInFlightRef.current) return;
+      const requestId = ++loadRequestRef.current;
+      loadInFlightRef.current = true;
+      setIsReloadingFavorites(true);
       try {
         const { data, error } = await supabase
           .from("favorite_affirmations")
@@ -93,17 +99,17 @@ export function useFavoriteAffirmations(
           .eq("user_id", userId)
           .order("created_at", { ascending: false });
 
-        if (!isMounted) return;
+        if (requestId !== loadRequestRef.current) return;
 
         if (error) {
           console.error(error);
-          setFavoriteError(
+          setFavoriteLoadError(
             "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
           );
           return;
         }
 
-        setFavoriteError("");
+        setFavoriteLoadError("");
 
         if (data) {
           const fetchedFavorites = data
@@ -115,20 +121,28 @@ export function useFavoriteAffirmations(
         }
       } catch (error) {
         console.error("お気に入り読み込み中の想定外エラー:", error);
-        if (isMounted) {
-          setFavoriteError(
+        if (requestId === loadRequestRef.current) {
+          setFavoriteLoadError(
             "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
           );
         }
+      } finally {
+        if (requestId === loadRequestRef.current) {
+          loadInFlightRef.current = false;
+          setIsReloadingFavorites(false);
+        }
       }
-    };
+  }, [hasLoadedFavorites, supabase, userId]);
 
+  useEffect(() => {
+    if (!userId || !hasLoadedFavorites) return;
     fetchFavoriteAffirmations();
 
     return () => {
-      isMounted = false;
+      loadRequestRef.current += 1;
+      loadInFlightRef.current = false;
     };
-  }, [hasLoadedFavorites, supabase, userId]);
+  }, [fetchFavoriteAffirmations, hasLoadedFavorites, userId]);
 
   const handleFavoriteAffirmation = useCallback(
     async (affirmationText: string) => {
@@ -231,6 +245,9 @@ export function useFavoriteAffirmations(
   return {
     favoriteAffirmations,
     favoriteError,
+    favoriteLoadError,
+    isReloadingFavorites,
+    reloadFavoriteAffirmations: fetchFavoriteAffirmations,
     handleFavoriteAffirmation,
     handleRemoveFavoriteAffirmation,
     isFavorite,

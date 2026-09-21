@@ -33,6 +33,9 @@ export default function Home() {
   const {
     favoriteAffirmations,
     favoriteError,
+    favoriteLoadError,
+    isReloadingFavorites,
+    reloadFavoriteAffirmations,
     handleFavoriteAffirmation: saveFavoriteAffirmation,
     handleRemoveFavoriteAffirmation,
     isFavorite,
@@ -53,6 +56,9 @@ export default function Home() {
     currentFlower,
     isBloomSaving,
     flowerError,
+    flowerLoadError,
+    isReloadingBlooms,
+    reloadBlooms,
     bloomRefreshKey,
     handleWalk,
   } = useFlowerGarden(userId, supabase);
@@ -129,6 +135,9 @@ export default function Home() {
                     isFavoriteDisabled={isFavoriteDisabled}
                     favoriteAffirmations={favoriteAffirmations}
                     favoriteError={favoriteError}
+                    favoriteLoadError={favoriteLoadError}
+                    isReloadingFavorites={isReloadingFavorites}
+                    reloadFavoriteAffirmations={reloadFavoriteAffirmations}
                     handleRemoveFavoriteAffirmation={
                       handleRemoveFavoriteAffirmation
                     }
@@ -137,6 +146,9 @@ export default function Home() {
                     currentFlower={currentFlower}
                     isBloomSaving={isBloomSaving}
                     flowerError={flowerError}
+                    flowerLoadError={flowerLoadError}
+                    isReloadingBlooms={isReloadingBlooms}
+                    reloadBlooms={reloadBlooms}
                     handleWalk={handleWalk}
                     setShowTada={setShowTada}
                   />
