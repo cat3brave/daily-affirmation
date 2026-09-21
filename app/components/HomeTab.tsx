@@ -12,11 +12,17 @@ type HomeTabProps = {
   isFavoriteDisabled: boolean;
   favoriteAffirmations: string[];
   favoriteError: string;
+  favoriteLoadError: string;
+  isReloadingFavorites: boolean;
+  reloadFavoriteAffirmations: () => void;
   totalBlooms: number;
   growth: number;
   currentFlower: string;
   isBloomSaving: boolean;
   flowerError: string;
+  flowerLoadError: string;
+  isReloadingBlooms: boolean;
+  reloadBlooms: () => void;
   handleWalk: () => void | Promise<void>;
   setShowTada: (value: boolean) => void;
 };
@@ -30,11 +36,17 @@ export default function HomeTab({
   isFavoriteDisabled,
   favoriteAffirmations,
   favoriteError,
+  favoriteLoadError,
+  isReloadingFavorites,
+  reloadFavoriteAffirmations,
   totalBlooms,
   growth,
   currentFlower,
   isBloomSaving,
   flowerError,
+  flowerLoadError,
+  isReloadingBlooms,
+  reloadBlooms,
   handleWalk,
   setShowTada,
 }: HomeTabProps) {
@@ -51,6 +63,9 @@ export default function HomeTab({
       <FavoriteAffirmationsList
         favoriteAffirmations={favoriteAffirmations}
         favoriteError={favoriteError}
+        favoriteLoadError={favoriteLoadError}
+        isReloading={isReloadingFavorites}
+        onReload={reloadFavoriteAffirmations}
         handleRemoveFavoriteAffirmation={handleRemoveFavoriteAffirmation}
       />
 
@@ -60,6 +75,9 @@ export default function HomeTab({
         currentFlower={currentFlower}
         isBloomSaving={isBloomSaving}
         flowerError={flowerError}
+        flowerLoadError={flowerLoadError}
+        isReloadingBlooms={isReloadingBlooms}
+        reloadBlooms={reloadBlooms}
         handleWalk={handleWalk}
       />
 

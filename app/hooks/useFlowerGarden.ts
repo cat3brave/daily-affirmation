@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const FLOWER_STAGES = ["🌰", "🌱", "🌿", "🌷", "🌸"];
@@ -16,33 +16,31 @@ export function useFlowerGarden(
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
   const [isBloomSaving, setIsBloomSaving] = useState<boolean>(false);
   const [flowerError, setFlowerError] = useState<string>("");
+  const [flowerLoadError, setFlowerLoadError] = useState<string>("");
+  const [isReloadingBlooms, setIsReloadingBlooms] = useState(false);
+  const loadRequestRef = useRef(0);
+  const loadInFlightRef = useRef(false);
   const [bloomRefreshKey, setBloomRefreshKey] = useState<number>(0);
 
   // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
-  useEffect(() => {
-    setTotalBlooms(0);
-    setFlowerError("");
-
-    if (!userId) {
-      return;
-    }
-
-    let isMounted = true;
-
-    const fetchBlooms = async () => {
+  const fetchBlooms = useCallback(async () => {
+      if (!userId || loadInFlightRef.current) return;
+      const requestId = ++loadRequestRef.current;
+      loadInFlightRef.current = true;
+      setIsReloadingBlooms(true);
       try {
         const { count, error } = await supabase
           .from("bloom_logs")
           .select("*", { count: "exact", head: true })
           .eq("user_id", userId);
 
-        if (!isMounted) {
+        if (requestId !== loadRequestRef.current) {
           return;
         }
 
         if (error) {
           console.error("bloom_logs count fetch error:", error);
-          setFlowerError(
+          setFlowerLoadError(
             "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
           );
           return;
@@ -50,24 +48,37 @@ export function useFlowerGarden(
 
         if (count !== null) {
           setTotalBlooms(count);
-          setFlowerError("");
         }
+        setFlowerLoadError("");
       } catch (error) {
         console.error("bloom_logs count fetch unexpected error:", error);
-        if (isMounted) {
-          setFlowerError(
+        if (requestId === loadRequestRef.current) {
+          setFlowerLoadError(
             "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
           );
         }
+      } finally {
+        if (requestId === loadRequestRef.current) {
+          loadInFlightRef.current = false;
+          setIsReloadingBlooms(false);
+        }
       }
-    };
+  }, [supabase, userId]);
 
+  useEffect(() => {
+    setTotalBlooms(0);
+    setFlowerError("");
+    setFlowerLoadError("");
+    loadRequestRef.current += 1;
+    loadInFlightRef.current = false;
+    if (!userId) return;
     fetchBlooms();
 
     return () => {
-      isMounted = false;
+      loadRequestRef.current += 1;
+      loadInFlightRef.current = false;
     };
-  }, [supabase, userId]);
+  }, [fetchBlooms, userId]);
 
   // 🌱 お散歩ボタンを押した時の処理
   const handleWalk = useCallback(async () => {
@@ -140,6 +151,9 @@ export function useFlowerGarden(
     currentFlower,
     isBloomSaving,
     flowerError,
+    flowerLoadError,
+    isReloadingBlooms,
+    reloadBlooms: fetchBlooms,
     bloomRefreshKey,
     handleWalk,
   };

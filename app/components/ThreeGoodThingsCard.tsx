@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
@@ -29,6 +29,8 @@ export default function ThreeGoodThingsCard() {
   const [draftRestored, setDraftRestored] = useState(false);
   const savedThingsRef = useRef<string[]>(["", "", ""]);
   const isMountedRef = useRef(true);
+  const loadRequestRef = useRef(0);
+  const loadInFlightRef = useRef(false);
   const savedMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -54,15 +56,11 @@ export default function ThreeGoodThingsCard() {
     return dates;
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    isMountedRef.current = true;
-
-    const fetchRecords = async () => {
-      if (isMounted) {
-        setLoadError("");
-        setIsLoadingRecords(true);
-      }
+  const fetchRecords = useCallback(async () => {
+      if (loadInFlightRef.current) return;
+      const requestId = ++loadRequestRef.current;
+      loadInFlightRef.current = true;
+      setIsLoadingRecords(true);
 
       try {
         const {
@@ -72,13 +70,13 @@ export default function ThreeGoodThingsCard() {
 
         if (userError || !user) {
           console.error("ユーザー情報が取得できませんでした", userError);
-          if (isMounted) {
+          if (requestId === loadRequestRef.current) {
             setLoadError(loadErrorMessage);
           }
           return;
         }
 
-        if (!isMounted) return;
+        if (requestId !== loadRequestRef.current) return;
 
         const today = getTodayDate();
         const draft = readThreeGoodThingsDraft(user.id, today);
@@ -95,7 +93,7 @@ export default function ThreeGoodThingsCard() {
 
         if (error) {
           console.error("3つのよかったこと取得エラー:", error);
-          if (isMounted) {
+          if (requestId === loadRequestRef.current) {
             setLoadError(loadErrorMessage);
           }
           return;
@@ -112,36 +110,42 @@ export default function ThreeGoodThingsCard() {
             ];
           });
 
-          if (!isMounted) return;
+          if (requestId !== loadRequestRef.current) return;
 
           setAllRecords(recordsObj);
 
           const savedThings = recordsObj[today] ?? ["", "", ""];
           savedThingsRef.current = savedThings;
           setThings(draft ?? savedThings);
+          setLoadError("");
         }
       } catch (error) {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
-        if (isMounted) {
+        if (requestId === loadRequestRef.current) {
           setLoadError(loadErrorMessage);
         }
       } finally {
-        if (isMounted) {
+        if (requestId === loadRequestRef.current) {
           setIsLoadingRecords(false);
+          loadInFlightRef.current = false;
         }
       }
-    };
+  }, [supabase]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
 
     fetchRecords();
 
     return () => {
-      isMounted = false;
       isMountedRef.current = false;
+      loadRequestRef.current += 1;
+      loadInFlightRef.current = false;
       if (savedMessageTimeoutRef.current) {
         clearTimeout(savedMessageTimeoutRef.current);
       }
     };
-  }, [supabase]);
+  }, [fetchRecords]);
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
@@ -377,23 +381,21 @@ export default function ThreeGoodThingsCard() {
         <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
           🌱 最近の記録（2週間）
         </p>
-        {isLoadingRecords ? (
+        {isLoadingRecords && !loadError ? (
           <p
             aria-live="polite"
             className="w-full mb-3 rounded-xl bg-white/60 px-3 py-2 text-center text-xs font-bold text-pink-400"
           >
             記録を読み込んでいます...
           </p>
-        ) : (
-          loadError && (
-            <p
-              role="alert"
-              className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500"
-            >
-              {loadError}
-            </p>
-          )
-        )}
+        ) : loadError ? (
+          <div role="alert" className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500">
+            <p>{loadError}</p>
+            <button type="button" onClick={fetchRecords} disabled={isLoadingRecords} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
+              {isLoadingRecords ? "再読み込み中..." : "3つのよかったことを再読み込み"}
+            </button>
+          </div>
+        ) : null}
         {deleteError && (
           <p
             role="alert"

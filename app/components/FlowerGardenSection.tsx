@@ -15,6 +15,9 @@ type FlowerGardenSectionProps = {
   currentFlower: string;
   isBloomSaving: boolean;
   flowerError: string;
+  flowerLoadError: string;
+  isReloadingBlooms: boolean;
+  reloadBlooms: () => void;
   handleWalk: () => void | Promise<void>;
 };
 
@@ -24,6 +27,9 @@ export default function FlowerGardenSection({
   currentFlower,
   isBloomSaving,
   flowerError,
+  flowerLoadError,
+  isReloadingBlooms,
+  reloadBlooms,
   handleWalk,
 }: FlowerGardenSectionProps) {
   return (
@@ -66,6 +72,14 @@ export default function FlowerGardenSection({
         >
           {flowerError}
         </p>
+      )}
+      {flowerLoadError && (
+        <div role="alert" className="mb-4 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-center text-sm font-medium leading-relaxed text-rose-600">
+          <p>{flowerLoadError}</p>
+          <button type="button" onClick={reloadBlooms} disabled={isReloadingBlooms} className="mt-2 rounded-full border border-rose-200 bg-white px-4 py-2 font-bold disabled:opacity-60">
+            {isReloadingBlooms ? "再読み込み中..." : "お花の数を再読み込み"}
+          </button>
+        </div>
       )}
       <motion.button
         type="button"
