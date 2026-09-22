@@ -1,15 +1,50 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createSupabaseServerClient } from "./lib/supabaseServer";
 
-// AIの初期設定（ファイル全体でこれを使い回します！）
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+export type GeminiActionResult =
+  | { status: "success"; text: string }
+  | { status: "fallback"; text: string }
+  | { status: "auth_required"; message: string }
+  | { status: "invalid_input"; message: string };
+
+const AUTH_REQUIRED_MESSAGE =
+  "ログイン状態を確認できませんでした。ログインし直してください。";
+const INVALID_INPUT_MESSAGE = "入力内容を確認してください。";
+const AFFIRMATION_FALLBACK = "あなたは、そのままで素晴らしい存在です。";
+const TRANSLATE_FALLBACK =
+  "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
+
+async function isAuthenticated() {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.getUser();
+    return !error && Boolean(data.user);
+  } catch {
+    return false;
+  }
+}
+
+function getGeminiModel() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  return new GoogleGenerativeAI(apiKey).getGenerativeModel({
+    model: "gemini-2.5-flash",
+  });
+}
 
 // -----------------------------------------------------------------
 // ① アファメーション生成機能
 // -----------------------------------------------------------------
-export async function generateAffirmation() {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+export async function generateAffirmation(): Promise<GeminiActionResult> {
+  if (!(await isAuthenticated())) {
+    return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
+  }
+
+  const model = getGeminiModel();
+  if (!model) return { status: "fallback", text: AFFIRMATION_FALLBACK };
 
   const prompt = `
     あなたは、ユーザーを優しく包み込む「心の執事」です。
@@ -33,21 +68,30 @@ export async function generateAffirmation() {
 
   try {
     const result = await model.generateContent(prompt);
-    return result.response.text().trim();
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    return "あなたは、そのままで素晴らしい存在です。";
+    return { status: "success", text: result.response.text().trim() };
+  } catch {
+    return { status: "fallback", text: AFFIRMATION_FALLBACK };
   }
 }
 
 // -----------------------------------------------------------------
 // ② 新機能：厳しい声を「ヘルシー・アダルト」の視点で翻訳する機能
 // -----------------------------------------------------------------
-export async function translateHarshVoice(harshText: string) {
-  // 上で設定した genAI をそのまま使って、同じモデルを呼び出します
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+export async function translateHarshVoice(
+  harshText: string,
+): Promise<GeminiActionResult> {
+  if (typeof harshText !== "string" || !harshText.trim()) {
+    return { status: "invalid_input", message: INVALID_INPUT_MESSAGE };
+  }
 
   const safeHarshText = harshText.trim().slice(0, 300);
+
+  if (!(await isAuthenticated())) {
+    return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
+  }
+
+  const model = getGeminiModel();
+  if (!model) return { status: "fallback", text: TRANSLATE_FALLBACK };
 
   const prompt = `あなたは心理療法の「ヘルシー・アダルト（健康で思いやりのある大人）」として振る舞う、優しく知的なアシスタントです。
 ユーザーが、自分自身を厳しく責める言葉（クリティカル・ペアレントの声）を入力します。
@@ -63,9 +107,8 @@ export async function translateHarshVoice(harshText: string) {
 
   try {
     const result = await model.generateContent(prompt);
-    return result.response.text().trim();
-  } catch (error) {
-    console.error("翻訳エラー:", error);
-    return "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
+    return { status: "success", text: result.response.text().trim() };
+  } catch {
+    return { status: "fallback", text: TRANSLATE_FALLBACK };
   }
 }

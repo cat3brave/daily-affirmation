@@ -20,6 +20,7 @@ function renderHomeTab(setShowTada = vi.fn()) {
     <HomeTab
       isLoading={false}
       text=""
+      affirmationAuthError=""
       handleClick={vi.fn()}
       handleFavoriteAffirmation={vi.fn()}
       handleRemoveFavoriteAffirmation={vi.fn()}

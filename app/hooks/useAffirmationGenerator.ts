@@ -3,6 +3,7 @@ import { generateAffirmation } from "../actions";
 
 export function useAffirmationGenerator() {
   const [text, setText] = useState<string>("");
+  const [authError, setAuthError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isGeneratingRef = useRef(false);
 
@@ -12,10 +13,15 @@ export function useAffirmationGenerator() {
     isGeneratingRef.current = true;
     setIsLoading(true);
     setText("");
+    setAuthError("");
 
     try {
-      const newText = await generateAffirmation();
-      setText(newText);
+      const result = await generateAffirmation();
+      if (result.status === "auth_required") {
+        setAuthError(result.message);
+      } else if (result.status === "success" || result.status === "fallback") {
+        setText(result.text);
+      }
     } catch {
       setText("深呼吸して、もう一度試してみてくださいね。");
     } finally {
@@ -24,5 +30,5 @@ export function useAffirmationGenerator() {
     }
   };
 
-  return { text, isLoading, handleGenerateAffirmation };
+  return { text, authError, isLoading, handleGenerateAffirmation };
 }

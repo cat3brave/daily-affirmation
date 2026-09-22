@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 type AffirmationSectionProps = {
   isLoading: boolean;
   text: string;
+  authError: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   isFavoriteDisabled: boolean;
@@ -11,6 +12,7 @@ type AffirmationSectionProps = {
 export default function AffirmationSection({
   isLoading,
   text,
+  authError,
   handleClick,
   handleFavoriteAffirmation,
   isFavoriteDisabled,
@@ -32,6 +34,16 @@ export default function AffirmationSection({
             >
               言葉を紡いでいます...
             </motion.p>
+          ) : authError ? (
+            <div
+              role="alert"
+              className="text-center text-red-700 text-sm leading-relaxed"
+            >
+              <p>{authError}</p>
+              <a className="font-bold underline underline-offset-4" href="/login">
+                ログイン画面へ
+              </a>
+            </div>
           ) : text ? (
             <motion.div
               key={text}
