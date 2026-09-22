@@ -19,7 +19,13 @@ export default function GentleTranslatorCard() {
     setTranslationError("");
     try {
       const result = await translateHarshVoice(harshVoice);
-      setTranslatedVoice(result);
+      if (result.status === "auth_required") {
+        setTranslationError(result.message);
+      } else if (result.status === "invalid_input") {
+        setTranslationError(result.message);
+      } else {
+        setTranslatedVoice(result.text);
+      }
     } catch (error) {
       console.error("優しい翻訳に失敗しました:", error);
       setTranslationError(
@@ -98,7 +104,16 @@ export default function GentleTranslatorCard() {
             animate={{ opacity: 1, y: 0, height: "auto" }}
             className="bg-red-50 border border-red-200 text-red-700 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
           >
-            {translationError}
+            <p>{translationError}</p>
+            {translationError ===
+              "ログイン状態を確認できませんでした。ログインし直してください。" && (
+              <a
+                className="font-bold underline underline-offset-4"
+                href="/login"
+              >
+                ログイン画面へ
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

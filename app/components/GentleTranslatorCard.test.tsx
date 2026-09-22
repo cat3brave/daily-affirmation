@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GeminiActionResult } from "../actions";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -15,7 +16,7 @@ type MotionDivProps = ComponentProps<"div"> & {
 };
 
 const translatorMocks = vi.hoisted(() => {
-  const translateHarshVoice = vi.fn<(text: string) => Promise<string>>();
+  const translateHarshVoice = vi.fn<(text: string) => Promise<GeminiActionResult>>();
 
   return {
     translateHarshVoice,
@@ -71,9 +72,10 @@ function getTranslateButton() {
 
 beforeEach(() => {
   translatorMocks.translateHarshVoice.mockReset();
-  translatorMocks.translateHarshVoice.mockResolvedValue(
-    "事実と気持ちを分けて見られていますね。",
-  );
+  translatorMocks.translateHarshVoice.mockResolvedValue({
+    status: "success",
+    text: "事実と気持ちを分けて見られていますね。",
+  });
 });
 
 afterEach(() => {
@@ -122,9 +124,10 @@ describe("GentleTranslatorCard", () => {
   });
 
   it("成功時にtranslateHarshVoiceへ入力を渡し結果をstatus表示する", async () => {
-    translatorMocks.translateHarshVoice.mockResolvedValue(
-      "少し距離を置いて見られていますね。",
-    );
+    translatorMocks.translateHarshVoice.mockResolvedValue({
+      status: "success",
+      text: "少し距離を置いて見られていますね。",
+    });
     render(<GentleTranslatorCard />);
 
     fireEvent.change(getTextbox(), { target: { value: "  私はだめだ  " } });
@@ -139,7 +142,7 @@ describe("GentleTranslatorCard", () => {
   });
 
   it("翻訳中は入力とボタンがdisabledになり以前の結果を消す", async () => {
-    translatorMocks.translateHarshVoice.mockResolvedValueOnce("前の翻訳です。");
+    translatorMocks.translateHarshVoice.mockResolvedValueOnce({ status: "success", text: "前の翻訳です。" });
     render(<GentleTranslatorCard />);
 
     fireEvent.change(getTextbox(), { target: { value: "最初の声" } });
@@ -147,7 +150,7 @@ describe("GentleTranslatorCard", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent("前の翻訳です。");
 
-    const translateDeferred = createDeferred<string>();
+    const translateDeferred = createDeferred<GeminiActionResult>();
     translatorMocks.translateHarshVoice.mockReturnValueOnce(
       translateDeferred.promise,
     );
@@ -161,13 +164,50 @@ describe("GentleTranslatorCard", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
     await act(async () => {
-      translateDeferred.resolve("次の翻訳です。");
+      translateDeferred.resolve({ status: "success", text: "次の翻訳です。" });
       await translateDeferred.promise;
     });
 
     expect(await screen.findByRole("status")).toHaveTextContent("次の翻訳です。");
     expect(getTextbox()).toBeEnabled();
     expect(screen.getByRole("button")).toBeEnabled();
+  });
+
+  it("認証切れでは入力を維持してalertとログインリンクを表示する", async () => {
+    translatorMocks.translateHarshVoice.mockResolvedValueOnce({
+      status: "auth_required",
+      message: "ログイン状態を確認できませんでした。ログインし直してください。",
+    });
+    render(<GentleTranslatorCard />);
+
+    fireEvent.change(getTextbox(), { target: { value: "消さない入力" } });
+    fireEvent.click(getTranslateButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("ログインし直してください");
+    expect(screen.getByRole("link", { name: "ログイン画面へ" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(getTextbox()).toHaveValue("消さない入力");
+    expect(getTextbox()).toBeEnabled();
+    expect(getTranslateButton()).toBeEnabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("古いエラーを新しい成功時に残さない", async () => {
+    translatorMocks.translateHarshVoice
+      .mockResolvedValueOnce({ status: "invalid_input", message: "入力内容を確認してください。" })
+      .mockResolvedValueOnce({ status: "success", text: "新しい翻訳です。" });
+    render(<GentleTranslatorCard />);
+
+    fireEvent.change(getTextbox(), { target: { value: "一回目" } });
+    fireEvent.click(getTranslateButton());
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    fireEvent.change(getTextbox(), { target: { value: "二回目" } });
+    fireEvent.click(getTranslateButton());
+    expect(await screen.findByRole("status")).toHaveTextContent("新しい翻訳です。");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("throw時にconsole.errorとalertを表示し再操作可能に戻る", async () => {
@@ -197,7 +237,7 @@ describe("GentleTranslatorCard", () => {
   });
 
   it("同一タイミングの連続操作でもtranslateHarshVoiceを1回だけ呼ぶ", async () => {
-    const translateDeferred = createDeferred<string>();
+    const translateDeferred = createDeferred<GeminiActionResult>();
     translatorMocks.translateHarshVoice.mockReturnValue(translateDeferred.promise);
     render(<GentleTranslatorCard />);
 
@@ -208,7 +248,7 @@ describe("GentleTranslatorCard", () => {
     expect(translatorMocks.translateHarshVoice).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      translateDeferred.resolve("一度だけ翻訳しました。");
+      translateDeferred.resolve({ status: "success", text: "一度だけ翻訳しました。" });
       await translateDeferred.promise;
     });
 

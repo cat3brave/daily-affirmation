@@ -1,5 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GeminiActionResult } from "../actions";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -7,7 +8,7 @@ type Deferred<T> = {
 };
 
 const affirmationMocks = vi.hoisted(() => {
-  const generateAffirmation = vi.fn<() => Promise<string>>();
+  const generateAffirmation = vi.fn<() => Promise<GeminiActionResult>>();
 
   return {
     generateAffirmation,
@@ -37,7 +38,7 @@ function createDeferred<T>(): Deferred<T> {
 
 beforeEach(() => {
   affirmationMocks.generateAffirmation.mockReset();
-  affirmationMocks.generateAffirmation.mockResolvedValue("今日はここまでで十分ですよ");
+  affirmationMocks.generateAffirmation.mockResolvedValue({ status: "success", text: "今日はここまでで十分ですよ" });
 });
 
 afterEach(() => {
@@ -47,9 +48,10 @@ afterEach(() => {
 
 describe("useAffirmationGenerator", () => {
   it("生成成功時に結果をtextへ反映しisLoadingを解除する", async () => {
-    affirmationMocks.generateAffirmation.mockResolvedValue(
-      "私は私の作業を進めれば十分ですよ",
-    );
+    affirmationMocks.generateAffirmation.mockResolvedValue({
+      status: "success",
+      text: "私は私の作業を進めれば十分ですよ",
+    });
     const { result } = renderHook(() => useAffirmationGenerator());
 
     await act(async () => {
@@ -61,7 +63,7 @@ describe("useAffirmationGenerator", () => {
   });
 
   it("生成中はisLoading=trueになり以前のtextを空にする", async () => {
-    affirmationMocks.generateAffirmation.mockResolvedValueOnce("前の言葉です");
+    affirmationMocks.generateAffirmation.mockResolvedValueOnce({ status: "success", text: "前の言葉です" });
     const { result } = renderHook(() => useAffirmationGenerator());
 
     await act(async () => {
@@ -69,7 +71,7 @@ describe("useAffirmationGenerator", () => {
     });
     expect(result.current.text).toBe("前の言葉です");
 
-    const generateDeferred = createDeferred<string>();
+    const generateDeferred = createDeferred<GeminiActionResult>();
     affirmationMocks.generateAffirmation.mockReturnValueOnce(
       generateDeferred.promise,
     );
@@ -84,7 +86,7 @@ describe("useAffirmationGenerator", () => {
     expect(result.current.text).toBe("");
 
     await act(async () => {
-      generateDeferred.resolve("新しい言葉です");
+      generateDeferred.resolve({ status: "success", text: "新しい言葉です" });
       await generateDeferred.promise;
     });
 
@@ -105,7 +107,7 @@ describe("useAffirmationGenerator", () => {
     expect(result.current.text).toBe(HOOK_FALLBACK);
     expect(result.current.isLoading).toBe(false);
 
-    affirmationMocks.generateAffirmation.mockResolvedValueOnce("再生成できました");
+    affirmationMocks.generateAffirmation.mockResolvedValueOnce({ status: "success", text: "再生成できました" });
 
     await act(async () => {
       await result.current.handleGenerateAffirmation();
@@ -116,8 +118,24 @@ describe("useAffirmationGenerator", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it("認証切れでは結果にせず安全な案内を返し再操作可能に戻る", async () => {
+    affirmationMocks.generateAffirmation.mockResolvedValueOnce({
+      status: "auth_required",
+      message: "ログイン状態を確認できませんでした。ログインし直してください。",
+    });
+    const { result } = renderHook(() => useAffirmationGenerator());
+
+    await act(async () => {
+      await result.current.handleGenerateAffirmation();
+    });
+
+    expect(result.current.text).toBe("");
+    expect(result.current.authError).toContain("ログインし直してください");
+    expect(result.current.isLoading).toBe(false);
+  });
+
   it("同一タイミングで連続実行してもgenerateAffirmationを1回だけ呼ぶ", async () => {
-    const generateDeferred = createDeferred<string>();
+    const generateDeferred = createDeferred<GeminiActionResult>();
     affirmationMocks.generateAffirmation.mockReturnValue(generateDeferred.promise);
     const { result } = renderHook(() => useAffirmationGenerator());
 
@@ -129,7 +147,7 @@ describe("useAffirmationGenerator", () => {
     expect(affirmationMocks.generateAffirmation).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      generateDeferred.resolve("一度だけ生成しました");
+      generateDeferred.resolve({ status: "success", text: "一度だけ生成しました" });
       await generateDeferred.promise;
     });
 

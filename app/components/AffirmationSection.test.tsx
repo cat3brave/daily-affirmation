@@ -63,6 +63,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text=""
         handleClick={vi.fn()}
         handleFavoriteAffirmation={vi.fn()}
@@ -78,6 +79,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text=""
         handleClick={vi.fn()}
         handleFavoriteAffirmation={vi.fn()}
@@ -100,6 +102,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text=""
         handleClick={handleClick}
         handleFavoriteAffirmation={vi.fn()}
@@ -116,6 +119,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading
+        authError=""
         text=""
         handleClick={vi.fn()}
         handleFavoriteAffirmation={vi.fn()}
@@ -131,10 +135,32 @@ describe("AffirmationSection", () => {
     ).toBeDisabled();
   });
 
+  it("認証切れではalertとログインリンクを表示し生成結果として扱わない", () => {
+    render(
+      <AffirmationSection
+        isLoading={false}
+        authError="ログイン状態を確認できませんでした。ログインし直してください。"
+        text=""
+        handleClick={vi.fn()}
+        handleFavoriteAffirmation={vi.fn()}
+        isFavoriteDisabled={false}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("ログインし直してください");
+    expect(screen.getByRole("link", { name: "ログイン画面へ" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
+    expect(screen.queryByRole("button", { name: /お気に入り/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
+  });
+
   it("生成成功後にアファメーションと有効なお気に入りボタンを表示する", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text="あなたは今日も十分にがんばっています"
         handleClick={vi.fn()}
         handleFavoriteAffirmation={vi.fn()}
@@ -159,6 +185,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text="あなたは大切な存在です"
         handleClick={vi.fn()}
         handleFavoriteAffirmation={handleFavoriteAffirmation}
@@ -177,6 +204,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        authError=""
         text="あなたは大切な存在です"
         handleClick={vi.fn()}
         handleFavoriteAffirmation={vi.fn()}

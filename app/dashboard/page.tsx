@@ -28,7 +28,7 @@ import DashboardHeader from "../components/DashboardHeader";
 export default function Home() {
   const { supabase, userId, userEmail, isAuthChecked } = useAuthUser();
 
-  const { text, isLoading, handleGenerateAffirmation } =
+  const { text, authError, isLoading, handleGenerateAffirmation } =
     useAffirmationGenerator();
   const {
     favoriteAffirmations,
@@ -130,6 +130,7 @@ export default function Home() {
                   <HomeTab
                     isLoading={isLoading}
                     text={text}
+                    affirmationAuthError={authError}
                     handleClick={handleGenerateAffirmation}
                     handleFavoriteAffirmation={handleFavoriteAffirmation}
                     isFavoriteDisabled={isFavoriteDisabled}

@@ -6,6 +6,7 @@ import FlowerGardenSection from "./FlowerGardenSection";
 type HomeTabProps = {
   isLoading: boolean;
   text: string;
+  affirmationAuthError: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   handleRemoveFavoriteAffirmation: (affirmation: string) => void;
@@ -30,6 +31,7 @@ type HomeTabProps = {
 export default function HomeTab({
   isLoading,
   text,
+  affirmationAuthError,
   handleClick,
   handleFavoriteAffirmation,
   handleRemoveFavoriteAffirmation,
@@ -55,6 +57,7 @@ export default function HomeTab({
       <AffirmationSection
         isLoading={isLoading}
         text={text}
+        authError={affirmationAuthError}
         handleClick={handleClick}
         handleFavoriteAffirmation={handleFavoriteAffirmation}
         isFavoriteDisabled={isFavoriteDisabled}
