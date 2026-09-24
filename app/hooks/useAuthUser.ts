@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
-export function useAuthUser() {
+export function useAuthUser(initialUser?: { id: string; email: string }) {
   const router = useRouter();
   const [supabase] = useState(() => createSupabaseBrowserClient());
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isAuthChecked, setIsAuthChecked] = useState<boolean>(false);
+  const [userId, setUserId] = useState<string | null>(initialUser?.id ?? null);
+  const [userEmail, setUserEmail] = useState<string | null>(initialUser?.email ?? null);
+  const [isAuthChecked, setIsAuthChecked] = useState<boolean>(Boolean(initialUser));
 
   useEffect(() => {
+    if (initialUser) return;
     let isMounted = true;
 
     const fetchUser = async () => {
@@ -43,7 +44,7 @@ export function useAuthUser() {
     return () => {
       isMounted = false;
     };
-  }, [router, supabase]);
+  }, [router, supabase, initialUser]);
 
   return { supabase, userId, userEmail, isAuthChecked };
 }

@@ -18,7 +18,7 @@ export default defineConfig({
         functions: 68,
         lines: 80,
       },
-      include: ["app/**/*.{ts,tsx}"],
+      include: ["app/**/*.{ts,tsx}", "proxy.ts"],
       exclude: [
         "app/**/*.test.{ts,tsx}",
         "app/**/*.spec.{ts,tsx}",

@@ -152,3 +152,9 @@ describe("useAuthUser", () => {
     expect(hookResult?.current.isAuthChecked).toBe(false);
   });
 });
+
+it("サーバー検証済みユーザーなら初回から表示し、追加の認証通信をしない", () => {
+  const { result } = renderHook(() => useAuthUser({ id: USER_ID, email: USER_EMAIL }));
+  expect(result.current).toMatchObject({ userId: USER_ID, userEmail: USER_EMAIL, isAuthChecked: true });
+  expect(authMocks.getUser).not.toHaveBeenCalled();
+});

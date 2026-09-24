@@ -145,7 +145,7 @@ for (const viewport of viewports) {
       await expectNoPageHorizontalScroll(page);
       expect(authRequests).toHaveLength(1);
       expect(authRequests[0]).toMatch(
-        /^https:\/\/example\.supabase\.co\/auth\/v1\/token/,
+        /^http:\/\/127\.0\.0\.1:54321\/auth\/v1\/token/,
       );
 
       if (viewport.width === 320) {
