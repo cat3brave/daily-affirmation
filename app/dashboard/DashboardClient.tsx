@@ -1,0 +1,174 @@
+"use client";
+
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuthUser } from "../hooks/useAuthUser";
+
+// 🔴 新しく作ったカスタムフック（お花係）をインポート！
+import { useFlowerGarden } from "../hooks/useFlowerGarden";
+import { useAffirmationGenerator } from "../hooks/useAffirmationGenerator";
+import { useFavoriteAffirmations } from "../hooks/useFavoriteAffirmations";
+import { useFloatingClouds } from "../hooks/useFloatingClouds";
+import { useWindowSize } from "../hooks/useWindowSize";
+
+import HomeTab from "../components/HomeTab";
+import WorkTab from "../components/WorkTab";
+import AmuletTab from "../components/AmuletTab";
+import BottomTabBar, {
+  dashboardTabs,
+  getDashboardPanelId,
+  getDashboardTabId,
+} from "../components/BottomTabBar";
+import TadaModal from "../components/TadaModal";
+import BloomGraph from "../components/BloomGraph";
+import FloatingCloudLayer from "../components/FloatingCloudLayer";
+import BirdViewPanel from "../components/BirdViewPanel";
+import DashboardHeader from "../components/DashboardHeader";
+
+export default function DashboardClient({ user }: { user: { id: string; email: string } }) {
+  const { supabase, userId, userEmail } = useAuthUser(user);
+
+  const { text, authError, isLoading, handleGenerateAffirmation } =
+    useAffirmationGenerator();
+  const {
+    favoriteAffirmations,
+    favoriteError,
+    favoriteLoadError,
+    isReloadingFavorites,
+    reloadFavoriteAffirmations,
+    handleFavoriteAffirmation: saveFavoriteAffirmation,
+    handleRemoveFavoriteAffirmation,
+    isFavorite,
+  } = useFavoriteAffirmations(userId, supabase);
+
+  const [isBirdView, setIsBirdView] = useState<boolean>(false);
+  const [showTada, setShowTada] = useState<boolean>(false);
+  const { windowSize } = useWindowSize();
+  const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
+    "home",
+  );
+  const { floatingClouds, handleFloatCloud } = useFloatingClouds();
+
+  // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
+  const {
+    growth,
+    totalBlooms,
+    currentFlower,
+    isBloomSaving,
+    flowerError,
+    flowerLoadError,
+    isReloadingBlooms,
+    reloadBlooms,
+    bloomRefreshKey,
+    handleWalk,
+  } = useFlowerGarden(userId, supabase);
+
+  const handleFavoriteAffirmation = async () => {
+    await saveFavoriteAffirmation(text);
+  };
+
+  const isFavoriteDisabled = !userId || !text.trim() || isFavorite(text);
+
+  return (
+    <main
+      className={`relative flex min-h-screen flex-col items-center p-6 pb-32 overflow-hidden transition-colors duration-1000 ${
+        isBirdView ? "bg-sky-100" : "bg-transparent"
+      }`}
+    >
+      <div className="contents" inert={showTada ? true : undefined}>
+        <DashboardHeader
+          currentTab={currentTab}
+          isBirdView={isBirdView}
+          onToggleBirdView={() => setIsBirdView(!isBirdView)}
+          userEmail={userEmail}
+        />
+
+        <FloatingCloudLayer floatingClouds={floatingClouds} />
+
+        <BirdViewPanel
+          currentTab={currentTab}
+          isBirdView={isBirdView}
+          totalBlooms={totalBlooms}
+        />
+
+        <motion.div
+          id="main-content"
+          tabIndex={-1}
+          animate={{
+            scale: isBirdView ? 0.75 : 1,
+            opacity: isBirdView ? 0.3 : 1,
+            y: isBirdView ? 120 : 0,
+          }}
+          transition={{ duration: 1, ease: "easeInOut" }}
+          className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
+        >
+          {dashboardTabs.map(({ id }) => (
+            <div
+              key={id}
+              id={getDashboardPanelId(id)}
+              role="tabpanel"
+              aria-labelledby={getDashboardTabId(id)}
+              hidden={currentTab !== id}
+              className="w-full"
+            >
+              <AnimatePresence mode="wait">
+                {id === "home" && currentTab === id && (
+                  <HomeTab
+                    isLoading={isLoading}
+                    text={text}
+                    affirmationAuthError={authError}
+                    handleClick={handleGenerateAffirmation}
+                    handleFavoriteAffirmation={handleFavoriteAffirmation}
+                    isFavoriteDisabled={isFavoriteDisabled}
+                    favoriteAffirmations={favoriteAffirmations}
+                    favoriteError={favoriteError}
+                    favoriteLoadError={favoriteLoadError}
+                    isReloadingFavorites={isReloadingFavorites}
+                    reloadFavoriteAffirmations={reloadFavoriteAffirmations}
+                    handleRemoveFavoriteAffirmation={
+                      handleRemoveFavoriteAffirmation
+                    }
+                    totalBlooms={totalBlooms}
+                    growth={growth}
+                    currentFlower={currentFlower}
+                    isBloomSaving={isBloomSaving}
+                    flowerError={flowerError}
+                    flowerLoadError={flowerLoadError}
+                    isReloadingBlooms={isReloadingBlooms}
+                    reloadBlooms={reloadBlooms}
+                    handleWalk={handleWalk}
+                    setShowTada={setShowTada}
+                  />
+                )}
+
+                {id === "work" && currentTab === id && (
+                  <WorkTab handleFloatCloud={handleFloatCloud} />
+                )}
+
+                {id === "amulet" && currentTab === id && (
+                  <AmuletTab setShowTada={setShowTada} />
+                )}
+              </AnimatePresence>
+
+              {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+              {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
+              {id === "home" && currentTab === id && (
+                <div className="w-full mt-8">
+                  <BloomGraph refreshKey={bloomRefreshKey} />
+                </div>
+              )}
+            </div>
+          ))}
+        </motion.div>
+
+        <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      </div>
+
+      <TadaModal
+        showTada={showTada}
+        setShowTada={setShowTada}
+        windowSize={windowSize}
+      />
+    </main>
+  );
+}

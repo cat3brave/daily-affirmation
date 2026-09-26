@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
     events.push("auth");
     return { data: { user: { id: "user-1" } }, error: null };
   });
-  const createSupabaseServerClient = vi.fn(async () => ({ auth: { getUser } }));
+  const createSupabaseServerClient = vi.fn(() => ({ auth: { getUser } }));
   const generateContent = vi.fn<(prompt: string) => Promise<GenerateContentResult>>();
   const getGenerativeModel = vi.fn<(config: { model: string }) => GenerativeModel>(
     () => {
@@ -32,9 +32,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("./lib/supabaseServer", () => ({
-  createSupabaseServerClient: mocks.createSupabaseServerClient,
-}));
+vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ getAll: () => [], set: vi.fn() })) }));
+vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createSupabaseServerClient }));
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: mocks.GoogleGenerativeAI,
 }));
@@ -52,6 +51,8 @@ function result(text: string): GenerateContentResult {
 }
 
 beforeEach(() => {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
   process.env.GEMINI_API_KEY = "test-api-key";
   mocks.events.length = 0;
   mocks.getUser.mockReset();
@@ -60,7 +61,7 @@ beforeEach(() => {
     return { data: { user: { id: "user-1" } }, error: null };
   });
   mocks.createSupabaseServerClient.mockReset();
-  mocks.createSupabaseServerClient.mockImplementation(async () => ({
+  mocks.createSupabaseServerClient.mockImplementation(() => ({
     auth: { getUser: mocks.getUser },
   }));
   mocks.generateContent.mockReset();
@@ -117,7 +118,7 @@ describe("generateAffirmation", () => {
   });
 
   it("Supabase初期化の例外でも安全に失敗する", async () => {
-    mocks.createSupabaseServerClient.mockRejectedValue(new Error("internal-key"));
+    mocks.createSupabaseServerClient.mockImplementation(() => { throw new Error("internal-key"); });
     const actionResult = await generateAffirmation();
 
     expect(JSON.stringify(actionResult)).not.toContain("internal-key");

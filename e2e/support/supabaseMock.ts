@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
 const supabaseAuthRequestUrlPattern =
-  /^https:\/\/example\.supabase\.co\/auth\/v1\//;
+  /^http:\/\/127\.0\.0\.1:54321\/auth\/v1\//;
 const e2eUser = {
   id: "e2e-user-id",
   aud: "authenticated",
@@ -59,7 +59,7 @@ type DashboardMockOptions = {
 };
 
 export async function stubExternalServices(page: Page) {
-  await page.route("https://example.supabase.co/**", async (route) => {
+  await page.route("http://127.0.0.1:54321/**", async (route) => {
     const url = new URL(route.request().url());
 
     if (url.pathname.startsWith("/auth/v1/user")) {
@@ -88,7 +88,7 @@ export async function stubRejectedAuthSupabase(
     unexpectedRestRequests: [],
   };
 
-  await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
+  await page.route("http://127.0.0.1:54321/auth/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -122,11 +122,16 @@ export async function stubRejectedAuthSupabase(
       return;
     }
 
+    if (request.method() === "POST" && url.pathname === "/auth/v1/logout") {
+      await route.fulfill({ status: 204 });
+      return;
+    }
+
     mockState.unexpectedAuthRequests.push(`${request.method()} ${url.href}`);
     await route.abort();
   });
 
-  await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
+  await page.route("http://127.0.0.1:54321/rest/v1/**", async (route) => {
     const request = route.request();
     const method = request.method();
     const url = request.url();
@@ -158,7 +163,7 @@ export async function stubAuthenticatedSupabase(
   };
   const failingLoads = new Set(options.failFirstLoadFor ?? []);
 
-  await page.route("https://example.supabase.co/auth/v1/**", async (route) => {
+  await page.route("http://127.0.0.1:54321/auth/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
 
@@ -188,11 +193,15 @@ export async function stubAuthenticatedSupabase(
       return;
     }
 
+    if (request.method() === "POST" && url.pathname === "/auth/v1/logout") {
+      await route.fulfill({ status: 204 });
+      return;
+    }
     mockState.unexpectedAuthRequests.push(`${request.method()} ${url.href}`);
     await route.abort();
   });
 
-  await page.route("https://example.supabase.co/rest/v1/**", async (route) => {
+  await page.route("http://127.0.0.1:54321/rest/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();

@@ -1,7 +1,7 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createSupabaseServerClient } from "./lib/supabaseServer";
+import { getAuthenticatedUser } from "./lib/supabaseServer";
 
 export type GeminiActionResult =
   | { status: "success"; text: string }
@@ -16,16 +16,6 @@ const AFFIRMATION_FALLBACK = "あなたは、そのままで素晴らしい存�
 const TRANSLATE_FALLBACK =
   "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
 
-async function isAuthenticated() {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.auth.getUser();
-    return !error && Boolean(data.user);
-  } catch {
-    return false;
-  }
-}
-
 function getGeminiModel() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
@@ -39,7 +29,7 @@ function getGeminiModel() {
 // ① アファメーション生成機能
 // -----------------------------------------------------------------
 export async function generateAffirmation(): Promise<GeminiActionResult> {
-  if (!(await isAuthenticated())) {
+  if (!(await getAuthenticatedUser())) {
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 
@@ -86,7 +76,7 @@ export async function translateHarshVoice(
 
   const safeHarshText = harshText.trim().slice(0, 300);
 
-  if (!(await isAuthenticated())) {
+  if (!(await getAuthenticatedUser())) {
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 

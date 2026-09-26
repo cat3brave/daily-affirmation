@@ -16,17 +16,22 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  webServer: {
+  webServer: [{
+    command: "node e2e/support/supabaseServerMock.mjs",
+    url: "http://127.0.0.1:54321/health",
+    reuseExistingServer: false,
+    timeout: 30_000,
+  }, {
     command: `${npmCommand} run dev -- --hostname ${host} --port ${port}`,
     url: `http://${host}:${port}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "e2e-placeholder-anon-key",
-      GEMINI_API_KEY: "e2e-placeholder-gemini-key",
+      GEMINI_API_KEY: "",
     },
-  },
+  }],
   projects: [
     {
       name: "chromium",

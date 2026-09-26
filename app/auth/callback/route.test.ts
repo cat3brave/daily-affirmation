@@ -10,11 +10,12 @@ type AuthExchangeResult = {
 };
 
 type CookieValue = {
+  name: string;
   value: string;
 };
 
 type CookieStore = {
-  get: ReturnType<typeof vi.fn<(name: string) => CookieValue | undefined>>;
+  getAll: ReturnType<typeof vi.fn<() => CookieValue[]>>;
   set: ReturnType<
     typeof vi.fn<
       (cookie: { name: string; value: string } & CookieOptions) => void
@@ -23,9 +24,8 @@ type CookieStore = {
 };
 
 type CookieAdapter = {
-  get: (name: string) => string | undefined;
-  set: (name: string, value: string, options: CookieOptions) => void;
-  remove: (name: string, options: CookieOptions) => void;
+  getAll: () => CookieValue[];
+  setAll: (cookies: Array<CookieValue & { options: CookieOptions }>) => void;
 };
 
 type ServerClientOptions = {
@@ -75,7 +75,7 @@ const ORIGINAL_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 function createCookieStore(): CookieStore {
   return {
-    get: vi.fn<(name: string) => CookieValue | undefined>(),
+    getAll: vi.fn<() => CookieValue[]>(),
     set: vi.fn<
       (cookie: { name: string; value: string } & CookieOptions) => void
     >(),
@@ -192,32 +192,16 @@ describe("GET /auth/callback", () => {
     expectRedirect(response, "https://example.test/login");
   });
 
-  it("cookie adapterのget/set/removeがcookieStoreへ正しく処理を委譲する", async () => {
+  it("共通Cookieアダプターで更新と削除を同期する", async () => {
     const cookieStore = createCookieStore();
-    const setOptions: CookieOptions = { path: "/", maxAge: 3600 };
-    const removeOptions: CookieOptions = { path: "/" };
-    cookieStore.get.mockReturnValue({ value: "stored-cookie-value" });
+    cookieStore.getAll.mockReturnValue([{ name: "session", value: "stored" }]);
     routeMocks.cookies.mockResolvedValue(cookieStore);
-
     await GET(createRequest("/auth/callback?code=oauth-code"));
-
-    const clientOptions = routeMocks.createServerClient.mock.calls[0][2];
-
-    expect(clientOptions.cookies.get("session")).toBe("stored-cookie-value");
-    expect(cookieStore.get).toHaveBeenCalledWith("session");
-
-    clientOptions.cookies.set("session", "new-cookie-value", setOptions);
-    expect(cookieStore.set).toHaveBeenCalledWith({
-      name: "session",
-      value: "new-cookie-value",
-      ...setOptions,
-    });
-
-    clientOptions.cookies.remove("session", removeOptions);
-    expect(cookieStore.set).toHaveBeenCalledWith({
-      name: "session",
-      value: "",
-      ...removeOptions,
-    });
+    const adapter = routeMocks.createServerClient.mock.calls[0][2].cookies;
+    expect(adapter.getAll()).toEqual([{ name: "session", value: "stored" }]);
+    adapter.setAll([{ name: "session", value: "updated", options: { path: "/" } }]);
+    expect(cookieStore.set).toHaveBeenCalledWith("session", "updated", { path: "/" });
+    adapter.setAll([{ name: "session", value: "", options: { maxAge: 0 } }]);
+    expect(cookieStore.set).toHaveBeenCalledWith("session", "", { maxAge: 0 });
   });
 });

@@ -8,9 +8,9 @@
     "start": "next start",
     "e2e": "playwright test",
     "lint": "eslint --cache --cache-location .eslintcache --ignore-pattern \"coverage/**\" --no-warn-ignored",
-    "test": "vitest run app",
-    "test:coverage": "vitest run --coverage app",
-    "test:watch": "vitest app"
+    "test": "vitest run app proxy.test.ts",
+    "test:coverage": "vitest run --coverage app proxy.test.ts",
+    "test:watch": "vitest app proxy.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
