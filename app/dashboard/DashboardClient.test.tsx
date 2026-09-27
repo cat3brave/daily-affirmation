@@ -17,6 +17,8 @@ type AuthUserReturn = {
 };
 type AffirmationGeneratorReturn = {
   text: string;
+  authError: string;
+  rateLimitError: string;
   isLoading: boolean;
   handleGenerateAffirmation: () => void;
 };
@@ -349,6 +351,8 @@ function configureDashboardMocks({
   });
   dashboardMocks.useAffirmationGenerator.mockReturnValue({
     text: affirmationText,
+    authError: "",
+    rateLimitError: "",
     isLoading: false,
     handleGenerateAffirmation: dashboardMocks.handleGenerateAffirmation,
   });

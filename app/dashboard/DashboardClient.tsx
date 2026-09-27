@@ -28,8 +28,13 @@ import DashboardHeader from "../components/DashboardHeader";
 export default function DashboardClient({ user }: { user: { id: string; email: string } }) {
   const { supabase, userId, userEmail } = useAuthUser(user);
 
-  const { text, authError, isLoading, handleGenerateAffirmation } =
-    useAffirmationGenerator();
+  const {
+    text,
+    authError,
+    rateLimitError,
+    isLoading,
+    handleGenerateAffirmation,
+  } = useAffirmationGenerator();
   const {
     favoriteAffirmations,
     favoriteError,
@@ -117,6 +122,7 @@ export default function DashboardClient({ user }: { user: { id: string; email: s
                     isLoading={isLoading}
                     text={text}
                     affirmationAuthError={authError}
+                    affirmationRateLimitError={rateLimitError}
                     handleClick={handleGenerateAffirmation}
                     handleFavoriteAffirmation={handleFavoriteAffirmation}
                     isFavoriteDisabled={isFavoriteDisabled}

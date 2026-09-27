@@ -19,15 +19,16 @@ export default function GentleTranslatorCard() {
     setTranslationError("");
     try {
       const result = await translateHarshVoice(harshVoice);
-      if (result.status === "auth_required") {
-        setTranslationError(result.message);
-      } else if (result.status === "invalid_input") {
+      if (
+        result.status === "auth_required" ||
+        result.status === "invalid_input" ||
+        result.status === "rate_limited"
+      ) {
         setTranslationError(result.message);
       } else {
         setTranslatedVoice(result.text);
       }
-    } catch (error) {
-      console.error("優しい翻訳に失敗しました:", error);
+    } catch {
       setTranslationError(
         "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
       );
@@ -51,9 +52,7 @@ export default function GentleTranslatorCard() {
         id="gentle-translator-guidance"
         className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-4 py-3 mb-4"
       >
-        入力した文章はAI処理のため外部APIに送信されます。
-        <br />
-        本名、住所、連絡先、医療情報などの個人情報は書かないでください。
+        入力した文章はGoogle Gemini APIへ送信されます。個人情報・連絡先・医療情報など、機微な情報は入力しないでください。
       </p>
       <label htmlFor="harsh-voice-input" className="sr-only">
         優しい言葉に翻訳したい自分への厳しい声

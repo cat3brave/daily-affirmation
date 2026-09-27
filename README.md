@@ -65,6 +65,7 @@ Supabase Authを使って、メールアドレス・パスワードログイン�
 | `docs/supabase-schema.md`      | Supabaseのテーブル構成とRLS方針の説明  |
 | `docs/app-checklist.md`        | アプリの動作確認チェックリスト         |
 | `docs/deployment-checklist.md` | Vercel本番環境の確認メモ               |
+| `docs/gemini-operations.md`    | Gemini APIの安全な運用チェックリスト |
 | `supabase/schema.sql`          | Supabase SQL Editorで実行するためのSQL |
 | `.env.example`                 | 必要な環境変数の見本                   |
 

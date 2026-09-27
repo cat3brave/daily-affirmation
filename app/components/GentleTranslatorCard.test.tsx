@@ -88,7 +88,7 @@ describe("GentleTranslatorCard", () => {
     render(<GentleTranslatorCard />);
 
     const textbox = getTextbox();
-    const guidance = screen.getByText(/入力した文章はAI処理/);
+    const guidance = screen.getByText(/入力した文章はGoogle Gemini API/);
     const characterCount = screen.getByText("0 / 300文字");
 
     expect(textbox).toHaveAttribute(
@@ -194,6 +194,30 @@ describe("GentleTranslatorCard", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("利用制限では入力を保持して通知し再試行できる", async () => {
+    translatorMocks.translateHarshVoice
+      .mockResolvedValueOnce({
+        status: "rate_limited",
+        message:
+          "利用が集中しています。少し時間をおいてから、もう一度お試しください。",
+      })
+      .mockResolvedValueOnce({ status: "success", text: "再試行できました。" });
+    render(<GentleTranslatorCard />);
+
+    fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
+    fireEvent.click(getTranslateButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("もう一度お試しください");
+    expect(getTextbox()).toHaveValue("保持する入力");
+    expect(getTextbox()).toBeEnabled();
+    expect(getTranslateButton()).toBeEnabled();
+
+    fireEvent.click(getTranslateButton());
+
+    expect(await screen.findByRole("status")).toHaveTextContent("再試行できました。");
+    expect(translatorMocks.translateHarshVoice).toHaveBeenCalledTimes(2);
+  });
+
   it("古いエラーを新しい成功時に残さない", async () => {
     translatorMocks.translateHarshVoice
       .mockResolvedValueOnce({ status: "invalid_input", message: "入力内容を確認してください。" })
@@ -210,10 +234,8 @@ describe("GentleTranslatorCard", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("throw時にconsole.errorとalertを表示し再操作可能に戻る", async () => {
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+  it("throw時に詳細をログへ出さずalertを表示し再操作可能に戻る", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const error = new Error("translate failed");
     translatorMocks.translateHarshVoice.mockRejectedValueOnce(error);
     render(<GentleTranslatorCard />);
@@ -228,10 +250,7 @@ describe("GentleTranslatorCard", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(FALLBACK_MESSAGE);
     expect(clickError).toBeUndefined();
-    expect(consoleError).toHaveBeenCalledWith(
-      "優しい翻訳に失敗しました:",
-      error,
-    );
+    expect(consoleError).not.toHaveBeenCalled();
     expect(getTextbox()).toBeEnabled();
     expect(screen.getByRole("button")).toBeEnabled();
   });

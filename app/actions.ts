@@ -7,11 +7,14 @@ export type GeminiActionResult =
   | { status: "success"; text: string }
   | { status: "fallback"; text: string }
   | { status: "auth_required"; message: string }
-  | { status: "invalid_input"; message: string };
+  | { status: "invalid_input"; message: string }
+  | { status: "rate_limited"; message: string };
 
 const AUTH_REQUIRED_MESSAGE =
   "ログイン状態を確認できませんでした。ログインし直してください。";
 const INVALID_INPUT_MESSAGE = "入力内容を確認してください。";
+const RATE_LIMITED_MESSAGE =
+  "利用が集中しています。少し時間をおいてから、もう一度お試しください。";
 const AFFIRMATION_FALLBACK = "あなたは、そのままで素晴らしい存在です。";
 const TRANSLATE_FALLBACK =
   "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
@@ -23,6 +26,34 @@ function getGeminiModel() {
   return new GoogleGenerativeAI(apiKey).getGenerativeModel({
     model: "gemini-2.5-flash",
   });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isRateLimitValue(value: unknown) {
+  return (
+    value === 429 ||
+    value === "429" ||
+    value === "RESOURCE_EXHAUSTED" ||
+    value === "RATE_LIMIT_EXCEEDED"
+  );
+}
+
+function isGeminiRateLimitError(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+
+  if (isRateLimitValue(error.status) || isRateLimitValue(error.code)) {
+    return true;
+  }
+
+  // SDKやHTTPクライアントが構造化情報を内包する場合だけ、安全な範囲で確認する。
+  return [error.cause, error.error, error.response].some(
+    (nested) =>
+      isRecord(nested) &&
+      (isRateLimitValue(nested.status) || isRateLimitValue(nested.code)),
+  );
 }
 
 // -----------------------------------------------------------------
@@ -59,7 +90,10 @@ export async function generateAffirmation(): Promise<GeminiActionResult> {
   try {
     const result = await model.generateContent(prompt);
     return { status: "success", text: result.response.text().trim() };
-  } catch {
+  } catch (error) {
+    if (isGeminiRateLimitError(error)) {
+      return { status: "rate_limited", message: RATE_LIMITED_MESSAGE };
+    }
     return { status: "fallback", text: AFFIRMATION_FALLBACK };
   }
 }
@@ -98,7 +132,10 @@ export async function translateHarshVoice(
   try {
     const result = await model.generateContent(prompt);
     return { status: "success", text: result.response.text().trim() };
-  } catch {
+  } catch (error) {
+    if (isGeminiRateLimitError(error)) {
+      return { status: "rate_limited", message: RATE_LIMITED_MESSAGE };
+    }
     return { status: "fallback", text: TRANSLATE_FALLBACK };
   }
 }

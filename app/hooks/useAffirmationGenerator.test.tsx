@@ -134,6 +134,33 @@ describe("useAffirmationGenerator", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it("利用制限を生成結果にせず通知し再試行できる", async () => {
+    affirmationMocks.generateAffirmation
+      .mockResolvedValueOnce({
+        status: "rate_limited",
+        message:
+          "利用が集中しています。少し時間をおいてから、もう一度お試しください。",
+      })
+      .mockResolvedValueOnce({ status: "success", text: "再試行できました" });
+    const { result } = renderHook(() => useAffirmationGenerator());
+
+    await act(async () => {
+      await result.current.handleGenerateAffirmation();
+    });
+
+    expect(result.current.text).toBe("");
+    expect(result.current.rateLimitError).toContain("もう一度お試しください");
+    expect(result.current.isLoading).toBe(false);
+
+    await act(async () => {
+      await result.current.handleGenerateAffirmation();
+    });
+
+    expect(result.current.text).toBe("再試行できました");
+    expect(result.current.rateLimitError).toBe("");
+    expect(affirmationMocks.generateAffirmation).toHaveBeenCalledTimes(2);
+  });
+
   it("同一タイミングで連続実行してもgenerateAffirmationを1回だけ呼ぶ", async () => {
     const generateDeferred = createDeferred<GeminiActionResult>();
     affirmationMocks.generateAffirmation.mockReturnValue(generateDeferred.promise);
