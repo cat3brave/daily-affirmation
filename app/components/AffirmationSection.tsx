@@ -4,6 +4,7 @@ type AffirmationSectionProps = {
   isLoading: boolean;
   text: string;
   authError: string;
+  rateLimitError: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   isFavoriteDisabled: boolean;
@@ -13,6 +14,7 @@ export default function AffirmationSection({
   isLoading,
   text,
   authError,
+  rateLimitError,
   handleClick,
   handleFavoriteAffirmation,
   isFavoriteDisabled,
@@ -44,6 +46,13 @@ export default function AffirmationSection({
                 ログイン画面へ
               </a>
             </div>
+          ) : rateLimitError ? (
+            <p
+              role="alert"
+              className="text-center text-red-700 text-sm leading-relaxed"
+            >
+              {rateLimitError}
+            </p>
           ) : text ? (
             <motion.div
               key={text}
@@ -85,7 +94,13 @@ export default function AffirmationSection({
       </div>
 
       {/* 2. アファメーションを受け取るボタン */}
-      <div className="mb-10 w-full flex justify-center">
+      <div className="mb-10 w-full flex flex-col items-center">
+        <p
+          id="affirmation-ai-guidance"
+          className="mb-3 text-center text-xs text-sky-700/60"
+        >
+          この機能は外部AI（Google Gemini）を利用します。
+        </p>
         <motion.button
           type="button"
           whileHover={{
@@ -98,6 +113,7 @@ export default function AffirmationSection({
           whileTap={{ scale: isLoading ? 1 : 0.95 }}
           onClick={handleClick}
           disabled={isLoading}
+          aria-describedby="affirmation-ai-guidance"
           className={`px-12 py-5 bg-sky-700 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-700 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
         >
           {isLoading ? "受け取り中..." : "言葉を受け取る"}

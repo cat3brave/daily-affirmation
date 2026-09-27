@@ -4,6 +4,7 @@ import { generateAffirmation } from "../actions";
 export function useAffirmationGenerator() {
   const [text, setText] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
+  const [rateLimitError, setRateLimitError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isGeneratingRef = useRef(false);
 
@@ -14,11 +15,14 @@ export function useAffirmationGenerator() {
     setIsLoading(true);
     setText("");
     setAuthError("");
+    setRateLimitError("");
 
     try {
       const result = await generateAffirmation();
       if (result.status === "auth_required") {
         setAuthError(result.message);
+      } else if (result.status === "rate_limited") {
+        setRateLimitError(result.message);
       } else if (result.status === "success" || result.status === "fallback") {
         setText(result.text);
       }
@@ -30,5 +34,11 @@ export function useAffirmationGenerator() {
     }
   };
 
-  return { text, authError, isLoading, handleGenerateAffirmation };
+  return {
+    text,
+    authError,
+    rateLimitError,
+    isLoading,
+    handleGenerateAffirmation,
+  };
 }

@@ -18,10 +18,26 @@ test("login succeeds and authenticated dashboard tabs can be navigated", async (
   await expect(
     page.getByRole("button", { name: "言葉を受け取る" }),
   ).toBeVisible();
+  await expect(
+    page.getByText("この機能は外部AI（Google Gemini）を利用します。"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "言葉を受け取る" }),
+  ).toHaveAttribute("aria-describedby", "affirmation-ai-guidance");
   await expect(page.getByText("🌸 デジタル花壇 🌸")).toBeVisible();
 
   await page.getByRole("tab", { name: /ワーク/ }).click();
   await expect(page.getByText("優しい翻訳機")).toBeVisible();
+  const translatorInput = page.getByLabel(
+    "優しい言葉に翻訳したい自分への厳しい声",
+  );
+  await expect(
+    page.getByText(/入力した文章はGoogle Gemini APIへ送信されます/),
+  ).toBeVisible();
+  await expect(translatorInput).toHaveAttribute(
+    "aria-describedby",
+    /gentle-translator-guidance/,
+  );
   await expect(
     page.getByRole("button", { name: "言葉を受け取る" }),
   ).toBeHidden();

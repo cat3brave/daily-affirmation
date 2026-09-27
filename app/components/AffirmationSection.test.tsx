@@ -63,6 +63,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text=""
         handleClick={vi.fn()}
@@ -79,6 +80,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text=""
         handleClick={vi.fn()}
@@ -102,6 +104,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text=""
         handleClick={handleClick}
@@ -119,6 +122,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading
+        rateLimitError=""
         authError=""
         text=""
         handleClick={vi.fn()}
@@ -139,6 +143,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError="ログイン状態を確認できませんでした。ログインし直してください。"
         text=""
         handleClick={vi.fn()}
@@ -156,10 +161,51 @@ describe("AffirmationSection", () => {
     expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
   });
 
+  it("利用制限をalertで通知し再操作を可能にする", () => {
+    render(
+      <AffirmationSection
+        isLoading={false}
+        authError=""
+        rateLimitError="利用が集中しています。少し時間をおいてから、もう一度お試しください。"
+        text=""
+        handleClick={vi.fn()}
+        handleFavoriteAffirmation={vi.fn()}
+        isFavoriteDisabled={false}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("もう一度お試しください");
+    expect(screen.queryByRole("button", { name: /お気に入り/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
+  });
+
+  it("外部AI案内を生成ボタンへ関連付ける", () => {
+    render(
+      <AffirmationSection
+        isLoading={false}
+        authError=""
+        rateLimitError=""
+        text=""
+        handleClick={vi.fn()}
+        handleFavoriteAffirmation={vi.fn()}
+        isFavoriteDisabled={false}
+      />,
+    );
+
+    const guidance = screen.getByText(
+      "この機能は外部AI（Google Gemini）を利用します。",
+    );
+    expect(screen.getByRole("button", { name: "言葉を受け取る" })).toHaveAttribute(
+      "aria-describedby",
+      guidance.id,
+    );
+  });
+
   it("生成成功後にアファメーションと有効なお気に入りボタンを表示する", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text="あなたは今日も十分にがんばっています"
         handleClick={vi.fn()}
@@ -185,6 +231,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text="あなたは大切な存在です"
         handleClick={vi.fn()}
@@ -204,6 +251,7 @@ describe("AffirmationSection", () => {
     render(
       <AffirmationSection
         isLoading={false}
+        rateLimitError=""
         authError=""
         text="あなたは大切な存在です"
         handleClick={vi.fn()}

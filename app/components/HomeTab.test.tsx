@@ -21,6 +21,7 @@ function renderHomeTab(setShowTada = vi.fn()) {
       isLoading={false}
       text=""
       affirmationAuthError=""
+      affirmationRateLimitError=""
       handleClick={vi.fn()}
       handleFavoriteAffirmation={vi.fn()}
       handleRemoveFavoriteAffirmation={vi.fn()}

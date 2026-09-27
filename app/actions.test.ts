@@ -45,6 +45,8 @@ const TRANSLATE_FALLBACK =
   "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
 const AUTH_MESSAGE =
   "ログイン状態を確認できませんでした。ログインし直してください。";
+const RATE_LIMIT_MESSAGE =
+  "利用が集中しています。少し時間をおいてから、もう一度お試しください。";
 
 function result(text: string): GenerateContentResult {
   return { response: { text: () => text } };
@@ -143,6 +145,22 @@ describe("generateAffirmation", () => {
     expect(actionResult).toEqual({ status: "fallback", text: AFFIRMATION_FALLBACK });
     expect(JSON.stringify(actionResult)).not.toContain("api-key-secret");
   });
+
+  it.each([
+    [{ status: 429, message: "api-key-secret" }],
+    [{ code: "RESOURCE_EXHAUSTED", details: "token-secret" }],
+    [{ response: { status: "429" }, message: "prompt-secret" }],
+  ])("構造化された利用制限を安全なrate_limitedへ変換する", async (error) => {
+    mocks.generateContent.mockRejectedValue(error);
+
+    const actionResult = await generateAffirmation();
+
+    expect(actionResult).toEqual({
+      status: "rate_limited",
+      message: RATE_LIMIT_MESSAGE,
+    });
+    expect(JSON.stringify(actionResult)).not.toMatch(/api-key|token|prompt/);
+  });
 });
 
 describe("translateHarshVoice", () => {
@@ -185,5 +203,20 @@ describe("translateHarshVoice", () => {
       status: "fallback",
       text: TRANSLATE_FALLBACK,
     });
+  });
+
+  it("構造化された429エラーを安全なrate_limitedへ変換する", async () => {
+    mocks.generateContent.mockRejectedValue({
+      code: 429,
+      message: "sdk internal token-secret prompt-secret",
+    });
+
+    const actionResult = await translateHarshVoice("つらい声");
+
+    expect(actionResult).toEqual({
+      status: "rate_limited",
+      message: RATE_LIMIT_MESSAGE,
+    });
+    expect(JSON.stringify(actionResult)).not.toMatch(/internal|token|prompt/);
   });
 });
