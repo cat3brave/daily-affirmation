@@ -28,6 +28,27 @@ Vercelの Environment Variables に以下を設定します。
 
 ---
 
+## セキュリティヘッダー
+
+本番レスポンスで以下を確認します。
+
+- [ ] `X-Content-Type-Options: nosniff`
+- [ ] `X-Frame-Options: DENY`
+- [ ] `Referrer-Policy: strict-origin-when-cross-origin`
+- [ ] `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- [ ] `Content-Security-Policy: base-uri 'self'; frame-ancestors 'none'; object-src 'none';`
+- [ ] `x-powered-by` が存在しない
+
+HSTS（`Strict-Transport-Security`）はVercelが管理するため、アプリでは重複設定しません。
+
+本番での確認例:
+
+```sh
+curl -I https://daily-affirmation-lac.vercel.app/login
+```
+
+---
+
 ## 注意
 
 `GEMINI_API_KEY` は秘密情報です。
