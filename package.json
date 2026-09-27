@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "e2e": "playwright test",
     "lint": "eslint --cache --cache-location .eslintcache --ignore-pattern \"coverage/**\" --no-warn-ignored",
     "test": "vitest run app proxy.test.ts",
@@ -18,7 +19,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "framer-motion": "^12.34.2",
-    "next": "16.2.11",
+    "next": "16.3.6",
     "react": "19.2.3",
     "react-confetti": "^6.4.0",
     "react-dom": "19.2.3"

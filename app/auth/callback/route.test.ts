@@ -175,6 +175,9 @@ describe("GET /auth/callback", () => {
     expect(caughtError).toBeUndefined();
     expect(consoleError).toHaveBeenCalledWith("OAuth callback failed:", error);
     expect(response).toBeDefined();
+    if (!response) {
+      throw new Error("Expected OAuth callback to return a response");
+    }
     expectRedirect(response, "https://example.test/login");
   });
 

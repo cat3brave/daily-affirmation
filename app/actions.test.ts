@@ -4,10 +4,14 @@ type GenerateContentResult = { response: { text: () => string } };
 type GenerativeModel = {
   generateContent: (prompt: string) => Promise<GenerateContentResult>;
 };
+type AuthResult = {
+  data: { user: { id: string } | null };
+  error: Error | null;
+};
 
 const mocks = vi.hoisted(() => {
   const events: string[] = [];
-  const getUser = vi.fn(async () => {
+  const getUser = vi.fn<() => Promise<AuthResult>>(async () => {
     events.push("auth");
     return { data: { user: { id: "user-1" } }, error: null };
   });

@@ -1,9 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+type ServerClient = { auth: { getUser: ReturnType<typeof vi.fn> } };
+type ServerClientOptions = {
+  cookies: {
+    getAll: () => Array<{ name: string; value: string }>;
+    setAll: (
+      cookies: Array<{
+        name: string;
+        value: string;
+        options: Record<string, unknown>;
+      }>,
+    ) => void;
+  };
+};
+
 const mocks = vi.hoisted(() => ({
   cookieStore: { getAll: vi.fn(() => []), set: vi.fn() },
   cookies: vi.fn(),
-  createServerClient: vi.fn(() => ({ auth: { getUser: vi.fn() } })),
+  createServerClient: vi.fn<
+    (url: string, anonKey: string, options: ServerClientOptions) => ServerClient
+  >(() => ({ auth: { getUser: vi.fn() } })),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -22,7 +38,10 @@ describe("createSupabaseServerClient", () => {
   it("next/headersのCookieを@supabase/ssrへ接続する", async () => {
     await createSupabaseServerClient();
 
-    const options = mocks.createServerClient.mock.calls[0][2];
+    const call = mocks.createServerClient.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) throw new Error("Expected createServerClient to be called");
+    const options = call[2];
     expect(options.cookies.getAll()).toEqual([]);
     options.cookies.setAll([
       { name: "session", value: "updated", options: { httpOnly: true } },
@@ -77,7 +96,10 @@ describe("getAuthenticatedUser", () => {
   it("Server ComponentがCookie書込不可でも認証を確認する", async () => {
     mocks.cookieStore.set.mockImplementation(() => { throw new Error("read only"); });
     await createSupabaseServerClient();
-    const adapter = mocks.createServerClient.mock.calls[0][2].cookies;
+    const call = mocks.createServerClient.mock.calls[0];
+    expect(call).toBeDefined();
+    if (!call) throw new Error("Expected createServerClient to be called");
+    const adapter = call[2].cookies;
     expect(() => adapter.setAll([{ name: "session", value: "fresh", options: {} }])).not.toThrow();
   });
 });
