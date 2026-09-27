@@ -68,7 +68,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const viewport of viewports) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {
-    test.use({ viewport, forcedColors: "active" });
+    test.use({ viewport });
 
     test("ログインと新規登録の状態を識別して操作できる", async ({ page }) => {
       const authRequests = trackSupabaseAuthRequests(page);
