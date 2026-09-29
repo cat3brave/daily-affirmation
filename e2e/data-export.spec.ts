@@ -1,0 +1,60 @@
+import { expect, test, type Page } from "@playwright/test";
+import { loginToDashboard, stubExternalServices } from "./support/supabaseMock";
+
+async function expectNoHorizontalScroll(page: Page) {
+  await expect.poll(() => page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
+    document.body.scrollWidth <= document.body.clientWidth,
+  )).toBe(true);
+}
+
+test.beforeEach(async ({ page }) => {
+  await stubExternalServices(page);
+});
+
+test("保存済みの本人データ3種類をJSONファイルでダウンロードする", async ({ page }) => {
+  await loginToDashboard(page);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "データを書き出す" }).click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  let contents = "";
+  for await (const chunk of stream) contents += chunk.toString();
+  const data = JSON.parse(contents);
+
+  expect(download.suggestedFilename()).toMatch(/^daily-affirmation-data-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(data).toMatchObject({
+    formatVersion: 1,
+    account: { email: "e2e-user@example.com" },
+    favoriteAffirmations: [{ id: "favorite-e2e", text: "今日も一歩ずつ" }],
+    threeGoodThings: [{ id: "good-e2e", things1: "散歩", things2: "青空", things3: "温かいお茶" }],
+    bloomLogs: [{ id: "bloom-e2e", flower_type: "tulip" }],
+  });
+  expect(data.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(contents).not.toContain("other-user");
+  expect(contents).not.toContain("他ユーザーの秘密");
+  expect(contents).not.toContain("user_id");
+  await expect(page.getByText("保存済みデータを書き出しました。", { exact: true })).toBeVisible();
+});
+
+for (const viewport of [{ width: 320, height: 720 }, { width: 1280, height: 720 }]) {
+  test(`${viewport.width}x${viewport.height}で書き出し操作が重ならず画面内に収まる`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await loginToDashboard(page);
+    const exportButton = page.getByRole("button", { name: "データを書き出す" });
+    const logoutButton = page.getByRole("button", { name: "👋 ログアウト" });
+    await expect(exportButton).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    const boxes = await Promise.all([exportButton.boundingBox(), logoutButton.boundingBox()]);
+    expect(boxes.every(Boolean)).toBe(true);
+    const [exportBox, logoutBox] = boxes as NonNullable<(typeof boxes)[number]>[];
+    expect(exportBox.x + exportBox.width <= viewport.width).toBe(true);
+    expect(logoutBox.x + logoutBox.width <= viewport.width).toBe(true);
+    expect(exportBox.x + exportBox.width <= logoutBox.x || logoutBox.x + logoutBox.width <= exportBox.x || exportBox.y + exportBox.height <= logoutBox.y || logoutBox.y + logoutBox.height <= exportBox.y).toBe(true);
+    await exportButton.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(exportButton).toBeFocused();
+    await expect(exportButton).toHaveCSS("outline-style", "solid");
+  });
+}

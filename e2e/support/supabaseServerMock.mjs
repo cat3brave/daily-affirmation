@@ -6,6 +6,18 @@ const user = {
   role: "authenticated", app_metadata: { provider: "email", providers: ["email"] },
   user_metadata: {}, created_at: "2026-08-13T00:00:00.000Z",
 };
+const exportRows = {
+  favorite_affirmations: [
+    { id: "favorite-e2e", user_id: user.id, text: "今日も一歩ずつ", created_at: "2026-09-20T00:00:00.000Z" },
+    { id: "favorite-other", user_id: "other-user", text: "他ユーザーの秘密", created_at: "2026-09-19T00:00:00.000Z" },
+  ],
+  three_good_things: [
+    { id: "good-e2e", user_id: user.id, date: "2026-09-21", things1: "散歩", things2: "青空", things3: "温かいお茶", created_at: "2026-09-21T12:00:00.000Z" },
+  ],
+  bloom_logs: [
+    { id: "bloom-e2e", user_id: user.id, flower_type: "tulip", created_at: "2026-09-22T00:00:00.000Z" },
+  ],
+};
 const server = createServer(async (request, response) => {
   response.setHeader("Content-Type", "application/json");
   response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:3100");
@@ -21,6 +33,23 @@ const server = createServer(async (request, response) => {
       : send(401, { code: "bad_jwt", message: "Invalid test session" });
   }
   if (url.pathname === "/auth/v1/logout" && request.method === "POST") return send(204, null);
+  if (url.pathname.startsWith("/rest/v1/") && request.method === "GET") {
+    if (request.headers.authorization !== "Bearer e2e-access-token") return send(401, { message: "Unauthorized" });
+    const table = url.pathname.slice("/rest/v1/".length);
+    if (!(table in exportRows)) return send(404, { message: "Unknown table" });
+    const requestedUser = url.searchParams.get("user_id")?.replace(/^eq\./, "");
+    const selected = (url.searchParams.get("select") ?? "").split(",");
+    const range = request.headers.range?.match(/(\d+)-(\d+)/);
+    const from = Number(range?.[1] ?? 0);
+    const to = Number(range?.[2] ?? 999);
+    const rows = exportRows[table]
+      .filter((row) => row.user_id === requestedUser)
+      .sort((a, b) => `${a.created_at}:${a.id}`.localeCompare(`${b.created_at}:${b.id}`))
+      .slice(from, to + 1)
+      .map((row) => Object.fromEntries(selected.filter((column) => column in row).map((column) => [column, row[column]])));
+    response.setHeader("Content-Range", `${from}-${Math.max(from, from + rows.length - 1)}/${rows.length}`);
+    return send(200, rows);
+  }
   if (url.pathname === "/auth/v1/token" && request.method === "POST") {
     let body = "";
     for await (const chunk of request) body += chunk;
