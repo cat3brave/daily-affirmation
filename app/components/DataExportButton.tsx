@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { exportUserData } from "../exportDataAction";
+import { formatExportLocalDate } from "./dataExportDate";
 
 const exportErrorMessage =
   "データを書き出せませんでした。時間をおいてもう一度お試しください。";
@@ -39,7 +40,7 @@ export default function DataExportButton() {
       try {
         const link = document.createElement("a");
         link.href = blobUrl;
-        link.download = `daily-affirmation-export-${result.data.exportedAt.slice(0, 10)}.json`;
+        link.download = `daily-affirmation-export-${formatExportLocalDate(result.data.exportedAt)}.json`;
         link.click();
       } finally {
         URL.revokeObjectURL(blobUrl);

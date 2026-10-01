@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loginToDashboard, stubExternalServices } from "./support/supabaseMock";
 
+test.use({ timezoneId: "Asia/Tokyo" });
+
 async function expectNoHorizontalScroll(page: Page) {
   await expect.poll(() => page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
@@ -22,7 +24,7 @@ test("保存済みの本人データ4種類をJSONファイルでダウンロー
   for await (const chunk of stream) contents += chunk.toString();
   const data = JSON.parse(contents);
 
-  expect(download.suggestedFilename()).toMatch(/^daily-affirmation-export-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toBe("daily-affirmation-export-2026-10-01.json");
   expect(data).toMatchObject({
     schemaVersion: 1,
     todos: [{ id: "todo-e2e", text: "深呼吸する", completed: true }],
@@ -30,7 +32,7 @@ test("保存済みの本人データ4種類をJSONファイルでダウンロー
     threeGoodThings: [{ id: "good-e2e", things1: "散歩", things2: "青空", things3: "温かいお茶" }],
     bloomLogs: [{ id: "bloom-e2e", flower_type: "tulip" }],
   });
-  expect(data.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(data.exportedAt).toBe("2026-09-30T15:30:00.000Z");
   expect(contents).not.toContain("other-user");
   expect(contents).not.toContain("他ユーザーの秘密");
   expect(contents).not.toContain("user_id");

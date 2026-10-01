@@ -7,6 +7,14 @@ import {
 
 const PAGE_SIZE = 1000;
 
+function getExportedAt() {
+  const fixedTime =
+    process.env.NODE_ENV !== "production"
+      ? process.env.E2E_EXPORT_FIXED_TIME
+      : undefined;
+  return new Date(fixedTime ?? Date.now()).toISOString();
+}
+
 type ExportTable =
   | "todos"
   | "favorite_affirmations"
@@ -73,7 +81,7 @@ export async function exportUserData(): Promise<ExportDataResult> {
       status: "success",
       data: {
         schemaVersion: 1,
-        exportedAt: new Date().toISOString(),
+        exportedAt: getExportedAt(),
         todos,
         favoriteAffirmations,
         threeGoodThings,
