@@ -1,14 +1,14 @@
-export const THREE_GOOD_THINGS_DRAFT_PREFIX =
-  "daily-affirmation:three-good-things-draft:";
+import {
+  getThreeGoodThingsDraftKey,
+  THREE_GOOD_THINGS_DRAFT_PREFIX,
+} from "./userLocalStorage";
+
+export { getThreeGoodThingsDraftKey, THREE_GOOD_THINGS_DRAFT_PREFIX };
 
 type ThreeGoodThingsDraft = {
   date: string;
   things: string[];
 };
-
-export function getThreeGoodThingsDraftKey(userId: string) {
-  return `${THREE_GOOD_THINGS_DRAFT_PREFIX}${encodeURIComponent(userId)}`;
-}
 
 function isThreeThings(value: unknown): value is string[] {
   return (

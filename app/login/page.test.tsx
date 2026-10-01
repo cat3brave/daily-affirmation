@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SupabaseError = { message: string };
@@ -382,7 +389,9 @@ describe("LoginPage", () => {
     expect(alert).toHaveTextContent(
       SIGN_UP_FAILURE_MESSAGE,
     );
-    expect(alert).toHaveFocus();
+    await waitFor(() => {
+      expect(alert).toHaveFocus();
+    });
     expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toHaveValue(
       "user@example.com",
     );

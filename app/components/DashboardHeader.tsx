@@ -8,6 +8,7 @@ type DashboardHeaderProps = {
   isBirdView: boolean;
   onToggleBirdView: () => void;
   userEmail: string | null;
+  userId: string;
 };
 
 export default function DashboardHeader({
@@ -15,6 +16,7 @@ export default function DashboardHeader({
   isBirdView,
   onToggleBirdView,
   userEmail,
+  userId,
 }: DashboardHeaderProps) {
   return (
     <header className="absolute top-4 z-50 flex w-full max-w-lg items-start justify-between gap-2 px-3 sm:px-6">
@@ -35,7 +37,7 @@ export default function DashboardHeader({
       <div className="flex min-w-0 flex-col items-end gap-2">
         <div className="flex flex-wrap justify-end gap-2">
           <DataExportButton />
-          <LogoutButton />
+          <LogoutButton userId={userId} />
         </div>
 
         {userEmail && (

@@ -77,6 +77,7 @@ type DashboardHeaderProps = {
   isBirdView: boolean;
   onToggleBirdView: () => void;
   userEmail: string | null;
+  userId: string;
 };
 type BirdViewPanelProps = {
   currentTab: DashboardTab;
@@ -642,6 +643,7 @@ describe("DashboardPage", () => {
       currentTab: "home",
       isBirdView: false,
       userEmail: "dashboard@example.com",
+      userId: "user-dashboard-1",
     });
   });
 });
