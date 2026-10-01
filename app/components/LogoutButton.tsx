@@ -1,23 +1,39 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/app/lib/supabaseClient";
+import {
+  hasUnsavedThreeGoodThingsDraft,
+  removeUserLocalData,
+} from "@/app/lib/userLocalStorage";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 const logoutErrorMessage =
   "ログアウトに失敗しました。もう一度お試しください。";
+const logoutDraftConfirmation =
+  "ログアウトすると、この端末の未保存の下書きが削除されます。ログアウトしますか？";
 
-export default function LogoutButton() {
+export default function LogoutButton({ userId }: { userId: string }) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const isLoggingOutRef = useRef(false);
 
   // ブラウザ用のSupabaseの準備
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   // ログアウト処理
   const handleLogout = async () => {
-    if (isLoggingOut) return;
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
+
+    if (
+      hasUnsavedThreeGoodThingsDraft(userId) &&
+      !window.confirm(logoutDraftConfirmation)
+    ) {
+      isLoggingOutRef.current = false;
+      return;
+    }
 
     setLogoutError("");
     setIsLoggingOut(true);
@@ -26,17 +42,19 @@ export default function LogoutButton() {
       const { error } = await supabase.auth.signOut();
 
       if (error) {
-        console.error("ログアウトに失敗しました:", error);
+        console.error("ログアウトに失敗しました。");
         setLogoutError(logoutErrorMessage);
         return;
       }
 
+      removeUserLocalData(userId);
       router.push("/login"); // ログアウトしたらログイン画面へ戻す
       router.refresh(); // 画面の情報を最新にリフレッシュ
-    } catch (error) {
-      console.error("ログアウト中に想定外のエラー:", error);
+    } catch {
+      console.error("ログアウト中に想定外のエラーが発生しました。");
       setLogoutError(logoutErrorMessage);
     } finally {
+      isLoggingOutRef.current = false;
       setIsLoggingOut(false);
     }
   };

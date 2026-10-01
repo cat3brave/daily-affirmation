@@ -86,6 +86,7 @@ export default function DashboardClient({ user }: { user: { id: string; email: s
           isBirdView={isBirdView}
           onToggleBirdView={() => setIsBirdView(!isBirdView)}
           userEmail={userEmail}
+          userId={user.id}
         />
 
         <FloatingCloudLayer floatingClouds={floatingClouds} />

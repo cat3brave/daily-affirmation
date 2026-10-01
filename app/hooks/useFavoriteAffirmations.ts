@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
-
-const FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX = "favoriteAffirmations";
+import { getFavoriteAffirmationsStorageKey } from "../lib/userLocalStorage";
 
 type SupabaseBrowserClient = ReturnType<typeof createSupabaseBrowserClient>;
-
-const getFavoriteAffirmationsStorageKey = (userId: string) =>
-  `${FAVORITE_AFFIRMATIONS_STORAGE_KEY_PREFIX}:${userId}`;
 
 export function useFavoriteAffirmations(
   userId: string | null,
@@ -61,11 +57,8 @@ export function useFavoriteAffirmations(
           setFavoriteAffirmations(favorites);
         }
       }
-    } catch (error) {
-      console.error(
-        "お気に入りアファメーションの読み込みに失敗しました。",
-        error,
-      );
+    } catch {
+      console.error("お気に入りアファメーションの読み込みに失敗しました。");
     } finally {
       setHasLoadedFavorites(true);
     }
@@ -79,11 +72,8 @@ export function useFavoriteAffirmations(
         getFavoriteAffirmationsStorageKey(userId),
         JSON.stringify(favoriteAffirmations),
       );
-    } catch (error) {
-      console.error(
-        "お気に入りアファメーションの保存に失敗しました。",
-        error,
-      );
+    } catch {
+      console.error("お気に入りアファメーションの保存に失敗しました。");
     }
   }, [favoriteAffirmations, hasLoadedFavorites, userId]);
 
