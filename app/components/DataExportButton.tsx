@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { exportUserData } from "../exportDataAction";
 
 const exportErrorMessage =
   "データを書き出せませんでした。時間をおいてもう一度お試しください。";
@@ -20,29 +21,25 @@ export default function DataExportButton() {
     setNeedsLogin(false);
 
     try {
-      const response = await fetch("/api/export-data", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!response.ok) {
-        setNeedsLogin(response.status === 401);
+      const result = await exportUserData();
+      if (result.status !== "success") {
+        setNeedsLogin(result.status === "auth_required");
         setMessage(
-          response.status === 401
+          result.status === "auth_required"
             ? "セッションが切れました。もう一度ログインしてください。"
             : exportErrorMessage,
         );
         return;
       }
 
-      const blobUrl = URL.createObjectURL(await response.blob());
+      const json = JSON.stringify(result.data, null, 2);
+      const blobUrl = URL.createObjectURL(
+        new Blob([json], { type: "application/json;charset=utf-8" }),
+      );
       try {
-        const disposition = response.headers.get("Content-Disposition") ?? "";
-        const matchedName = disposition.match(
-          /filename="(daily-affirmation-data-\d{4}-\d{2}-\d{2}\.json)"/,
-        )?.[1];
         const link = document.createElement("a");
         link.href = blobUrl;
-        link.download = matchedName ?? "daily-affirmation-data.json";
+        link.download = `daily-affirmation-export-${result.data.exportedAt.slice(0, 10)}.json`;
         link.click();
       } finally {
         URL.revokeObjectURL(blobUrl);

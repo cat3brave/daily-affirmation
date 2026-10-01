@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   await stubExternalServices(page);
 });
 
-test("保存済みの本人データ3種類をJSONファイルでダウンロードする", async ({ page }) => {
+test("保存済みの本人データ4種類をJSONファイルでダウンロードする", async ({ page }) => {
   await loginToDashboard(page);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "データを書き出す" }).click();
@@ -22,10 +22,10 @@ test("保存済みの本人データ3種類をJSONファイルでダウンロー
   for await (const chunk of stream) contents += chunk.toString();
   const data = JSON.parse(contents);
 
-  expect(download.suggestedFilename()).toMatch(/^daily-affirmation-data-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^daily-affirmation-export-\d{4}-\d{2}-\d{2}\.json$/);
   expect(data).toMatchObject({
-    formatVersion: 1,
-    account: { email: "e2e-user@example.com" },
+    schemaVersion: 1,
+    todos: [{ id: "todo-e2e", text: "深呼吸する", completed: true }],
     favoriteAffirmations: [{ id: "favorite-e2e", text: "今日も一歩ずつ" }],
     threeGoodThings: [{ id: "good-e2e", things1: "散歩", things2: "青空", things3: "温かいお茶" }],
     bloomLogs: [{ id: "bloom-e2e", flower_type: "tulip" }],
@@ -34,6 +34,7 @@ test("保存済みの本人データ3種類をJSONファイルでダウンロー
   expect(contents).not.toContain("other-user");
   expect(contents).not.toContain("他ユーザーの秘密");
   expect(contents).not.toContain("user_id");
+  expect(contents).not.toMatch(/access.?token|refresh.?token|cookie|api.?key/i);
   await expect(page.getByText("保存済みデータを書き出しました。", { exact: true })).toBeVisible();
 });
 

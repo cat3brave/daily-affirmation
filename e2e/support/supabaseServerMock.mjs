@@ -7,6 +7,10 @@ const user = {
   user_metadata: {}, created_at: "2026-08-13T00:00:00.000Z",
 };
 const exportRows = {
+  todos: [
+    { id: "todo-e2e", user_id: user.id, text: "深呼吸する", completed: true, created_at: "2026-09-18T00:00:00.000Z" },
+    { id: "todo-other", user_id: "other-user", text: "他ユーザーの秘密", completed: false, created_at: "2026-09-17T00:00:00.000Z" },
+  ],
   favorite_affirmations: [
     { id: "favorite-e2e", user_id: user.id, text: "今日も一歩ずつ", created_at: "2026-09-20T00:00:00.000Z" },
     { id: "favorite-other", user_id: "other-user", text: "他ユーザーの秘密", created_at: "2026-09-19T00:00:00.000Z" },
