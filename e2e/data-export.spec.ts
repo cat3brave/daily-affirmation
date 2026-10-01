@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loginToDashboard, stubExternalServices } from "./support/supabaseMock";
 
+test.use({ timezoneId: "Asia/Tokyo" });
+
 async function expectNoHorizontalScroll(page: Page) {
   await expect.poll(() => page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
@@ -14,6 +16,17 @@ test.beforeEach(async ({ page }) => {
 
 test("保存済みの本人データ4種類をJSONファイルでダウンロードする", async ({ page }) => {
   await loginToDashboard(page);
+  const exportedAt = "2026-09-27T15:30:00.000Z";
+  // 実際のServer Actionのデータを維持し、返却時刻だけ固定する。
+  // ブラウザーの時計を固定してもサーバーのexportedAtは変わらない。
+  await page.route("**/dashboard", async (route) => {
+    if (!route.request().headers()["next-action"]) return route.continue();
+    const response = await route.fetch();
+    const body = await response.text();
+    const timestampPattern = /"exportedAt":"[^"]+"/g;
+    expect(body.match(timestampPattern)).toHaveLength(1);
+    await route.fulfill({ response, body: body.replace(timestampPattern, `"exportedAt":"${exportedAt}"`) });
+  });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "データを書き出す" }).click();
   const download = await downloadPromise;
@@ -22,7 +35,7 @@ test("保存済みの本人データ4種類をJSONファイルでダウンロー
   for await (const chunk of stream) contents += chunk.toString();
   const data = JSON.parse(contents);
 
-  expect(download.suggestedFilename()).toMatch(/^daily-affirmation-export-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toBe("daily-affirmation-export-2026-09-28.json");
   expect(data).toMatchObject({
     schemaVersion: 1,
     todos: [{ id: "todo-e2e", text: "深呼吸する", completed: true }],
@@ -30,7 +43,7 @@ test("保存済みの本人データ4種類をJSONファイルでダウンロー
     threeGoodThings: [{ id: "good-e2e", things1: "散歩", things2: "青空", things3: "温かいお茶" }],
     bloomLogs: [{ id: "bloom-e2e", flower_type: "tulip" }],
   });
-  expect(data.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(data.exportedAt).toBe(exportedAt);
   expect(contents).not.toContain("other-user");
   expect(contents).not.toContain("他ユーザーの秘密");
   expect(contents).not.toContain("user_id");
