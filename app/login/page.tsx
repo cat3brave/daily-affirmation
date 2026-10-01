@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const LOGIN_FAILURE_MESSAGE =
   "ログインに失敗しました。メールアドレスとパスワードを確認してください。";
@@ -360,6 +361,14 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+        <p className="mt-6 text-center text-sm">
+          <Link
+            href="/privacy"
+            className="rounded text-pink-700 underline underline-offset-2"
+          >
+            プライバシーとデータについて
+          </Link>
+        </p>
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import LogoutButton from "./LogoutButton";
 import DataExportButton from "./DataExportButton";
 
@@ -35,6 +36,12 @@ export default function DashboardHeader({
       )}
 
       <div className="flex min-w-0 flex-col items-end gap-2">
+        <Link
+          href="/privacy"
+          className="rounded-md text-xs font-bold text-sky-800 underline underline-offset-2"
+        >
+          プライバシーとデータ
+        </Link>
         <div className="flex flex-wrap justify-end gap-2">
           <DataExportButton />
           <LogoutButton userId={userId} />
