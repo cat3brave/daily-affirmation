@@ -2,7 +2,7 @@
 
 調査日: 2026-10-02。調査基準: 最新 `origin/main` の `4cc6b190a5196a0317e8937fc6396bd9e5dcd2b6`（PR #48）。開始時の作業ツリーに差分なし。作業ブランチ: `codex/design-account-deletion`。
 
-この文書は未実装の設計案です。今回は文書だけを変更し、アプリコード、SQL、RLS、依存関係、環境変数、本番設定を変更しません。実アカウントや実データの削除、秘密情報の取得、本番DBへの接続は行っていません。
+この文書はPR #49時点の未実装の設計案です。PR #49では文書だけを変更し、アプリコード、SQL、RLS、依存関係、環境変数、本番設定を変更しません。実アカウントや実データの削除、秘密情報の取得、本番DBへの接続は行っていません。
 
 ## 1. 現状と削除範囲
 
@@ -33,6 +33,8 @@
 Auth側は本人の `auth.users` と関連するidentity・session等が削除対象です。Auth管理スキーマはリポジトリで定義していません。公式資料ではhard deleteによる `auth.users → auth.sessions` の連鎖とrefresh tokenの無効化が説明されていますが、その他のAuth内部テーブルの制約一覧は本番未確認です。内部テーブルの手動削除は計画しません。[ユーザー管理公式資料](https://supabase.com/docs/guides/auth/managing-user-data)
 
 ### 本番未確認事項
+
+具体的な読み取り専用SQL・実行順・期待結果・取得不可と未確認の区別は[DB監査手順](account-deletion-db-audit.md)を参照してください。監査準備ではDBに接続せず、FK/RLS変更や削除API実行を行いません。操作状態保存先と再認証方式は引き続き未決です。
 
 - `create table if not exists` は既存テーブルの外部キーを変更しません。SQLを再実行しても既存DBがこの定義に一致するとは限りません。
 - `docs/supabase-schema.md` は構成メモで、一部にDROP TABLE例があります。既存データを保持する移行の実行手順として使用しません。
@@ -150,6 +152,7 @@ localStorage削除がブラウザー制限で失敗した場合、DB成功を取
 
 | PR | 作業 | 完了条件 |
 | --- | --- | --- |
+| 0: DB監査準備 | 読み取り専用監査SQL、実行手順、将来のステージング検証計画 | リポジトリで確認済みと実DB未確認を区別。DB変更・接続・削除実行なし |
 | 1: DB移行と削除前提 | 実DB棚卸し、todosのCASCADE移行、新規schema定義整合、必要な操作状態保存先と権限、移行手順 | 既存全データを保持した移行が検証済み。全参照・Storageの阻害要因が判明。制約検証済み。失敗を注入した親削除で全行がロールバックし、Bが不変 |
 | 2: 本人確認とサーバー削除 | server-only管理クライアント、再認証challenge、本人ID照合、CSRF、永続排他、状態照会と応答喪失の回復 | 未認証・設定不足では削除APIを呼ばない。別ID入力・別OAuthアカウント・期限切れ証跡を拒否。重複処理・サーバー再起動・Auth成功後の記録失敗が安全に収束。機能は公開前提確認まで無効 |
 | 3: 確認UI・後始末 | JSON案内、確認・キャンセル・処理中・失敗・成功、本人キー消去、Cookie後始末、他タブ対応、プライバシー説明 | キーボード・フォーカス・読み上げ・モバイル検証合格。下書き注意が見える。BのlocalStorageが保持され、成功後Aのキーが再生成されない。結果不明を成功／失敗と断定しない |
@@ -190,6 +193,6 @@ localStorage削除がブラウザー制限で失敗した場合、DB成功を取
 | [Google login](https://supabase.com/docs/guides/auth/social-login/auth-google) | [auth-google.mdx](https://github.com/supabase/supabase/blob/master/apps/docs/content/guides/auth/social-login/auth-google.mdx) | OAuth／PKCE、GoogleとSupabaseのtokenの区別 |
 | [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) | [row-level-security.mdx](https://github.com/supabase/supabase/blob/master/apps/docs/content/guides/database/postgres/row-level-security.mdx) | 所有者条件、権限とRLS、service_roleの回避、UPDATEのWITH CHECK省略 |
 
-## 8. 今回の検証方針
+## 8. PR #49の検証方針
 
 文書だけの変更で実行コード・設定に影響しないため、AGENTS.mdと依頼に従いtest・coverage・lint・build・E2Eを省略します。`git diff --check`、`git diff --stat`、`git diff --name-only`、`git status -sb`、`git status --short` で差分と対象ファイルを確認し、対象文書だけをcommitします。
