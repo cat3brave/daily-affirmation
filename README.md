@@ -69,6 +69,7 @@ Supabase Authを使って、メールアドレス・パスワードログイン�
 
 | ファイル                       | 内容                                   |
 | ------------------------------ | -------------------------------------- |
+| [docs/account-deletion-design.md](docs/account-deletion-design.md) | アカウント削除の現状調査・実装設計（未実装） |
 | `docs/supabase-schema.md`      | Supabaseのテーブル構成とRLS方針の説明  |
 | `docs/app-checklist.md`        | アプリの動作確認チェックリスト         |
 | `docs/deployment-checklist.md` | Vercel本番環境の確認メモ               |
