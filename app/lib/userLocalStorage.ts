@@ -30,6 +30,7 @@ export function hasUnsavedThreeGoodThingsDraft(userId: string) {
 }
 
 export function removeUserLocalData(userId: string) {
+  let removed = true;
   const keys = [
     getFavoriteAffirmationsStorageKey(userId),
     getThreeGoodThingsDraftKey(userId),
@@ -39,7 +40,9 @@ export function removeUserLocalData(userId: string) {
     try {
       window.localStorage.removeItem(key);
     } catch {
+      removed = false;
       // 片方を削除できなくても、もう片方の削除とログアウトは続けます。
     }
   }
+  return removed;
 }

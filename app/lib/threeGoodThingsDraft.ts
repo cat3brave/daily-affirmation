@@ -1,3 +1,4 @@
+import { isAccountDeleted } from "./deletedAccount";
 import {
   getThreeGoodThingsDraftKey,
   THREE_GOOD_THINGS_DRAFT_PREFIX,
@@ -50,6 +51,7 @@ export function writeThreeGoodThingsDraft(
   today: string,
   things: string[],
 ) {
+  if (isAccountDeleted(userId)) return;
   try {
     window.localStorage.setItem(
       getThreeGoodThingsDraftKey(userId),

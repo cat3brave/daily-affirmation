@@ -38,6 +38,13 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("accountDeleted") === "1") {
+      setMessage("アカウントの削除が完了しました。");
+      setMessageType("success");
+    }
+  }, []);
+
+  useEffect(() => {
     if (!errorFocusRequest) return;
 
     const targets = {

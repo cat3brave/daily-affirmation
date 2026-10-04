@@ -21,6 +21,7 @@ export default function PrivacyPage() {
             <li>お気に入りにしたアファメーションと作成日時</li>
             <li>「3つのよかったこと」の日付、3つの文章、作成日時</li>
             <li>咲かせた花の種類と作成日時</li>
+            <li>プロフィールに保存されている花の累計</li>
           </ul>
           <p className="mt-3 leading-7">各データは認証されたユーザーIDに結び付けて保存・表示・削除します。</p>
         </section>
@@ -49,6 +50,12 @@ export default function PrivacyPage() {
             <li>ログアウトすると、成功後に現在のユーザーのlocalStorageデータを消去します。</li>
             <li>ログイン中は、Supabaseへ保存した本人のデータをJSONでエクスポートできます。端末内のキャッシュと下書きは含みません。</li>
           </ul>
+        </section>
+
+        <section className="mt-8" aria-labelledby="account-delete">
+          <h2 id="account-delete" className="text-xl font-bold text-sky-900">アカウント削除</h2>
+          <p className="mt-3 leading-7">安全性の検証が完了するまで削除機能は準備中です。利用可能になった場合は、本人確認と最終確認を経て削除します。</p>
+          <Link href="/account/delete" className="inline-block py-3 font-bold text-sky-800 underline">アカウント削除の案内</Link>
         </section>
 
         <nav aria-label="アプリ画面" className="mt-10 flex flex-wrap gap-3 border-t border-sky-100 pt-6">

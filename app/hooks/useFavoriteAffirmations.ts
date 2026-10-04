@@ -1,3 +1,4 @@
+import { isAccountDeleted } from "../lib/deletedAccount";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { getFavoriteAffirmationsStorageKey } from "../lib/userLocalStorage";
@@ -65,7 +66,7 @@ export function useFavoriteAffirmations(
   }, [userId]);
 
   useEffect(() => {
-    if (!userId || !hasLoadedFavorites) return;
+    if (!userId || !hasLoadedFavorites || isAccountDeleted(userId)) return;
 
     try {
       localStorage.setItem(
@@ -125,7 +126,7 @@ export function useFavoriteAffirmations(
   }, [hasLoadedFavorites, supabase, userId]);
 
   useEffect(() => {
-    if (!userId || !hasLoadedFavorites) return;
+    if (!userId || !hasLoadedFavorites || isAccountDeleted(userId)) return;
     fetchFavoriteAffirmations();
 
     return () => {
@@ -138,7 +139,7 @@ export function useFavoriteAffirmations(
     async (affirmationText: string) => {
       const favoriteText = affirmationText.trim();
 
-      if (!favoriteText || !userId) return;
+      if (!favoriteText || !userId || isAccountDeleted(userId)) return;
       if (
         favoriteAffirmationsRef.current.includes(favoriteText) ||
         pendingFavoriteAffirmationsRef.current.has(favoriteText)
@@ -187,7 +188,7 @@ export function useFavoriteAffirmations(
     async (affirmationToRemove: string) => {
       const removeText = affirmationToRemove.trim();
 
-      if (!removeText || !userId) return;
+      if (!removeText || !userId || isAccountDeleted(userId)) return;
 
       setFavoriteError("");
 
