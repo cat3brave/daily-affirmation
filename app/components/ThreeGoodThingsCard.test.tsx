@@ -73,6 +73,8 @@ type UpsertOptions = {
 };
 
 const supabaseMocks = vi.hoisted(() => {
+  const unsubscribe = vi.fn();
+  const onAuthStateChange = vi.fn();
   const getUser = vi.fn<() => Promise<UserResult>>();
   const selectEq = vi.fn<
     (column: string, value: string) => Promise<SelectResult>
@@ -96,7 +98,7 @@ const supabaseMocks = vi.hoisted(() => {
     }
   >();
   const createSupabaseBrowserClient = vi.fn(() => ({
-    auth: { getUser },
+    auth: { getUser, onAuthStateChange },
     from,
   }));
 
@@ -107,6 +109,8 @@ const supabaseMocks = vi.hoisted(() => {
     deleteUserEq,
     from,
     getUser,
+    onAuthStateChange,
+    unsubscribe,
     select,
     selectEq,
     upsert,
@@ -169,6 +173,8 @@ function configureSupabaseMock({
 } = {}) {
   supabaseMocks.createSupabaseBrowserClient.mockReset();
   supabaseMocks.getUser.mockReset();
+  supabaseMocks.onAuthStateChange.mockReset();
+  supabaseMocks.unsubscribe.mockReset();
   supabaseMocks.from.mockReset();
   supabaseMocks.select.mockReset();
   supabaseMocks.selectEq.mockReset();
@@ -178,8 +184,14 @@ function configureSupabaseMock({
   supabaseMocks.deleteDateEq.mockReset();
 
   supabaseMocks.createSupabaseBrowserClient.mockReturnValue({
-    auth: { getUser: supabaseMocks.getUser },
+    auth: {
+      getUser: supabaseMocks.getUser,
+      onAuthStateChange: supabaseMocks.onAuthStateChange,
+    },
     from: supabaseMocks.from,
+  });
+  supabaseMocks.onAuthStateChange.mockReturnValue({
+    data: { subscription: { unsubscribe: supabaseMocks.unsubscribe } },
   });
   supabaseMocks.getUser.mockImplementation(async () => {
     if (getUserException) {
@@ -233,6 +245,334 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("表示中の利用者と現在の認証利用者が異なると保存しない", async () => {
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "Aの入力" },
+    });
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "ログインしている利用者が変わりました",
+    );
+    expect(supabaseMocks.upsert).not.toHaveBeenCalled();
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).toContain("Aの入力");
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey("user-B")),
+    ).toBeNull();
+  });
+
+  it("表示中の利用者と現在の認証利用者が異なると削除しない", async () => {
+    const today = getTodayDate();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    configureSupabaseMock({
+      selectResult: createSelectResult([
+        { date: today, things1: "Aの記録", things2: "", things3: "" },
+      ]),
+    });
+    await renderLoadedCard();
+    fireEvent.click(screen.getByTitle(today));
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: `${today} の記録を削除` }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "ログインしている利用者が変わりました",
+    );
+    expect(supabaseMocks.deleteRecord).not.toHaveBeenCalled();
+    expect(screen.getByText("📅 " + today + " のよかったこと")).toBeInTheDocument();
+  });
+
+  it("別タブで利用者が変わると古い表示を破棄しBの下書きだけを復元する", async () => {
+    const today = getTodayDate();
+    window.localStorage.setItem(
+      getThreeGoodThingsDraftKey("user-B"),
+      JSON.stringify({ date: today, things: ["Bの下書き", "", ""] }),
+    );
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "Aの未保存入力" },
+    });
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの下書き"),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("利用者が変わりました");
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).toContain("Aの未保存入力");
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey("user-B")),
+    ).toContain("Bの下書き");
+  });
+
+  it("ログアウトを検知すると古い入力と記録を消して操作を無効にする", async () => {
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "Aの入力" },
+    });
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+
+    authCallback("SIGNED_OUT", null);
+
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue(""));
+    expect(screen.getAllByRole("textbox")[0]).toBeDisabled();
+    expect(screen.getByRole("button", { name: "記録する" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("もう一度操作してください");
+  });
+
+  it("保存中に利用者が変わった場合は遅い成功応答で表示や下書きを更新しない", async () => {
+    let finishUpsert: ((result: MutationResult) => void) | undefined;
+    supabaseMocks.upsert.mockImplementation(
+      () => new Promise((resolve) => { finishUpsert = resolve; }),
+    );
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "Aの保存中入力" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalled());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    finishUpsert?.({ error: null });
+
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue(""));
+    expect(screen.queryByText(/保存しました/)).not.toBeInTheDocument();
+    expect(
+      window.localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID)),
+    ).toContain("Aの保存中入力");
+  });
+
+  it("同一利用者のトークン更新では入力を破棄しない", async () => {
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], {
+      target: { value: "続きを書く入力" },
+    });
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+
+    authCallback("TOKEN_REFRESHED", { user: { id: USER_ID } });
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("続きを書く入力");
+    expect(screen.queryByText(/利用者が変わりました/)).not.toBeInTheDocument();
+  });
+
+  it("初期getUser待機中の利用者変更を処理し、古い応答を表示しない", async () => {
+    let finishInitialUser: ((result: UserResult) => void) | undefined;
+    supabaseMocks.getUser
+      .mockImplementationOnce(
+        () => new Promise((resolve) => { finishInitialUser = resolve; }),
+      )
+      .mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.selectEq.mockResolvedValue(
+      createSelectResult([
+        { date: getTodayDate(), things1: "Bの記録", things2: "", things3: "" },
+      ]),
+    );
+    render(<ThreeGoodThingsCard />);
+    await waitFor(() => expect(supabaseMocks.getUser).toHaveBeenCalledOnce());
+
+    supabaseMocks.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", {
+      user: { id: "user-B" },
+    });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの記録"));
+    finishInitialUser?.(createUserResult("user-A"));
+    await Promise.resolve();
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの記録");
+  });
+
+  it("記録取得中のA→B→CでBの遅い応答を表示しない", async () => {
+    let finishA: ((result: SelectResult) => void) | undefined;
+    let finishB: ((result: SelectResult) => void) | undefined;
+    supabaseMocks.selectEq
+      .mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishB = resolve; }))
+      .mockResolvedValueOnce(createSelectResult([
+        { date: getTodayDate(), things1: "Cの記録", things2: "", things3: "" },
+      ]));
+    render(<ThreeGoodThingsCard />);
+    await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledOnce());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2));
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-C"));
+    authCallback("SIGNED_IN", { user: { id: "user-C" } });
+
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Cの記録"));
+    finishB?.(createSelectResult([
+      { date: getTodayDate(), things1: "Bの遅い記録", things2: "", things3: "" },
+    ]));
+    finishA?.(createSelectResult([
+      { date: getTodayDate(), things1: "Aの遅い記録", things2: "", things3: "" },
+    ]));
+    await Promise.resolve();
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("Cの記録");
+  });
+
+  it("ログアウト後のログインで新しい利用者の記録と下書きを再取得する", async () => {
+    const today = getTodayDate();
+    window.localStorage.setItem(
+      getThreeGoodThingsDraftKey("user-B"),
+      JSON.stringify({ date: today, things: ["Bの下書き", "", ""] }),
+    );
+    await renderLoadedCard();
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    authCallback("SIGNED_OUT", null);
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの下書き"));
+    expect(supabaseMocks.selectEq).toHaveBeenLastCalledWith("user_id", "user-B");
+  });
+
+  it("保存のgetUser待機中に切り替わるとDB書き込みを送らない", async () => {
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "Aの入力" } });
+    let finishUser: ((result: UserResult) => void) | undefined;
+    supabaseMocks.getUser.mockImplementationOnce(
+      () => new Promise((resolve) => { finishUser = resolve; }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存中..." })).toBeDisabled());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "user-B" } });
+    finishUser?.(createUserResult());
+    await Promise.resolve();
+
+    expect(supabaseMocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("削除のgetUser待機中に切り替わるとDB削除を送らない", async () => {
+    const today = getTodayDate();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    configureSupabaseMock({ selectResult: createSelectResult([
+      { date: today, things1: "Aの記録", things2: "", things3: "" },
+    ]) });
+    await renderLoadedCard();
+    fireEvent.click(screen.getByTitle(today));
+    let finishUser: ((result: UserResult) => void) | undefined;
+    supabaseMocks.getUser.mockImplementationOnce(
+      () => new Promise((resolve) => { finishUser = resolve; }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: `${today} の記録を削除` }));
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "user-B" } });
+    finishUser?.(createUserResult());
+    await Promise.resolve();
+
+    expect(supabaseMocks.deleteRecord).not.toHaveBeenCalled();
+  });
+
+  it("A→B→A後に最初のAの保存成功が現在のAの入力と下書きを変更しない", async () => {
+    let finishOldSave: ((result: MutationResult) => void) | undefined;
+    supabaseMocks.upsert.mockImplementationOnce(
+      () => new Promise((resolve) => { finishOldSave = resolve; }),
+    );
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "古いAの入力" } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledOnce());
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult(USER_ID));
+    authCallback("SIGNED_IN", { user: { id: USER_ID } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "新しいAの入力" } });
+
+    finishOldSave?.({ error: null });
+    await Promise.resolve();
+
+    expect(screen.getAllByRole("textbox")[0]).toHaveValue("新しいAの入力");
+    expect(localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toContain("新しいAの入力");
+    expect(screen.queryByText(/保存しました/)).not.toBeInTheDocument();
+  });
+
+  it("A→B→A後に最初のAの削除成功が再取得後の記録を消さない", async () => {
+    const today = getTodayDate();
+    let finishOldDelete: ((result: MutationResult) => void) | undefined;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    configureSupabaseMock({ selectResult: createSelectResult([
+      { date: today, things1: "Aの記録", things2: "", things3: "" },
+    ]) });
+    supabaseMocks.deleteDateEq.mockImplementationOnce(
+      () => new Promise((resolve) => { finishOldDelete = resolve; }),
+    );
+    await renderLoadedCard();
+    fireEvent.click(screen.getByTitle(today));
+    fireEvent.click(await screen.findByRole("button", { name: `${today} の記録を削除` }));
+    await waitFor(() => expect(supabaseMocks.deleteRecord).toHaveBeenCalledOnce());
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult(USER_ID));
+    authCallback("SIGNED_IN", { user: { id: USER_ID } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Aの記録"));
+
+    finishOldDelete?.({ error: null });
+    await Promise.resolve();
+    fireEvent.click(screen.getByTitle(today));
+
+    expect(await screen.findByText(`📅 ${today} のよかったこと`)).toBeInTheDocument();
+  });
+
+  it("Aの遅い保存失敗と例外をBの画面に表示しない", async () => {
+    let rejectOldSave: ((error: Error) => void) | undefined;
+    supabaseMocks.upsert.mockImplementationOnce(
+      () => new Promise((_resolve, reject) => { rejectOldSave = reject; }),
+    );
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "Aの入力" } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledOnce());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "user-B" } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
+
+    rejectOldSave?.(new Error("old A failure"));
+    await Promise.resolve();
+
+    expect(screen.queryByText(SAVE_ERROR_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("Bの新しい保存中にAのfinallyが返ってもBの保存中状態を解除しない", async () => {
+    let finishA: ((result: MutationResult) => void) | undefined;
+    let finishB: ((result: MutationResult) => void) | undefined;
+    supabaseMocks.upsert
+      .mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishB = resolve; }));
+    await renderLoadedCard();
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "Aの入力" } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledOnce());
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.onAuthStateChange.mock.calls[0][0]("SIGNED_IN", { user: { id: "user-B" } });
+    await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
+    fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "Bの入力" } });
+    fireEvent.click(screen.getByRole("button", { name: "記録する" }));
+    await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledTimes(2));
+
+    finishA?.({ error: null });
+    await Promise.resolve();
+    expect(screen.getByRole("button", { name: "保存中..." })).toBeDisabled();
+    finishB?.({ error: null });
+    expect(await screen.findByText(/保存しました/)).toBeInTheDocument();
+  });
   it("タブ移動で再マウントしても未保存の入力を復元する", async () => {
     const firstRender = render(<ThreeGoodThingsCard />);
     await waitFor(() => {
