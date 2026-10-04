@@ -324,7 +324,7 @@ describe("LoginPage", () => {
       LOGIN_FAILURE_MESSAGE,
     );
     expect(alert).toHaveAttribute("tabindex", "-1");
-    expect(alert).toHaveFocus();
+    await waitFor(() => expect(alert).toHaveFocus());
     expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toHaveValue(
       "user@example.com",
     );

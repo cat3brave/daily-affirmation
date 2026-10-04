@@ -91,7 +91,7 @@ fingerprintは監査時の小規模データ向けで、厳密な暗号学的証
 
 一時Playwright設定は既存設定を継承し、実行ファイル・フォント・共有ライブラリの場所、設定移動に伴う絶対パス、レポーターを指定した。テスト・判定・タイムアウト・認証モックは変更していない。フォント設定不足でブラウザーがSIGTRAP終了した初回は61件失敗・5件成功。`FONTCONFIG_PATH=/etc/fonts` に修正して削除E2E2件の成功を確認し、全66件の成功を確認した。最終結果は標準配布のChromium 151と同一環境の保証ではない。PRのCIでは既存設定どおり標準ブラウザーを使用し、その結果も別途確認する。
 
-通常テスト・coverage・lint・build・依存監査は前回成功後に対象コードを変更していないため、今回の再実行は省略。ローカル必須検証の成功を確認してcommit/PRを作成する。SHA・PR URL・CI結果は最終報告を参照。auto-merge・merge・本番適用・実ユーザー削除は行わずレビュー待ちとする。PostgreSQL実行環境がないため提案SQLは未実行。Next devが追加したAGENTS.mdの自動生成ブロックは除去し、既存の指示を維持した。
+最初の再開では成功後にコード変更がなかった通常テスト等を再実行せず、ローカルE2E成功後にPR #51を作成した。最初のCIはログイン失敗時のフォーカス検証1件で失敗（328件成功）。DOM出現を待つfindByRoleの直後にuseEffectのfocus完了を同期判定していたため、既存の登録失敗テストと同様にwaitForでfocusを待つようテストを修正した。判定内容は維持し、coverage（329件、全閾値達成）・lint・buildを再検証。再lint時に以前のPlaywright生成レポートも検査対象になったため、生成物をリポジトリ外へ移して通常コマンドで再確認した。アプリコードとE2Eは変更していないのでE2E再実行は省略。SHA・PR URL・CI結果は最終報告を参照。auto-merge・merge・本番適用・実ユーザー削除は行わずレビュー待ちとする。PostgreSQL実行環境がないため提案SQLは未実行。Next devが追加したAGENTS.mdの自動生成ブロックは除去し、既存の指示を維持した。
 
 ## 変更ファイル
 
@@ -99,7 +99,7 @@ fingerprintは監査時の小規模データ向けで、厳密な暗号学的証
 - 削除画面/API：`app/account/delete/page.tsx`、`DeleteAccountForm.tsx`、`DeleteAccountForm.test.tsx`、`request/route.ts`、`request/route.test.ts`
 - 状態管理/管理API：`app/lib/accountDeletion.ts`、`accountDeletion.test.ts`、`accountDeletionServer.ts`、`accountDeletionServer.test.ts`
 - 削除後のブラウザーデータ：`app/lib/deletedAccount.ts`、`deletedAccount.test.ts`、`userLocalStorage.ts`、`threeGoodThingsDraft.ts`、`app/hooks/useAuthUser.ts`、`useAuthUser.test.tsx`、`useFavoriteAffirmations.ts`
-- 案内・設定・検証：`app/login/page.tsx`、`app/privacy/page.tsx`、`.env.example`、`playwright.config.ts`、`vitest.config.mts`、`e2e/account-deletion.spec.ts`、`README.md`、本資料
+- 案内・設定・検証：`app/login/page.tsx`、`app/login/page.test.tsx`、`app/privacy/page.tsx`、`.env.example`、`playwright.config.ts`、`vitest.config.mts`、`e2e/account-deletion.spec.ts`、`README.md`、本資料
 
 ## 公式資料
 
