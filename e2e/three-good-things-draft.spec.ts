@@ -47,3 +47,32 @@ test("3つのよかったことの下書きをタブ移動と再読み込み後�
 
   expectSafeAuthenticatedRequests(supabaseMock);
 });
+
+test("別タブのログアウト後は古いタブの入力画面を操作できない", async ({
+  page,
+  context,
+}) => {
+  const supabaseMock = await loginToDashboard(page);
+  await page.getByRole("tab", { name: /ワーク/ }).click();
+  await page.getByRole("textbox", { name: "1つ目のよかったこと" }).fill("Aの入力中データ");
+
+  const otherTab = await context.newPage();
+  await otherTab.goto("/dashboard");
+  await expect(otherTab.getByText("ログイン情報を確認しています...")).toBeHidden();
+  otherTab.on("dialog", (dialog) => dialog.accept());
+  await otherTab.getByRole("button", { name: "ログアウト" }).click();
+
+  await expect(otherTab).toHaveURL(/\/login$/);
+  await page.route("http://127.0.0.1:54321/auth/v1/user", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Missing session" }),
+    }),
+  );
+  await page.bringToFront();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("textbox", { name: "1つ目のよかったこと" })).toHaveCount(0);
+  expectSafeAuthenticatedRequests(supabaseMock);
+});

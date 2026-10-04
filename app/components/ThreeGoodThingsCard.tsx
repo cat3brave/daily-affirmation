@@ -12,6 +12,8 @@ import {
 
 const loadErrorMessage =
   "記録を読み込めませんでした。時間をおいて、もう一度お試しください。";
+const accountChangedMessage =
+  "ログインしている利用者が変わりました。内容を確認してから、もう一度操作してください。";
 
 export default function ThreeGoodThingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -26,11 +28,13 @@ export default function ThreeGoodThingsCard() {
   const [deletingDate, setDeletingDate] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
+  const authUserIdRef = useRef<string | null | undefined>(undefined);
+  const authGenerationRef = useRef(0);
   const [draftRestored, setDraftRestored] = useState(false);
   const savedThingsRef = useRef<string[]>(["", "", ""]);
   const isMountedRef = useRef(true);
   const loadRequestRef = useRef(0);
-  const loadInFlightRef = useRef(false);
   const savedMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -57,9 +61,8 @@ export default function ThreeGoodThingsCard() {
   };
 
   const fetchRecords = useCallback(async () => {
-      if (loadInFlightRef.current) return;
+      const authGeneration = authGenerationRef.current;
       const requestId = ++loadRequestRef.current;
-      loadInFlightRef.current = true;
       setIsLoadingRecords(true);
 
       try {
@@ -67,6 +70,11 @@ export default function ThreeGoodThingsCard() {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
+
+        if (
+          requestId !== loadRequestRef.current ||
+          authGeneration !== authGenerationRef.current
+        ) return;
 
         if (userError || !user) {
           console.error("ユーザー情報が取得できませんでした", userError);
@@ -76,10 +84,15 @@ export default function ThreeGoodThingsCard() {
           return;
         }
 
-        if (requestId !== loadRequestRef.current) return;
+        if (
+          authUserIdRef.current !== undefined &&
+          authUserIdRef.current !== user.id
+        ) return;
+        authUserIdRef.current = user.id;
 
         const today = getTodayDate();
         const draft = readThreeGoodThingsDraft(user.id, today);
+        userIdRef.current = user.id;
         setUserId(user.id);
         if (draft) {
           setThings(draft);
@@ -110,24 +123,31 @@ export default function ThreeGoodThingsCard() {
             ];
           });
 
-          if (requestId !== loadRequestRef.current) return;
+          if (
+            requestId !== loadRequestRef.current ||
+            authGeneration !== authGenerationRef.current ||
+            authUserIdRef.current !== user.id
+          ) return;
 
           setAllRecords(recordsObj);
 
           const savedThings = recordsObj[today] ?? ["", "", ""];
           savedThingsRef.current = savedThings;
           setThings(draft ?? savedThings);
+          setDraftRestored(Boolean(draft));
           setLoadError("");
         }
       } catch (error) {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
-        if (requestId === loadRequestRef.current) {
+        if (
+          requestId === loadRequestRef.current &&
+          authGeneration === authGenerationRef.current
+        ) {
           setLoadError(loadErrorMessage);
         }
       } finally {
         if (requestId === loadRequestRef.current) {
           setIsLoadingRecords(false);
-          loadInFlightRef.current = false;
         }
       }
   }, [supabase]);
@@ -137,15 +157,50 @@ export default function ThreeGoodThingsCard() {
 
     fetchRecords();
 
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const nextUserId = session?.user?.id ?? null;
+        if (authUserIdRef.current === nextUserId) return;
+
+        authUserIdRef.current = nextUserId;
+        authGenerationRef.current += 1;
+        loadRequestRef.current += 1;
+        userIdRef.current = null;
+        setUserId(null);
+        setThings(["", "", ""]);
+        savedThingsRef.current = ["", "", ""];
+        setAllRecords({});
+        setSelectedDate(null);
+        setDraftRestored(false);
+        setIsSaved(false);
+        setSaveError(nextUserId ? accountChangedMessage : "");
+        setDeleteError("");
+        setLoadError(nextUserId ? "" : accountChangedMessage);
+        setIsSaving(false);
+        setDeletingDate(null);
+        if (savedMessageTimeoutRef.current) {
+          clearTimeout(savedMessageTimeoutRef.current);
+          savedMessageTimeoutRef.current = null;
+        }
+
+        if (nextUserId) {
+          void fetchRecords();
+        } else {
+          setIsLoadingRecords(false);
+        }
+      },
+    );
+
     return () => {
       isMountedRef.current = false;
+      authGenerationRef.current += 1;
       loadRequestRef.current += 1;
-      loadInFlightRef.current = false;
+      authListener.subscription.unsubscribe();
       if (savedMessageTimeoutRef.current) {
         clearTimeout(savedMessageTimeoutRef.current);
       }
     };
-  }, [fetchRecords]);
+  }, [fetchRecords, supabase.auth]);
   const handleChange = (index: number, value: string) => {
     const newThings = [...things];
     newThings[index] = value;
@@ -164,7 +219,19 @@ export default function ThreeGoodThingsCard() {
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
+    const displayedUserId = userIdRef.current;
+    const authGeneration = authGenerationRef.current;
+    const isCurrentOperation = () =>
+      isMountedRef.current &&
+      authGenerationRef.current === authGeneration &&
+      authUserIdRef.current === displayedUserId &&
+      userIdRef.current === displayedUserId;
+    if (
+      isSaving ||
+      !displayedUserId ||
+      authUserIdRef.current !== displayedUserId ||
+      isLoadingRecords
+    ) return;
 
     const normalizedThings = things.map((thing) => thing.trim());
     if (!normalizedThings.some((thing) => thing !== "")) return;
@@ -179,13 +246,11 @@ export default function ThreeGoodThingsCard() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (!isMountedRef.current) return;
+      if (!isCurrentOperation()) return;
 
-      if (userError || !user) {
+      if (userError || !user || user.id !== displayedUserId) {
         console.error("ユーザー情報が取得できませんでした", userError);
-        setSaveError(
-          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
-        );
+        setSaveError(accountChangedMessage);
         return;
       }
 
@@ -194,7 +259,7 @@ export default function ThreeGoodThingsCard() {
         .from("three_good_things")
         .upsert(
           {
-            user_id: user.id,
+            user_id: displayedUserId,
             date: today,
             things1: normalizedThings[0],
             things2: normalizedThings[1],
@@ -202,6 +267,8 @@ export default function ThreeGoodThingsCard() {
           },
           { onConflict: "user_id,date" },
         );
+
+      if (!isCurrentOperation()) return;
 
       if (insertError) {
         console.error("保存エラー:", insertError);
@@ -212,9 +279,8 @@ export default function ThreeGoodThingsCard() {
       }
 
       const updatedRecords = { ...allRecords, [today]: normalizedThings };
-      removeThreeGoodThingsDraft(user.id);
+      removeThreeGoodThingsDraft(displayedUserId);
       savedThingsRef.current = normalizedThings;
-      if (!isMountedRef.current) return;
 
       setThings(normalizedThings);
       setAllRecords(updatedRecords);
@@ -223,20 +289,32 @@ export default function ThreeGoodThingsCard() {
       setSaveError("");
 
       savedMessageTimeoutRef.current = setTimeout(() => {
-        if (isMountedRef.current) setIsSaved(false);
+        if (isCurrentOperation()) setIsSaved(false);
       }, 3000);
     } catch (error) {
-      console.error("記録保存中の想定外のエラー:", error);
-      if (isMountedRef.current) {
+      if (isCurrentOperation()) {
+        console.error("記録保存中の想定外のエラー:", error);
         setSaveError("記録を保存できませんでした。もう一度お試しください。");
       }
     } finally {
-      if (isMountedRef.current) setIsSaving(false);
+      if (isCurrentOperation()) setIsSaving(false);
     }
   };
 
   const handleDelete = async (dateToDelete: string) => {
-    if (deletingDate !== null) return;
+    const displayedUserId = userIdRef.current;
+    const authGeneration = authGenerationRef.current;
+    const isCurrentOperation = () =>
+      isMountedRef.current &&
+      authGenerationRef.current === authGeneration &&
+      authUserIdRef.current === displayedUserId &&
+      userIdRef.current === displayedUserId;
+    if (
+      deletingDate !== null ||
+      !displayedUserId ||
+      authUserIdRef.current !== displayedUserId ||
+      isLoadingRecords
+    ) return;
 
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
@@ -250,13 +328,11 @@ export default function ThreeGoodThingsCard() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (!isMountedRef.current) return;
+      if (!isCurrentOperation()) return;
 
-      if (userError || !user) {
+      if (userError || !user || user.id !== displayedUserId) {
         console.error("ユーザー情報が取得できませんでした", userError);
-        setDeleteError(
-          "ログイン情報を確認できませんでした。もう一度ログインしてください。",
-        );
+        setDeleteError(accountChangedMessage);
         return;
       }
 
@@ -264,10 +340,10 @@ export default function ThreeGoodThingsCard() {
       const { error } = await supabase
         .from("three_good_things")
         .delete()
-        .eq("user_id", user.id)
+        .eq("user_id", displayedUserId)
         .eq("date", dateToDelete);
 
-      if (!isMountedRef.current) return;
+      if (!isCurrentOperation()) return;
 
       if (error) {
         console.error("削除エラー:", error);
@@ -282,7 +358,7 @@ export default function ThreeGoodThingsCard() {
       });
 
       if (dateToDelete === getTodayDate()) {
-        removeThreeGoodThingsDraft(user.id);
+        removeThreeGoodThingsDraft(displayedUserId);
         savedThingsRef.current = ["", "", ""];
         setThings(["", "", ""]);
       }
@@ -290,12 +366,12 @@ export default function ThreeGoodThingsCard() {
       setSelectedDate(null);
       setDeleteError("");
     } catch (error) {
-      console.error("記録削除中の想定外のエラー:", error);
-      if (isMountedRef.current) {
+      if (isCurrentOperation()) {
+        console.error("記録削除中の想定外のエラー:", error);
         setDeleteError("記録を削除できませんでした。もう一度お試しください。");
       }
     } finally {
-      if (isMountedRef.current) setDeletingDate(null);
+      if (isCurrentOperation()) setDeletingDate(null);
     }
   };
   const past14Days = getPast14Days();
@@ -331,7 +407,7 @@ export default function ThreeGoodThingsCard() {
               aria-label={`${["1つ目", "2つ目", "3つ目"][index]}のよかったこと`}
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
-              disabled={isLoadingRecords || isSaving}
+              disabled={isLoadingRecords || isSaving || !userId}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
               className="w-full min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
             />
@@ -349,7 +425,7 @@ export default function ThreeGoodThingsCard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               onClick={handleSave}
-              disabled={isSaving || !hasThingToSave}
+              disabled={isSaving || isLoadingRecords || !userId || !hasThingToSave}
               className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
             >
               {isSaving ? "保存中..." : "記録する"}
