@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     tsconfigPaths: true,
+    // Next aliases this marker during builds; tests execute server modules in isolation.
+    alias: { "server-only": "next/dist/compiled/server-only/empty.js" },
   },
   test: {
     clearMocks: true,

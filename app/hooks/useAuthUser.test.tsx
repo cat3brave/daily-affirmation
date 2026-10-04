@@ -158,3 +158,22 @@ it("サーバー検証済みユーザーなら初回から表示し、追加の�
   expect(result.current).toMatchObject({ userId: USER_ID, userEmail: USER_EMAIL, isAuthChecked: true });
   expect(authMocks.getUser).not.toHaveBeenCalled();
 });
+
+it("別タブで本人削除を通知されたら状態と本人キャッシュだけを破棄する", async () => {
+  localStorage.setItem(`favoriteAffirmations:${USER_ID}`, '["A"]');
+  localStorage.setItem("favoriteAffirmations:other", '["B"]');
+  const { result } = renderHook(() => useAuthUser({ id: USER_ID, email: USER_EMAIL }));
+  window.dispatchEvent(new StorageEvent("storage", { key: `daily-affirmation:deleted-account:${USER_ID}`, newValue: "true" }));
+  await waitFor(() => expect(result.current.userId).toBeNull());
+  expect(localStorage.getItem(`favoriteAffirmations:${USER_ID}`)).toBeNull();
+  expect(localStorage.getItem("favoriteAffirmations:other")).toBe('["B"]');
+  localStorage.clear();
+});
+
+it("タブへ戻った時に認証を再確認して古い状態を破棄する", async () => {
+  const { result } = renderHook(() => useAuthUser({ id: USER_ID, email: USER_EMAIL }));
+  authMocks.getUser.mockResolvedValue(createUserResult({ user: null }));
+  window.dispatchEvent(new Event("focus"));
+  await waitFor(() => expect(result.current.userId).toBeNull());
+  expect(authMocks.replace).toHaveBeenCalledWith("/login");
+});
