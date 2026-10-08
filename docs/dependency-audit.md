@@ -1,5 +1,110 @@
 # npm依存関係監査・引き継ぎ記録
 
+## 最新: CI #90の本番High対応（2026-10-09 JST）
+
+以下を現在の結果とする。後半の「履歴」は過去の記録であり、現在の監査・commit・検証状態とは区別する。本対応は部分対応であり、全依存の脆弱性を解消したものではない。
+
+作業ブランチは `codex/address-development-dependency-vulnerabilities`。保存済みcommit `c56600de676f437f29f4f658cde63fb1ee2edf96` を保持し、その後に追加する更新。mainへの直接反映、履歴改変、旧PR #52の取込み・操作は行わない。ユーザーの指示により、ローカルE2Eが環境制限で実行できなくても、利用可能な検証と本番監査の成功後に同じ作業ブランチへcommit・通常pushし、GitHub CIでの検証用に保存する。完成・E2E検証済みとは扱わず、PR作成・CI手動実行は行わない。
+
+### CIログと今回の監査
+
+[CI #90](https://github.com/cat3brave/daily-affirmation/actions/runs/37840876988) は2026-10-08 20:37:52 UTC（2026-10-09 05:37:52 JST）開始、対象SHAは上記保存済みcommit。Verifyのjobログとstep結果を取得し、`npm ci` 成功後に `npm run audit:prod` が終了1、本番Highが `next`、`sharp`、`source-map-js` の3パッケージだったことを確認した。coverage、lint、Chromium導入、E2E、buildはすべてskippedで、成功とは扱わない。
+
+CIの過去件数を流用せず、更新前と最終依存のそれぞれで `npm ci` 後にnpm監査APIのJSON応答を取得した。通信・認証エラーの応答ではなく、`metadata.vulnerabilities` と各advisoryを含む有効な応答だった。
+
+| 監査 | 今回の更新前 | 今回の更新後 | 終了コード（前→後） |
+| --- | --- | --- | --- |
+| 本番依存 | High 3、他0、計3 | 全severity 0、計0 | 1 → 0 |
+| 全依存 | High 8、Moderate 5、Low 1、Critical 0、計14 | High 5、Moderate 5、Low 1、Critical 0、計11 | 1 → 1 |
+
+更新前JSONの保存時刻は2026-10-08 20:41:21–24 UTC（2026-10-09 05:41 JST）。更新後の全依存監査は20:46:44 UTC、本番JSON監査は20:46:45 UTC（いずれも2026-10-09 05:46 JST）に開始した。本番スクリプト監査も同時間帯に成功した。件数はnpm auditのパッケージ集計であり、独立advisory数ではない。今回本番Highを3件減らしたが、**全依存監査は残存Highにより終了1で、成功していない**。
+
+### 必要最小限の更新と公式根拠
+
+| 対象 | 更新 | 依存経路・採用理由 |
+| --- | --- | --- |
+| `next` | 16.3.6 → 16.3.8 | 直接本番依存。公式advisoryが示す16系の最小修正版。同じminorのpatch更新で、監査が提案した16.4.0の強制適用は行わない |
+| `eslint-config-next` | 16.3.6 → 16.3.8 | Next本体と同版に整合。内包する `@next/eslint-plugin-next` も16.3.8。公式パッケージのpeerはESLint `>=9.0.0`、TypeScript `>=3.3.1` で既存設定に対応 |
+| `sharp` | 0.35.4 → 0.35.5 | `next → sharp`。Nextのoptional依存範囲 `^0.35.4` 内でlock更新。対応する `@img/sharp-*` と `@img/sharp-libvips-*` も追従更新 |
+| `source-map-js` | 1.2.1 → 1.2.2 | 本番経路は `next → postcss 8.5.23 → source-map-js`。各親の `^1.2.1` 内でlock更新 |
+
+`source-map-js` は開発経路でも共有される: `@tailwindcss/postcss → @tailwindcss/node / postcss`、`@vitest/coverage-v8 → magicast`、`jsdom → @asamuzakjp/dom-selector → css-tree`。開発ツールで使われることだけを理由に、本番集計から除外していない。
+
+Nextの `@next/env` と各プラットフォームのSWCも16.3.8へ追従。更新前後のlock比較で、変更は上記とそれらの対応パッケージに限定される。Vitestとcoverage-v8は双方4.1.10のまま維持し、React・認証・DB・アプリ機能・CI・ESLint/Playwright設定は変更しない。
+
+[Next 16.3.8公式ESLint情報](https://github.com/vercel/next.js/blob/v16.3.8/docs/01-app/03-api-reference/05-config/03-eslint.mdx) はESLint CLIとflat configで `eslint-config-next` を使用する構成を説明する。対象版の公式npmメタデータでもpeerとpluginの正確な版指定を確認した。異なるNext/config minor間の互換保証は確認していないため、同版に揃えた。
+
+実際の更新コマンド:
+
+```sh
+npm install --package-lock-only --save-exact next@16.3.8 eslint-config-next@16.3.8 --cache /tmp/daily-affirmation-npm-cache
+npm update sharp source-map-js --package-lock-only --cache /tmp/daily-affirmation-npm-cache
+```
+
+`npm audit fix --force`、無関係な一括更新、overrides、監査・検証の無効化は使用していない。既存の `audit:prod` とワークフローは維持し、今回は `audit:all` のスクリプト・CI追加を行わない。
+
+### 解消した本番Highの影響条件と評価限界
+
+公式GitHub advisory本文と修正版欄を今回取得して確認した。
+
+| パッケージ / 直接advisory | 影響条件 | このリポジトリでの確認・限界 |
+| --- | --- | --- |
+| `next`: [GHSA-cjq9-62q9-8jv4](https://github.com/advisories/GHSA-cjq9-62q9-8jv4)、影響 `>=16.0.0 <16.3.8`、修正16.3.8 | Image Optimizationで許可された攻撃者制御のremote URLを通じたSSRF（私設IP等）。`images.remotePatterns` 未設定なら非該当と公式が説明 | `next.config.ts` はHTTPSの `www.google.com` の `/favicon.ico` のみ許可している。任意ホストを許可する設定ではないがremotePatternsは存在するため、未設定向けの非該当条件は使わない。実配備先のDNS・リダイレクト等と攻撃到達性のPoCは未検証。設定緩和ではなく修正版へ更新 |
+| `sharp`: [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)、影響 `<0.35.5`、修正0.35.5 | SVG処理に使用するlibrsvgのメモリ脆弱性。glibc Linuxの特定ランタイム条件下ではRCEの可能性。公式はlibrsvg 2.63.2とNode PIE条件も説明 | Next画像処理の推移依存。アプリによる直接sharp呼出や `dangerouslyAllowSVG` の有効化は確認されないが、安全性の証明ではない。ローカルの `require('sharp').versions` でsharp 0.35.5 / rsvg 2.63.2を確認。実配備先のNode PIE、OS、グローバルlibrsvg利用状態は未確認 |
+| `source-map-js`: [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)、影響 `>=1.0.0 <1.2.2`、修正1.2.2 | indexed source mapのsection offset lineに巨大値を与えると同期処理でevent loopを長時間ブロックしDoS | NextのPostCSSを通じて本番依存に含まれ、ビルド・coverage等でも使用される。アプリでの直接呼出は見つからない。外部から細工したsource mapを渡す全経路や攻撃再現は未検証。開発・CIへの影響も除外しない |
+
+Nextの本番High集計には、上記Highに加えて以下の直接advisoryも含まれていた。いずれも16.3.8で修正され、更新後JSONでは検出されない:
+
+- Moderate [GHSA-3w37-wq28-93x7](https://github.com/advisories/GHSA-3w37-wq28-93x7): Cache Components / `experimental.useCache` とDraft Modeを併用した同時cache fillによるdraft漏えい・永続化。
+- Moderate [GHSA-4jqv-mc3x-m676](https://github.com/advisories/GHSA-4jqv-mc3x-m676): self-hosted Pages RouterのSSG/ISRキャッシュ汚染。公式はVercel非該当と説明。
+- Low [GHSA-39w2-rjm5-chcv](https://github.com/advisories/GHSA-39w2-rjm5-chcv): 開発者が悪意あるWebサイトを訪問した際、`next dev` のMCP endpointから開発情報を取得できる。開発環境も評価対象。
+- Moderate [GHSA-f87g-xv8r-7p7x](https://github.com/advisories/GHSA-f87g-xv8r-7p7x): webpackで構築したApp Routerのmetadata image routesで `dynamicParams` を無視し、除外したdynamic segmentへアクセス可能。
+- Moderate [GHSA-mcj8-r9mp-w47p](https://github.com/advisories/GHSA-mcj8-r9mp-w47p): root-level catch-allとSSG/ISRを組み合わせたresponse cache汚染・cross-user置換・永続DoS。
+
+### 残存する開発依存High
+
+今回公式advisory [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) の修正版欄は引き続き `None`。`braces <=3.0.3` に深いbraceパターンを渡すと再帰AST処理でスタック枯渇し、未捕捉RangeErrorでNodeプロセスが終了し得る。
+
+```text
+eslint-config-next 16.3.8
+  → @next/eslint-plugin-next 16.3.8
+  → fast-glob 3.3.1 → micromatch 4.0.8 → braces 3.0.3
+```
+
+High 5件のうち直接advisoryを持つのは推移依存 `braces` 1パッケージ。残る4件は `micromatch`、`fast-glob`、`@next/eslint-plugin-next`、`eslint-config-next` への伝播で、独立したHigh advisoryが5件ある意味ではない。本番監査ではこの経路は除外されるが、開発・CIでは残存する。
+
+更新後pluginの実装と `node_modules/.bin/eslint --print-config app/page.tsx` を再確認し、`@next/next/no-html-link-for-pages` は `[2]`、`settings.next` は未設定だった。確認した経路は `settings.next.rootDir → getRootDirs → fast-glob.globSync → micromatch.braces → braces`。現在はrootDir未指定で `context.cwd` を返すため、そのglob呼出は省略される。
+
+ESLint設定を編集できるPR投稿者や、外部globをrootDirへ組み込む開発設定は問題の入力を渡せる候補で、CI/ローカルlintの停止につながり得る。設定を変更できる主体には任意の設定コードを実行できる権限との重なりもある。公開アプリのフォーム・URL・保存データからこのglobへ渡す経路、JSXのhrefやファイル名だけでrootDirへ渡す経路は今回確認されていない。開発依存であることだけを根拠に安全とは断定しない。
+
+未確認事項は、実際の攻撃パターンでの再現、全ファイルの有効ESLint設定、依存・外部ツールを含む全間接経路、外部PRの実行承認・GitHub権限設定。後半の到達性調査も参照。修正版公開またはNext pluginの安全なglob実装移行後に再検討する。監査が提示するNext config 14系へのダウングレードは採用しない。
+
+Low 1 / Moderate 5もすべて開発依存側に残る。候補は `@babel/core` 7.29.0 → 7.29.6以降、`@humanfs/node` 0.16.7 → 0.16.8以降、`ajv` 6.12.6 → 6.14.0以降、`vitest` と `@vitest/coverage-v8` の4.1.11への同時更新（Vitest/mocker/coverageの伝播でModerate集計3）。今回のCI停止原因である本番Highの最小修正に範囲を限定し、これらの追加更新は行わない。各影響・候補advisoryは履歴の記録に保持する。
+
+### 最終依存関係での検証
+
+実行環境: Linux、Node v24.19.0、npm 11.9.0。ホームのnpmキャッシュはread-onlyのため、通信エラーと混同せず一時キャッシュを指定した。
+
+| 実際に実行したコマンド | 結果 |
+| --- | --- |
+| `timeout 300s npm ci --cache /tmp/daily-affirmation-npm-cache` | 成功、終了0 |
+| `NPM_CONFIG_CACHE=/tmp/daily-affirmation-npm-cache timeout 300s npm run audit:prod` | 成功、終了0、脆弱性0 |
+| `timeout 300s npm audit --omit=dev --json --cache /tmp/daily-affirmation-npm-cache` | 有効なJSON、終了0、脆弱性0 |
+| `timeout 300s npm audit --json --cache /tmp/daily-affirmation-npm-cache` | 有効なJSON、終了1、High 5 / Moderate 5 / Low 1。脆弱性検出であり通信エラーではない |
+| `timeout 300s npm run test` | 成功、終了0、45ファイル・344件 |
+| `timeout 300s npm run test:coverage` | 成功、終了0、45ファイル・344件。Statements 91.86%、Branches 86.35%、Functions 95.36%、Lines 94.46%。閾値維持 |
+| `timeout 300s npm run lint` | 初回終了1（Git管理外の既存Playwright生成レポート内の255エラー・2774警告）。その生成レポートのみを `/tmp/daily-oct9-preserved-playwright-report` へ退避して保持後、同じコマンドを再実行し終了0。ソース・lint設定・ルールは変更していない |
+| `timeout 300s npm run build` | 成功、終了0。Next 16.3.8でコンパイル・TypeScript・静的ページ生成完了。既存CIと同じ非秘密のダミー値を `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`GEMINI_API_KEY` にコマンド環境で指定 |
+| `timeout 600s npm run e2e` | 省略。ブラウザー未導入のため動作検証未実施 |
+
+対応Playwrightは1.62.1、Chromium / Headless Shellは151.0.7922.34、revision 1234。標準キャッシュと既知の一時キャッシュに対応ブラウザーがないことを今回確認した。管理環境revision 12のrestrictedポリシーはenforcedで、`cdn.playwright.dev` が許可一覧にない。公式URLは `https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip`。同URLへの以前の403 `Domain forbidden` は通信ポリシーによる拒否であり、npm監査の脆弱性検出とは別。本対応ではダウンロードや疎通を再試行していない。非公式配布元・非対応ブラウザーで代用しない。
+
+E2Eが実行可能になった際は既存Playwright設定のローカルSupabaseモック・Geminiモックを使用する。実サービス接続・秘密情報追加は不要。今回はユーザーが許可したGitHub CI検証用の保存であり、新commitでのChromium導入・E2E・Verifyは今後のCI実行で確認する必要がある。PR・mainへのpush・force push・旧PR #52の操作は行わない。
+
+`git diff --check` は成功。`git diff --stat`、`git diff --name-only`、`git status -sb`、`git status --short` を確認し、変更は `package.json`、`package-lock.json`、本ドキュメントの3ファイルのみ。生成レポート・node_modules・秘密情報はstage対象に含めない。
+
+## 履歴: 2026-10-06の初回対応・停止後調査
+
 記録日: 2026-10-06（Asia/Tokyo）。監査件数と実行済み検証は前回作業の結果であり、今回の調査で再実行した結果ではない。依存ファイルは前回停止時の内容を保持している。
 
 作業ブランチ: `codex/address-development-dependency-vulnerabilities`。未stage・未commit。
