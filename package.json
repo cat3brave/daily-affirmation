@@ -11,7 +11,8 @@
     "lint": "eslint --cache --cache-location .eslintcache --ignore-pattern \"coverage/**\" --no-warn-ignored",
     "test": "vitest run app proxy.test.ts",
     "test:coverage": "vitest run --coverage app proxy.test.ts",
-    "test:watch": "vitest app proxy.test.ts"
+    "test:watch": "vitest app proxy.test.ts",
+    "e2e:prod": "node scripts/run-production-e2e.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
