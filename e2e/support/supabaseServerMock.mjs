@@ -67,9 +67,13 @@ const server = createServer(async (request, response) => {
     if (!(table in exportRows)) return rejectUnexpected();
     const requestedUser = url.searchParams.get("user_id")?.replace(/^eq\./, "");
     if (productionSmoke && (url.searchParams.get("user_id") !== `eq.${user.id}` ||
-        [...url.searchParams.keys()].some((key) => !["user_id", "select", "order", "offset", "limit"].includes(key)))) {
+        [...url.searchParams.keys()].some((key) => !["user_id", "select", "order", "offset", "limit", "created_at"].includes(key)))) {
       return rejectUnexpected();
     }
+    const createdAtFilter = url.searchParams.get("created_at");
+    if (productionSmoke && createdAtFilter && (table !== "bloom_logs" ||
+        !/^gte\.\d{4}-\d{2}-\d{2}T/.test(createdAtFilter) ||
+        !Number.isFinite(Date.parse(createdAtFilter.slice(4))))) return rejectUnexpected();
     const selected = (url.searchParams.get("select") ?? "").split(",");
     if (productionSmoke && selected.some((column) => column !== "*" && !(column in exportRows[table][0]))) return rejectUnexpected();
     const range = request.headers.range?.match(/(\d+)-(\d+)/);
@@ -77,6 +81,7 @@ const server = createServer(async (request, response) => {
     const to = Number(range?.[2] ?? (from + Number(url.searchParams.get("limit") ?? 1000) - 1));
     const rows = exportRows[table]
       .filter((row) => row.user_id === requestedUser)
+      .filter((row) => !productionSmoke || !createdAtFilter || Date.parse(row.created_at) >= Date.parse(createdAtFilter.slice(4)))
       .sort((a, b) => `${a.created_at}:${a.id}`.localeCompare(`${b.created_at}:${b.id}`))
       .slice(from, to + 1)
       .map((row) => Object.fromEntries((selected.includes("*") ? Object.keys(row) : selected).filter((column) => column in row).map((column) => [column, row[column]])));

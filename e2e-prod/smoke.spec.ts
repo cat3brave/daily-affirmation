@@ -95,7 +95,12 @@ test("login, tabs, unsaved draft, reload and logout", async ({ page }) => {
   for (const [index, draft] of drafts.entries()) {
     await expect(page.getByRole("textbox", { name: `${index + 1}つ目のよかったこと` })).toHaveValue(draft);
   }
-  await page.getByRole("button", { name: "👋 ログアウト" }).click();
+  const dialogPromise = page.waitForEvent("dialog");
+  const logoutClick = page.getByRole("button", { name: "👋 ログアウト" }).click();
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe("confirm");
+  await dialog.accept();
+  await logoutClick;
   await expect(page).toHaveURL(/\/login$/);
   const redirect = await page.request.get("/dashboard", { maxRedirects: 0 });
   expect(redirect.status()).toBe(307);
