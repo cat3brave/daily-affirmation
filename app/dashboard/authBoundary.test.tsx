@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthUser } from "../hooks/useAuthUser";
@@ -235,6 +236,18 @@ describe("dashboard authentication boundary (mock only)", () => {
     await click("save");
     expect(screen.queryByTestId("favorites")).not.toBeInTheDocument();
     expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("StrictMode replay starts garden/graph loads and preserves their retry UI", async () => {
+    mocks.count.mockResolvedValue({ count: null, error: { message: "temporary count failure" } });
+    mocks.graph.mockResolvedValue({ data: null, error: { message: "temporary graph failure" } });
+    render(<StrictMode><Boundary /></StrictMode>); await flush();
+    expect(screen.getByTestId("garden")).toHaveTextContent("お花の記録を読み込めませんでした");
+    expect(screen.getByRole("button", { name: "成長記録を再読み込み" })).toBeEnabled();
+    mocks.graph.mockResolvedValue({ data: [], error: null });
+    await click("成長記録を再読み込み");
+    expect(screen.getByRole("region", { name: "お花の成長記録（過去3ヶ月）" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "成長記録を再読み込み" })).not.toBeInTheDocument();
   });
 
 });

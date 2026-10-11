@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { ACCOUNT_DELETED_EVENT, isAccountDeleted, isDeletionStorageKey } from "../lib/deletedAccount";
@@ -12,6 +12,13 @@ export function useAuthUser(initialUser?: Owner) {
   const current = useRef({ owner: (initialUser?.id ?? null) as string | null, generation: 0, checked: Boolean(initialUser), observed: Boolean(initialUser), active: true });
   const request = useRef(0);
   const mismatch = useRef<(owner: string | null) => void>(() => undefined);
+
+  // Restore the lifetime before descendant passive effects run during StrictMode
+  // replay. Otherwise initial graph/garden loads can see a disposed boundary.
+  useLayoutEffect(() => {
+    current.current.active = true;
+    return () => { current.current.active = false; request.current += 1; };
+  }, []);
 
   useEffect(() => {
     current.current.active = true;
