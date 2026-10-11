@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DashboardAuthContext } from "../hooks/dashboardAuth";
 import { useAuthUser } from "../hooks/useAuthUser";
 
 // 🔴 新しく作ったカスタムフック（お花係）をインポート！
@@ -26,7 +27,17 @@ import BirdViewPanel from "../components/BirdViewPanel";
 import DashboardHeader from "../components/DashboardHeader";
 
 export default function DashboardClient({ user }: { user: { id: string; email: string } }) {
-  const { supabase, userId, userEmail } = useAuthUser(user);
+  const auth = useAuthUser(user);
+  if (!auth.isAuthChecked || !auth.userId) {
+    return <main><p role="status">ログイン情報を確認しています...</p></main>;
+  }
+  return <DashboardAuthContext.Provider value={auth}>
+    <OwnedDashboard key={`${auth.authGeneration}:${auth.userId}`} auth={auth} />
+  </DashboardAuthContext.Provider>;
+}
+
+function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
+  const { supabase, userId, userEmail } = auth;
 
   const {
     text,
@@ -86,7 +97,7 @@ export default function DashboardClient({ user }: { user: { id: string; email: s
           isBirdView={isBirdView}
           onToggleBirdView={() => setIsBirdView(!isBirdView)}
           userEmail={userEmail}
-          userId={user.id}
+          userId={userId!}
         />
 
         <FloatingCloudLayer floatingClouds={floatingClouds} />
@@ -161,7 +172,7 @@ export default function DashboardClient({ user }: { user: { id: string; email: s
               {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
               {id === "home" && currentTab === id && (
                 <div className="w-full mt-8">
-                  <BloomGraph refreshKey={bloomRefreshKey} />
+                  <BloomGraph userId={userId!} refreshKey={bloomRefreshKey} />
                 </div>
               )}
             </div>

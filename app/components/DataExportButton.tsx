@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useDashboardOperation, verifyDashboardOwner } from "../hooks/dashboardAuth";
 import { useRef, useState } from "react";
 import { exportUserData } from "../exportDataAction";
 import { formatExportLocalDate } from "./dataExportDate";
@@ -9,12 +10,15 @@ const exportErrorMessage =
   "データを書き出せませんでした。時間をおいてもう一度お試しください。";
 
 export default function DataExportButton() {
+  const { capture, auth } = useDashboardOperation();
   const requestInProgress = useRef(false);
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState("");
   const [needsLogin, setNeedsLogin] = useState(false);
 
   const handleExport = async () => {
+    const current = capture();
+    if (!current()) return;
     if (requestInProgress.current) return;
     requestInProgress.current = true;
     setIsExporting(true);
@@ -22,7 +26,11 @@ export default function DataExportButton() {
     setNeedsLogin(false);
 
     try {
+      if (auth) {
+        if (!await verifyDashboardOwner(auth, auth.supabase, auth.userId!, current)) return;
+      }
       const result = await exportUserData();
+      if (!current()) return;
       if (result.status !== "success") {
         setNeedsLogin(result.status === "auth_required");
         setMessage(
@@ -47,10 +55,13 @@ export default function DataExportButton() {
       }
       setMessage("保存済みデータを書き出しました。");
     } catch {
+      if (!current()) return;
       setMessage(exportErrorMessage);
     } finally {
-      requestInProgress.current = false;
-      setIsExporting(false);
+      if (current()) {
+        requestInProgress.current = false;
+        setIsExporting(false);
+      }
     }
   };
 

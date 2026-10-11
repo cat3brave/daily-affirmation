@@ -69,7 +69,7 @@ function createSupabaseMock({
     from,
     insert,
     select,
-    supabase: { from } as unknown as FlowerGardenSupabaseClient,
+    supabase: { from, auth: { getUser: vi.fn(async () => ({ data: { user: { id: USER_ID } }, error: null })) } } as unknown as FlowerGardenSupabaseClient,
   };
 }
 

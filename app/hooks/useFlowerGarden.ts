@@ -1,3 +1,4 @@
+import { useDashboardOperation, verifyDashboardOwner } from "./dashboardAuth";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
@@ -11,6 +12,8 @@ export function useFlowerGarden(
   userId: string | null,
   supabase: SupabaseBrowserClient,
 ) {
+  const { capture, auth } = useDashboardOperation(userId);
+  const saveInFlightRef = useRef(false);
   const [growth, setGrowth] = useState<number>(0);
   const [totalBlooms, setTotalBlooms] = useState<number>(0);
   const [currentFlower, setCurrentFlower] = useState<string>("🌸");
@@ -25,6 +28,8 @@ export function useFlowerGarden(
   // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
   const fetchBlooms = useCallback(async () => {
       if (!userId || loadInFlightRef.current) return;
+      const current = capture();
+      if (!current()) return;
       const requestId = ++loadRequestRef.current;
       loadInFlightRef.current = true;
       setIsReloadingBlooms(true);
@@ -34,7 +39,7 @@ export function useFlowerGarden(
           .select("*", { count: "exact", head: true })
           .eq("user_id", userId);
 
-        if (requestId !== loadRequestRef.current) {
+        if (!current() || requestId !== loadRequestRef.current) {
           return;
         }
 
@@ -52,20 +57,25 @@ export function useFlowerGarden(
         setFlowerLoadError("");
       } catch (error) {
         console.error("bloom_logs count fetch unexpected error:", error);
-        if (requestId === loadRequestRef.current) {
+        if (current() && requestId === loadRequestRef.current) {
           setFlowerLoadError(
             "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
           );
         }
       } finally {
-        if (requestId === loadRequestRef.current) {
+        if (current() && requestId === loadRequestRef.current) {
           loadInFlightRef.current = false;
           setIsReloadingBlooms(false);
         }
       }
-  }, [supabase, userId]);
+  }, [capture, supabase, userId]);
 
   useEffect(() => {
+    setGrowth(0);
+    setCurrentFlower("🌸");
+    setIsBloomSaving(false);
+    saveInFlightRef.current = false;
+    setBloomRefreshKey(0);
     setTotalBlooms(0);
     setFlowerError("");
     setFlowerLoadError("");
@@ -82,7 +92,8 @@ export function useFlowerGarden(
 
   // 🌱 お散歩ボタンを押した時の処理
   const handleWalk = useCallback(async () => {
-    if (isBloomSaving) return;
+    const current = capture();
+    if (!current() || !userId || saveInFlightRef.current) return;
 
     setFlowerError("");
 
@@ -116,13 +127,16 @@ export function useFlowerGarden(
         RARE_FLOWERS[Math.floor(Math.random() * RARE_FLOWERS.length)];
     }
 
+    saveInFlightRef.current = true;
     setIsBloomSaving(true);
 
     try {
+      if (!await verifyDashboardOwner(auth, supabase, userId, current)) return;
       const { error } = await supabase
         .from("bloom_logs")
         .insert({ user_id: userId, flower_type: nextFlower });
 
+      if (!current()) return;
       if (error) {
         console.error("ログ保存エラー:", error);
         setFlowerError(
@@ -136,14 +150,15 @@ export function useFlowerGarden(
       setBloomRefreshKey((prev) => prev + 1);
       setGrowth(nextGrowth);
     } catch (error) {
+      if (!current()) return;
       console.error("ログ保存中の想定外エラー:", error);
       setFlowerError(
         "お花の記録を保存できませんでした。もう一度お試しください。",
       );
     } finally {
-      setIsBloomSaving(false);
+      if (current()) { saveInFlightRef.current = false; setIsBloomSaving(false); }
     }
-  }, [growth, isBloomSaving, supabase, userId]);
+  }, [auth, capture, growth, supabase, userId]);
 
   return {
     growth,

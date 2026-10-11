@@ -64,7 +64,7 @@ function createSupabaseMock({
     insert,
     order,
     secondDeleteEq,
-    supabase: { from } as unknown as FavoriteSupabaseClient,
+    supabase: { from, auth: { getUser: vi.fn(async () => ({ data: { user: { id: USER_ID } }, error: null })) } } as unknown as FavoriteSupabaseClient,
   };
 }
 
@@ -258,4 +258,23 @@ describe("useFavoriteAffirmations", () => {
     });
     expect(consoleError).toHaveBeenCalled();
   });
+});
+
+it("古い削除失敗をBの一覧へ戻さずBのキャッシュを汚さない", async () => {
+  const mock = createSupabaseMock({ fetchedFavorites: ["Aの言葉"] });
+  vi.mocked(mock.supabase.auth.getUser).mockResolvedValue({ data: { user: { id: "A" } }, error: null } as Awaited<ReturnType<typeof mock.supabase.auth.getUser>>);
+  const { result, rerender } = renderHook(({ id }) => useFavoriteAffirmations(id, mock.supabase), { initialProps: { id: "A" } });
+  await waitFor(() => expect(result.current.favoriteAffirmations).toEqual(["Aの言葉"]));
+  let reject!: (reason: Error) => void;
+  mock.secondDeleteEq.mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+  let operation!: Promise<void>;
+  act(() => { operation = result.current.handleRemoveFavoriteAffirmation("Aの言葉"); });
+  await waitFor(() => expect(mock.secondDeleteEq).toHaveBeenCalledOnce());
+  mock.order.mockResolvedValue({ data: [{ text: "Bの言葉" }], error: null });
+  rerender({ id: "B" });
+  await waitFor(() => expect(result.current.favoriteAffirmations).toEqual(["Bの言葉"]));
+  await act(async () => { reject(new Error("old delete failed")); await operation; });
+  expect(result.current.favoriteAffirmations).toEqual(["Bの言葉"]);
+  expect(result.current.favoriteError).toBe("");
+  expect(localStorage.getItem("favoriteAffirmations:B")).toBe('["Bの言葉"]');
 });

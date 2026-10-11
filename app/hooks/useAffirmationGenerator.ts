@@ -1,7 +1,9 @@
+import { useDashboardOperation } from "./dashboardAuth";
 import { useRef, useState } from "react";
 import { generateAffirmation } from "../actions";
 
 export function useAffirmationGenerator() {
+  const { capture } = useDashboardOperation();
   const [text, setText] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
   const [rateLimitError, setRateLimitError] = useState<string>("");
@@ -9,6 +11,8 @@ export function useAffirmationGenerator() {
   const isGeneratingRef = useRef(false);
 
   const handleGenerateAffirmation = async () => {
+    const current = capture();
+    if (!current()) return;
     if (isGeneratingRef.current) return;
 
     isGeneratingRef.current = true;
@@ -19,6 +23,7 @@ export function useAffirmationGenerator() {
 
     try {
       const result = await generateAffirmation();
+      if (!current()) return;
       if (result.status === "auth_required") {
         setAuthError(result.message);
       } else if (result.status === "rate_limited") {
@@ -27,10 +32,13 @@ export function useAffirmationGenerator() {
         setText(result.text);
       }
     } catch {
+      if (!current()) return;
       setText("深呼吸して、もう一度試してみてくださいね。");
     } finally {
-      isGeneratingRef.current = false;
-      setIsLoading(false);
+      if (current()) {
+        isGeneratingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -302,7 +303,7 @@ describe("ThreeGoodThingsCard", () => {
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
 
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
 
     await waitFor(() =>
       expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの下書き"),
@@ -323,7 +324,7 @@ describe("ThreeGoodThingsCard", () => {
     });
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
 
-    authCallback("SIGNED_OUT", null);
+    act(() => authCallback("SIGNED_OUT", null));
 
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue(""));
     expect(screen.getAllByRole("textbox")[0]).toBeDisabled();
@@ -344,7 +345,7 @@ describe("ThreeGoodThingsCard", () => {
     await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalled());
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
     finishUpsert?.({ error: null });
 
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue(""));
@@ -361,7 +362,7 @@ describe("ThreeGoodThingsCard", () => {
     });
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
 
-    authCallback("TOKEN_REFRESHED", { user: { id: USER_ID } });
+    act(() => authCallback("TOKEN_REFRESHED", { user: { id: USER_ID } }));
 
     expect(screen.getAllByRole("textbox")[0]).toHaveValue("続きを書く入力");
     expect(screen.queryByText(/利用者が変わりました/)).not.toBeInTheDocument();
@@ -405,10 +406,10 @@ describe("ThreeGoodThingsCard", () => {
     await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledOnce());
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
     await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2));
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-C"));
-    authCallback("SIGNED_IN", { user: { id: "user-C" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-C" } }));
 
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Cの記録"));
     finishB?.(createSelectResult([
@@ -430,9 +431,9 @@ describe("ThreeGoodThingsCard", () => {
     );
     await renderLoadedCard();
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
-    authCallback("SIGNED_OUT", null);
+    act(() => authCallback("SIGNED_OUT", null));
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
 
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Bの下書き"));
     expect(supabaseMocks.selectEq).toHaveBeenLastCalledWith("user_id", "user-B");
@@ -487,10 +488,10 @@ describe("ThreeGoodThingsCard", () => {
     await waitFor(() => expect(supabaseMocks.upsert).toHaveBeenCalledOnce());
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
     supabaseMocks.getUser.mockResolvedValue(createUserResult(USER_ID));
-    authCallback("SIGNED_IN", { user: { id: USER_ID } });
+    act(() => authCallback("SIGNED_IN", { user: { id: USER_ID } }));
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
     fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "新しいAの入力" } });
 
@@ -518,10 +519,10 @@ describe("ThreeGoodThingsCard", () => {
     await waitFor(() => expect(supabaseMocks.deleteRecord).toHaveBeenCalledOnce());
     const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
     supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
-    authCallback("SIGNED_IN", { user: { id: "user-B" } });
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toBeEnabled());
     supabaseMocks.getUser.mockResolvedValue(createUserResult(USER_ID));
-    authCallback("SIGNED_IN", { user: { id: USER_ID } });
+    act(() => authCallback("SIGNED_IN", { user: { id: USER_ID } }));
     await waitFor(() => expect(screen.getAllByRole("textbox")[0]).toHaveValue("Aの記録"));
 
     finishOldDelete?.({ error: null });

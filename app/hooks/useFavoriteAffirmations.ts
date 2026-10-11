@@ -1,3 +1,4 @@
+import { useDashboardOperation, verifyDashboardOwner } from "./dashboardAuth";
 import { isAccountDeleted } from "../lib/deletedAccount";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
@@ -9,6 +10,8 @@ export function useFavoriteAffirmations(
   userId: string | null,
   supabase: SupabaseBrowserClient,
 ) {
+  const { capture, auth } = useDashboardOperation(userId);
+  const [loadedOwner, setLoadedOwner] = useState<string | null>(null);
   const [favoriteAffirmations, setFavoriteAffirmations] = useState<string[]>(
     [],
   );
@@ -31,6 +34,7 @@ export function useFavoriteAffirmations(
   );
 
   useEffect(() => {
+    setLoadedOwner(null);
     setHasLoadedFavorites(false);
     setFavoriteAffirmations([]);
     favoriteAffirmationsRef.current = [];
@@ -61,12 +65,13 @@ export function useFavoriteAffirmations(
     } catch {
       console.error("お気に入りアファメーションの読み込みに失敗しました。");
     } finally {
+      setLoadedOwner(userId);
       setHasLoadedFavorites(true);
     }
   }, [userId]);
 
   useEffect(() => {
-    if (!userId || !hasLoadedFavorites || isAccountDeleted(userId)) return;
+    if (!userId || loadedOwner !== userId || !hasLoadedFavorites || isAccountDeleted(userId) || !capture()()) return;
 
     try {
       localStorage.setItem(
@@ -76,10 +81,12 @@ export function useFavoriteAffirmations(
     } catch {
       console.error("お気に入りアファメーションの保存に失敗しました。");
     }
-  }, [favoriteAffirmations, hasLoadedFavorites, userId]);
+  }, [favoriteAffirmations, hasLoadedFavorites, loadedOwner, userId, capture]);
 
   const fetchFavoriteAffirmations = useCallback(async () => {
       if (!userId || !hasLoadedFavorites || loadInFlightRef.current) return;
+      const current = capture();
+      if (!current()) return;
       const requestId = ++loadRequestRef.current;
       loadInFlightRef.current = true;
       setIsReloadingFavorites(true);
@@ -90,7 +97,7 @@ export function useFavoriteAffirmations(
           .eq("user_id", userId)
           .order("created_at", { ascending: false });
 
-        if (requestId !== loadRequestRef.current) return;
+        if (!current() || requestId !== loadRequestRef.current) return;
 
         if (error) {
           console.error(error);
@@ -111,32 +118,35 @@ export function useFavoriteAffirmations(
           setFavoriteAffirmations(fetchedFavorites);
         }
       } catch (error) {
+        if (!current()) return;
         console.error("お気に入り読み込み中の想定外エラー:", error);
-        if (requestId === loadRequestRef.current) {
+        if (current() && requestId === loadRequestRef.current) {
           setFavoriteLoadError(
             "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
           );
         }
       } finally {
-        if (requestId === loadRequestRef.current) {
+        if (current() && requestId === loadRequestRef.current) {
           loadInFlightRef.current = false;
           setIsReloadingFavorites(false);
         }
       }
-  }, [hasLoadedFavorites, supabase, userId]);
+  }, [capture, hasLoadedFavorites, supabase, userId]);
 
   useEffect(() => {
-    if (!userId || !hasLoadedFavorites || isAccountDeleted(userId)) return;
+    if (!userId || loadedOwner !== userId || !hasLoadedFavorites || isAccountDeleted(userId) || !capture()()) return;
     fetchFavoriteAffirmations();
 
     return () => {
       loadRequestRef.current += 1;
       loadInFlightRef.current = false;
     };
-  }, [fetchFavoriteAffirmations, hasLoadedFavorites, userId]);
+  }, [capture, fetchFavoriteAffirmations, hasLoadedFavorites, loadedOwner, userId]);
 
   const handleFavoriteAffirmation = useCallback(
     async (affirmationText: string) => {
+      const current = capture();
+      if (!current()) return;
       const favoriteText = affirmationText.trim();
 
       if (!favoriteText || !userId || isAccountDeleted(userId)) return;
@@ -156,10 +166,12 @@ export function useFavoriteAffirmations(
       });
 
       try {
+        if (!await verifyDashboardOwner(auth, supabase, userId, current)) return;
         const { error } = await supabase
           .from("favorite_affirmations")
           .insert({ user_id: userId, text: favoriteText });
 
+        if (!current()) return;
         if (error) {
           console.error(error);
           setFavoriteError(
@@ -170,6 +182,7 @@ export function useFavoriteAffirmations(
           );
         }
       } catch (error) {
+        if (!current()) return;
         console.error("お気に入り保存中の想定外エラー:", error);
         setFavoriteError(
           "お気に入りの保存に失敗しました。もう一度お試しください。",
@@ -178,17 +191,20 @@ export function useFavoriteAffirmations(
           prev.filter((affirmation) => affirmation !== favoriteText),
         );
       } finally {
-        pendingFavoriteAffirmationsRef.current.delete(favoriteText);
+        if (current()) pendingFavoriteAffirmationsRef.current.delete(favoriteText);
       }
     },
-    [supabase, updateFavoriteAffirmations, userId],
+    [auth, capture, supabase, updateFavoriteAffirmations, userId],
   );
 
   const handleRemoveFavoriteAffirmation = useCallback(
     async (affirmationToRemove: string) => {
+      const current = capture();
+      if (!current()) return;
       const removeText = affirmationToRemove.trim();
 
-      if (!removeText || !userId || isAccountDeleted(userId)) return;
+      if (!removeText || !userId || isAccountDeleted(userId) || pendingFavoriteAffirmationsRef.current.has(removeText)) return;
+      pendingFavoriteAffirmationsRef.current.add(removeText);
 
       setFavoriteError("");
 
@@ -197,12 +213,14 @@ export function useFavoriteAffirmations(
       );
 
       try {
+        if (!await verifyDashboardOwner(auth, supabase, userId, current)) return;
         const { error } = await supabase
           .from("favorite_affirmations")
           .delete()
           .eq("user_id", userId)
           .eq("text", removeText);
 
+        if (!current()) return;
         if (error) {
           console.error(error);
           setFavoriteError(
@@ -214,6 +232,7 @@ export function useFavoriteAffirmations(
           });
         }
       } catch (error) {
+        if (!current()) return;
         console.error("お気に入り削除中の想定外エラー:", error);
         setFavoriteError(
           "お気に入りの削除に失敗しました。もう一度お試しください。",
@@ -222,9 +241,11 @@ export function useFavoriteAffirmations(
           if (prev.includes(removeText)) return prev;
           return [removeText, ...prev];
         });
+      } finally {
+        if (current()) pendingFavoriteAffirmationsRef.current.delete(removeText);
       }
     },
-    [supabase, updateFavoriteAffirmations, userId],
+    [auth, capture, supabase, updateFavoriteAffirmations, userId],
   );
 
   const isFavorite = useCallback(

@@ -48,6 +48,7 @@ export type AuthenticatedSupabaseMock = {
   allowConfiguredLoads: () => void;
   allowConfiguredLoad: (table: keyof DashboardMockData) => void;
   failedLoadRequests: string[];
+  changeAuthUser: (id: string | null, data?: DashboardMockData) => Promise<void>;
 };
 
 type DashboardMockData = Partial<
@@ -152,6 +153,8 @@ export async function stubAuthenticatedSupabase(
   restData: DashboardMockData = {},
   options: DashboardMockOptions = {},
 ): Promise<AuthenticatedSupabaseMock> {
+  let currentUser: typeof e2eUser | null = e2eUser;
+  let currentData = restData;
   const mockState: AuthenticatedSupabaseMock = {
     loginRequestBodies: [],
     restWriteRequests: [],
@@ -160,6 +163,18 @@ export async function stubAuthenticatedSupabase(
     allowConfiguredLoads: () => failingLoads.clear(),
     allowConfiguredLoad: (table) => failingLoads.delete(table),
     failedLoadRequests: [],
+    changeAuthUser: async (id, data = {}) => {
+      currentUser = id ? { ...e2eUser, id, email: `${id}@example.com` } : null;
+      currentData = data;
+      if (!id) await page.context().clearCookies({ name: /^sb-127-auth-token/ });
+      // Exercise Supabase's real cross-tab subscription transport against mocks.
+      // No application-only auth bypass is installed.
+      await page.evaluate((user) => {
+        const channel = new BroadcastChannel("sb-127-auth-token");
+        channel.postMessage({ event: user ? "SIGNED_IN" : "SIGNED_OUT", session: user ? { user } : null });
+        channel.close();
+      }, currentUser);
+    },
   };
   const failingLoads = new Set(options.failFirstLoadFor ?? []);
 
@@ -186,9 +201,9 @@ export async function stubAuthenticatedSupabase(
 
     if (request.method() === "GET" && url.pathname === "/auth/v1/user") {
       await route.fulfill({
-        status: 200,
+        status: currentUser ? 200 : 401,
         contentType: "application/json",
-        body: JSON.stringify(e2eUser),
+        body: JSON.stringify(currentUser ?? { message: "Missing session" }),
       });
       return;
     }
@@ -232,13 +247,13 @@ export async function stubAuthenticatedSupabase(
       status: 200,
       contentType: "application/json",
       headers: {
-        "content-range": `0-0/${restData[table as keyof DashboardMockData]?.length ?? 0}`,
+        "content-range": `0-0/${currentData[table as keyof DashboardMockData]?.length ?? 0}`,
       },
       body:
         method === "HEAD"
           ? ""
           : JSON.stringify(
-              restData[table as keyof DashboardMockData] ?? [],
+              currentData[table as keyof DashboardMockData] ?? [],
             ),
     });
   });

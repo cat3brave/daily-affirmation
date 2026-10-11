@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDashboardOperation } from "../hooks/dashboardAuth";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 
 const supabase = createSupabaseBrowserClient();
@@ -11,6 +12,7 @@ type BloomCounts = {
 
 type BloomGraphProps = {
   refreshKey: number;
+  userId?: string;
 };
 
 const BLOOM_LOGS_LOAD_ERROR_MESSAGE =
@@ -27,7 +29,8 @@ const formatAccessibleDate = (date: string) => {
   }).format(new Date(year, month - 1, day));
 };
 
-export default function BloomGraph({ refreshKey }: BloomGraphProps) {
+export default function BloomGraph({ refreshKey, userId: owner }: BloomGraphProps) {
+  const { capture } = useDashboardOperation(owner);
   const [bloomData, setBloomData] = useState<BloomCounts>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -70,34 +73,41 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
   }, []);
 
   const fetchLogs = useCallback(async () => {
+      const current = capture();
+      if (!current()) return;
       if (inFlightRef.current) return;
       const requestId = ++requestRef.current;
       inFlightRef.current = true;
       setLoading(true);
 
       try {
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        let userId = owner;
+        if (!userId) {
+          const {
+            data: { session },
+            error: sessionError,
+          } = await supabase.auth.getSession();
 
-        if (sessionError) {
-          console.error("セッション取得エラー:", sessionError);
-          if (requestId === requestRef.current) {
-            setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+          if (sessionError) {
+            console.error("セッション取得エラー:", sessionError);
+            if (current() && requestId === requestRef.current) {
+              setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+            }
+            return;
           }
-          return;
-        }
 
-        if (!session?.user) {
-          console.error("ログインユーザーが確認できませんでした。");
-          if (requestId === requestRef.current) {
-            setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+          if (!session?.user) {
+            console.error("ログインユーザーが確認できませんでした。");
+            if (current() && requestId === requestRef.current) {
+              setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
+            }
+            return;
           }
-          return;
-        }
 
-        const userId = session.user.id;
+          if (!current()) return;
+          userId = session.user.id;
+        }
+        if (!current()) return;
 
         const { data, error } = await supabase
           .from("bloom_logs")
@@ -107,7 +117,7 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
 
         if (error) {
           console.error("ログ取得エラー:", error);
-          if (requestId === requestRef.current) {
+          if (current() && requestId === requestRef.current) {
             setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
           }
           return;
@@ -124,22 +134,22 @@ export default function BloomGraph({ refreshKey }: BloomGraphProps) {
           counts[dateStr] = (counts[dateStr] || 0) + 1;
         });
 
-        if (requestId === requestRef.current) {
+        if (current() && requestId === requestRef.current) {
           setBloomData(counts);
           setLoadError("");
         }
       } catch (error) {
         console.error("成長記録取得中に想定外のエラー:", error);
-        if (requestId === requestRef.current) {
+        if (current() && requestId === requestRef.current) {
           setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
         }
       } finally {
-        if (requestId === requestRef.current) {
+        if (current() && requestId === requestRef.current) {
           setLoading(false);
           inFlightRef.current = false;
         }
       }
-  }, [startDate]);
+  }, [capture, owner, startDate]);
 
   useEffect(() => {
     fetchLogs();
