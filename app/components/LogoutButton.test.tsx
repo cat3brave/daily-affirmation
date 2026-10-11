@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SupabaseError = { message: string };
@@ -16,7 +16,7 @@ const logoutMocks = vi.hoisted(() => {
   const useRouter = vi.fn(() => ({ push, refresh }));
   const signOut = vi.fn<() => Promise<SignOutResult>>();
   const createSupabaseBrowserClient = vi.fn(() => ({
-    auth: { signOut },
+    auth: { signOut, getUser: vi.fn(async () => ({ data: { user: { id: "current-user" } }, error: null })) },
   }));
 
   return {
@@ -70,7 +70,7 @@ function configureLogoutMock() {
     refresh: logoutMocks.refresh,
   });
   logoutMocks.createSupabaseBrowserClient.mockReturnValue({
-    auth: { signOut: logoutMocks.signOut },
+    auth: { signOut: logoutMocks.signOut, getUser: vi.fn(async () => ({ data: { user: { id: "current-user" } }, error: null })) },
   });
   logoutMocks.signOut.mockResolvedValue({ error: null });
 }
@@ -110,7 +110,7 @@ describe("LogoutButton", () => {
       await signOutDeferred.promise;
     });
 
-    expect(logoutMocks.signOut).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(logoutMocks.signOut).toHaveBeenCalledTimes(1));
     expect(logoutMocks.push).toHaveBeenCalledWith("/login");
     expect(logoutMocks.refresh).toHaveBeenCalled();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -177,7 +177,7 @@ describe("LogoutButton", () => {
     fireEvent.click(button);
 
     expect(button).toBeDisabled();
-    expect(logoutMocks.signOut).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(logoutMocks.signOut).toHaveBeenCalledTimes(1));
 
     await act(async () => {
       signOutDeferred.resolve({ error: null });
@@ -243,12 +243,12 @@ describe("LogoutButton", () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it("state更新前の同期的な連打でもsignOutを1回だけ呼ぶ", () => {
+  it("state更新前の同期的な連打でもsignOutを1回だけ呼ぶ", async () => {
     logoutMocks.signOut.mockReturnValue(createDeferred<SignOutResult>().promise);
     render(<LogoutButton userId="current-user" />);
     const button = screen.getByRole("button");
     fireEvent.click(button);
     fireEvent.click(button);
-    expect(logoutMocks.signOut).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(logoutMocks.signOut).toHaveBeenCalledTimes(1));
   });
 });

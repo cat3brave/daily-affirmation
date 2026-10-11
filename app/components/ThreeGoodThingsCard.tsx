@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
+import { useDashboardOperation } from "../hooks/dashboardAuth";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import {
   readThreeGoodThingsDraft,
@@ -16,6 +17,7 @@ const accountChangedMessage =
   "ログインしている利用者が変わりました。内容を確認してから、もう一度操作してください。";
 
 export default function ThreeGoodThingsCard() {
+  const { capture, auth } = useDashboardOperation();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
@@ -61,6 +63,8 @@ export default function ThreeGoodThingsCard() {
   };
 
   const fetchRecords = useCallback(async () => {
+      const current = capture();
+      if (!current()) return;
       const authGeneration = authGenerationRef.current;
       const requestId = ++loadRequestRef.current;
       setIsLoadingRecords(true);
@@ -69,16 +73,21 @@ export default function ThreeGoodThingsCard() {
         const {
           data: { user },
           error: userError,
-        } = await supabase.auth.getUser();
+        } = await supabase.auth.getUser().catch((error) => {
+          if (current()) auth?.onOwnerMismatch(null);
+          throw error;
+        });
 
         if (
+          !current() ||
           requestId !== loadRequestRef.current ||
           authGeneration !== authGenerationRef.current
         ) return;
 
         if (userError || !user) {
+          auth?.onOwnerMismatch(null);
           console.error("ユーザー情報が取得できませんでした", userError);
-          if (requestId === loadRequestRef.current) {
+          if (current() && requestId === loadRequestRef.current) {
             setLoadError(loadErrorMessage);
           }
           return;
@@ -87,7 +96,10 @@ export default function ThreeGoodThingsCard() {
         if (
           authUserIdRef.current !== undefined &&
           authUserIdRef.current !== user.id
-        ) return;
+        ) {
+          auth?.onOwnerMismatch(user.id);
+          return;
+        }
         authUserIdRef.current = user.id;
 
         const today = getTodayDate();
@@ -104,9 +116,10 @@ export default function ThreeGoodThingsCard() {
           .select("*")
           .eq("user_id", user.id);
 
+        if (!current() || requestId !== loadRequestRef.current || authGeneration !== authGenerationRef.current) return;
         if (error) {
           console.error("3つのよかったこと取得エラー:", error);
-          if (requestId === loadRequestRef.current) {
+          if (current() && requestId === loadRequestRef.current) {
             setLoadError(loadErrorMessage);
           }
           return;
@@ -124,6 +137,7 @@ export default function ThreeGoodThingsCard() {
           });
 
           if (
+            !current() ||
             requestId !== loadRequestRef.current ||
             authGeneration !== authGenerationRef.current ||
             authUserIdRef.current !== user.id
@@ -140,24 +154,26 @@ export default function ThreeGoodThingsCard() {
       } catch (error) {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
         if (
-          requestId === loadRequestRef.current &&
+          current() && requestId === loadRequestRef.current &&
           authGeneration === authGenerationRef.current
         ) {
           setLoadError(loadErrorMessage);
         }
       } finally {
-        if (requestId === loadRequestRef.current) {
+        if (current() && requestId === loadRequestRef.current) {
           setIsLoadingRecords(false);
         }
       }
-  }, [supabase]);
+  }, [auth, capture, supabase]);
 
   useEffect(() => {
     isMountedRef.current = true;
 
+    if (auth) authUserIdRef.current = auth.userId;
     fetchRecords();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const authListener = auth ? null : supabase.auth.onAuthStateChange(
       (_event, session) => {
         const nextUserId = session?.user?.id ?? null;
         if (authUserIdRef.current === nextUserId) return;
@@ -177,14 +193,16 @@ export default function ThreeGoodThingsCard() {
         setDeleteError("");
         setLoadError(nextUserId ? "" : accountChangedMessage);
         setIsSaving(false);
+        setIsLoadingRecords(Boolean(nextUserId));
         setDeletingDate(null);
         if (savedMessageTimeoutRef.current) {
           clearTimeout(savedMessageTimeoutRef.current);
           savedMessageTimeoutRef.current = null;
         }
 
+        if (refreshTimer) clearTimeout(refreshTimer);
         if (nextUserId) {
-          void fetchRecords();
+          refreshTimer = setTimeout(() => { void fetchRecords(); }, 0);
         } else {
           setIsLoadingRecords(false);
         }
@@ -195,13 +213,15 @@ export default function ThreeGoodThingsCard() {
       isMountedRef.current = false;
       authGenerationRef.current += 1;
       loadRequestRef.current += 1;
-      authListener.subscription.unsubscribe();
+      authListener?.data.subscription.unsubscribe();
+      if (refreshTimer) clearTimeout(refreshTimer);
       if (savedMessageTimeoutRef.current) {
         clearTimeout(savedMessageTimeoutRef.current);
       }
     };
-  }, [fetchRecords, supabase.auth]);
+  }, [auth, fetchRecords, supabase.auth]);
   const handleChange = (index: number, value: string) => {
+    if (!capture()()) return;
     const newThings = [...things];
     newThings[index] = value;
     setThings(newThings);
@@ -219,14 +239,16 @@ export default function ThreeGoodThingsCard() {
   };
 
   const handleSave = async () => {
+    const current = capture();
     const displayedUserId = userIdRef.current;
     const authGeneration = authGenerationRef.current;
     const isCurrentOperation = () =>
-      isMountedRef.current &&
+      current() && isMountedRef.current &&
       authGenerationRef.current === authGeneration &&
       authUserIdRef.current === displayedUserId &&
       userIdRef.current === displayedUserId;
     if (
+      !isCurrentOperation() ||
       isSaving ||
       !displayedUserId ||
       authUserIdRef.current !== displayedUserId ||
@@ -244,11 +266,16 @@ export default function ThreeGoodThingsCard() {
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getUser().catch((error) => {
+          if (current()) auth?.onOwnerMismatch(null);
+          throw error;
+        });
 
       if (!isCurrentOperation()) return;
 
       if (userError || !user || user.id !== displayedUserId) {
+        auth?.onOwnerMismatch(userError ? null : user?.id ?? null);
+        if (!isCurrentOperation()) return;
         console.error("ユーザー情報が取得できませんでした", userError);
         setSaveError(accountChangedMessage);
         return;
@@ -302,14 +329,16 @@ export default function ThreeGoodThingsCard() {
   };
 
   const handleDelete = async (dateToDelete: string) => {
+    const current = capture();
     const displayedUserId = userIdRef.current;
     const authGeneration = authGenerationRef.current;
     const isCurrentOperation = () =>
-      isMountedRef.current &&
+      current() && isMountedRef.current &&
       authGenerationRef.current === authGeneration &&
       authUserIdRef.current === displayedUserId &&
       userIdRef.current === displayedUserId;
     if (
+      !isCurrentOperation() ||
       deletingDate !== null ||
       !displayedUserId ||
       authUserIdRef.current !== displayedUserId ||
@@ -319,6 +348,7 @@ export default function ThreeGoodThingsCard() {
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
 
+    if (!isCurrentOperation()) return;
     setDeleteError("");
     setDeletingDate(dateToDelete);
 
@@ -326,11 +356,16 @@ export default function ThreeGoodThingsCard() {
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser();
+      } = await supabase.auth.getUser().catch((error) => {
+          if (current()) auth?.onOwnerMismatch(null);
+          throw error;
+        });
 
       if (!isCurrentOperation()) return;
 
       if (userError || !user || user.id !== displayedUserId) {
+        auth?.onOwnerMismatch(userError ? null : user?.id ?? null);
+        if (!isCurrentOperation()) return;
         console.error("ユーザー情報が取得できませんでした", userError);
         setDeleteError(accountChangedMessage);
         return;

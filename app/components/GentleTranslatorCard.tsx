@@ -1,3 +1,4 @@
+import { useDashboardOperation } from "../hooks/dashboardAuth";
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { translateHarshVoice } from "../actions";
@@ -5,6 +6,7 @@ import { translateHarshVoice } from "../actions";
 const MAX_HARSH_VOICE_LENGTH = 300;
 
 export default function GentleTranslatorCard() {
+  const { capture } = useDashboardOperation();
   const [harshVoice, setHarshVoice] = useState("");
   const [translatedVoice, setTranslatedVoice] = useState("");
   const [translationError, setTranslationError] = useState("");
@@ -12,6 +14,8 @@ export default function GentleTranslatorCard() {
   const isTranslatingRef = useRef(false);
 
   const handleTranslate = async () => {
+    const current = capture();
+    if (!current()) return;
     if (!harshVoice.trim() || isTranslatingRef.current) return;
     isTranslatingRef.current = true;
     setIsTranslating(true);
@@ -19,6 +23,7 @@ export default function GentleTranslatorCard() {
     setTranslationError("");
     try {
       const result = await translateHarshVoice(harshVoice);
+      if (!current()) return;
       if (
         result.status === "auth_required" ||
         result.status === "invalid_input" ||
@@ -29,12 +34,15 @@ export default function GentleTranslatorCard() {
         setTranslatedVoice(result.text);
       }
     } catch {
+      if (!current()) return;
       setTranslationError(
         "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
       );
     } finally {
-      isTranslatingRef.current = false;
-      setIsTranslating(false);
+      if (current()) {
+        isTranslatingRef.current = false;
+        setIsTranslating(false);
+      }
     }
   };
 

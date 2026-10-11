@@ -1,5 +1,6 @@
 "use client";
 
+import { useDashboardOperation, verifyDashboardOwner } from "../hooks/dashboardAuth";
 import { createSupabaseBrowserClient } from "@/app/lib/supabaseClient";
 import {
   hasUnsavedThreeGoodThingsDraft,
@@ -14,6 +15,7 @@ const logoutDraftConfirmation =
   "ログアウトすると、この端末の未保存の下書きが削除されます。ログアウトしますか？";
 
 export default function LogoutButton({ userId }: { userId: string }) {
+  const { capture, auth } = useDashboardOperation(userId);
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -24,6 +26,8 @@ export default function LogoutButton({ userId }: { userId: string }) {
 
   // ログアウト処理
   const handleLogout = async () => {
+    const current = capture();
+    if (!current()) return;
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
 
@@ -39,11 +43,18 @@ export default function LogoutButton({ userId }: { userId: string }) {
     setIsLoggingOut(true);
 
     try {
+      if (!await verifyDashboardOwner(auth, supabase, userId, current)) {
+        if (current()) setLogoutError(logoutErrorMessage);
+        return;
+      }
       const { error } = await supabase.auth.signOut();
+      // SIGNED_OUT may already have removed this subtree. Clean only the initiating
+      // owner's cache on success, provided no intervening sign-in occurred.
+      if (!current() && !(auth?.isLogoutCurrent())) return;
 
       if (error) {
         console.error("ログアウトに失敗しました。");
-        setLogoutError(logoutErrorMessage);
+        if (current()) setLogoutError(logoutErrorMessage);
         return;
       }
 
@@ -51,11 +62,11 @@ export default function LogoutButton({ userId }: { userId: string }) {
       router.push("/login"); // ログアウトしたらログイン画面へ戻す
       router.refresh(); // 画面の情報を最新にリフレッシュ
     } catch {
+      if (!current()) return;
       console.error("ログアウト中に想定外のエラーが発生しました。");
       setLogoutError(logoutErrorMessage);
     } finally {
-      isLoggingOutRef.current = false;
-      setIsLoggingOut(false);
+      if (current()) { isLoggingOutRef.current = false; setIsLoggingOut(false); }
     }
   };
 

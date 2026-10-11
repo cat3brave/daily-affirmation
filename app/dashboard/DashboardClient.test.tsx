@@ -474,6 +474,7 @@ describe("DashboardPage", () => {
     );
     expect(dashboardMocks.renderBloomGraph).toHaveBeenLastCalledWith({
       refreshKey: 12,
+      userId: "user-dashboard-1",
     });
     expect(dashboardMocks.createSupabaseBrowserClient).not.toHaveBeenCalled();
     expect(screen.getByRole("tabpanel")).toHaveAttribute(
@@ -545,8 +546,7 @@ describe("DashboardPage", () => {
 
     configureDashboardMocks({ userId: null });
     rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
-    expect(screen.getByTestId("favorite-disabled-state")).toHaveTextContent("true");
-    expect(getLastHomeTabProps().isFavoriteDisabled).toBe(true);
+    expect(screen.queryByTestId("home-tab")).not.toBeInTheDocument();
 
     configureDashboardMocks({ affirmationText: "   " });
     rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
