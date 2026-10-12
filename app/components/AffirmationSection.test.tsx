@@ -265,3 +265,16 @@ describe("AffirmationSection", () => {
     ).toBeDisabled();
   });
 });
+
+it("時間切れ案内とフォールバックを別々のARIA通知で表示し、お気に入りと再操作を維持する", () => {
+  const favorite = vi.fn();
+  render(<AffirmationSection isLoading={false} authError="" rateLimitError=""
+    timeoutError="応答に時間がかかっています。少し時間をおいて、もう一度お試しください。"
+    text="あなたは、そのままで素晴らしい存在です。"
+    handleClick={vi.fn()} handleFavoriteAffirmation={favorite} isFavoriteDisabled={false} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("応答に時間がかかっています。");
+  expect(screen.getByRole("status")).toHaveTextContent("あなたは、そのままで素晴らしい存在です。");
+  expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "お気に入りにする 🌷" }));
+  expect(favorite).toHaveBeenCalledOnce();
+});

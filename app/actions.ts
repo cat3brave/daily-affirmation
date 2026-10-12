@@ -1,15 +1,19 @@
 "use server";
 
+import { generateGeminiText, GeminiTimeoutError } from "./lib/geminiRequest";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAuthenticatedUser } from "./lib/supabaseServer";
 
 export type GeminiActionResult =
   | { status: "success"; text: string }
   | { status: "fallback"; text: string }
+  | { status: "timed_out"; message: string; text: string }
   | { status: "auth_required"; message: string }
   | { status: "invalid_input"; message: string }
   | { status: "rate_limited"; message: string };
 
+const TIMEOUT_MESSAGE =
+  "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。";
 const AUTH_REQUIRED_MESSAGE =
   "ログイン状態を確認できませんでした。ログインし直してください。";
 const INVALID_INPUT_MESSAGE = "入力内容を確認してください。";
@@ -88,9 +92,15 @@ export async function generateAffirmation(): Promise<GeminiActionResult> {
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    return { status: "success", text: result.response.text().trim() };
+    return { status: "success", text: await generateGeminiText(model, prompt) };
   } catch (error) {
+    if (error instanceof GeminiTimeoutError) {
+      return {
+        status: "timed_out",
+        message: TIMEOUT_MESSAGE,
+        text: AFFIRMATION_FALLBACK,
+      };
+    }
     if (isGeminiRateLimitError(error)) {
       return { status: "rate_limited", message: RATE_LIMITED_MESSAGE };
     }
@@ -130,9 +140,15 @@ export async function translateHarshVoice(
 「${safeHarshText}」`;
 
   try {
-    const result = await model.generateContent(prompt);
-    return { status: "success", text: result.response.text().trim() };
+    return { status: "success", text: await generateGeminiText(model, prompt) };
   } catch (error) {
+    if (error instanceof GeminiTimeoutError) {
+      return {
+        status: "timed_out",
+        message: TIMEOUT_MESSAGE,
+        text: TRANSLATE_FALLBACK,
+      };
+    }
     if (isGeminiRateLimitError(error)) {
       return { status: "rate_limited", message: RATE_LIMITED_MESSAGE };
     }
