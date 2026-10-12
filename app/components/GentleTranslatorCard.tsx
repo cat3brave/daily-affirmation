@@ -30,6 +30,9 @@ export default function GentleTranslatorCard() {
         result.status === "rate_limited"
       ) {
         setTranslationError(result.message);
+      } else if (result.status === "timed_out") {
+        setTranslationError(result.message);
+        setTranslatedVoice(result.text);
       } else {
         setTranslatedVoice(result.text);
       }
@@ -93,6 +96,7 @@ export default function GentleTranslatorCard() {
       <AnimatePresence mode="wait">
         {translatedVoice && (
           <motion.div
+            key="translation-result"
             role="status"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
@@ -106,6 +110,7 @@ export default function GentleTranslatorCard() {
         )}
         {translationError && (
           <motion.div
+            key="translation-error"
             role="alert"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}

@@ -2,6 +2,16 @@
 
 Gemini APIの利用プランや制限、データ取扱いは変更される可能性があります。固定の上限値や料金ではなく、運用時点の公式情報を確認します。
 
+## 応答時間の制限
+
+`generateAffirmation`と`translateHarshVoice`は、Gemini呼び出し開始からレスポンス本文・テキスト取得までを共通の15秒で制限します。入力検証、`auth.getUser()`による認証確認、APIキー確認の順序は従来どおりです。認証確認やServer Actionの通信全体が15秒以内に完了する保証ではありません。
+
+導入済み`@google/generative-ai` 0.24.1の[公式SingleRequestOptions](https://github.com/google-gemini/generative-ai-js/blob/v0.24.1/types/requests.ts)がサポートするAbortSignalを使用し、期限時に中断を要求します。SDK内蔵timeoutは独自タイマーの後始末をできないため使用せず、共通ヘルパーでタイマーとSDKの中断転送リスナーを後始末します。通信が直ちに停止しない場合も時間切れを返し、遅い成功・失敗を採用しません。サービス側の処理や課金まで取り消せるとは保証しません。
+
+時間切れは`timed_out`として固定案内と既存フォールバックを表示し、入力を保持して再操作可能に戻します。自動再試行は行いません。Geminiの429は従来の`rate_limited`として扱います。利用者別の回数制限は未実装です。
+
+実SDKとモックfetchを組み合わせたfake timerテストで、fetch・本文待機中の中断、遅延応答の破棄、タイマー・リスナーの後始末を検証します。実Supabase・実Geminiには接続しません。
+
 ## 定期確認
 
 - [ ] Google AI Studioで、現在有効なRPM・TPM・RPDを確認する

@@ -276,3 +276,30 @@ describe("GentleTranslatorCard", () => {
     );
   });
 });
+
+it("時間切れではalertと既存フォールバックを表示し入力を保持して再試行できる", async () => {
+  translatorMocks.translateHarshVoice.mockResolvedValueOnce({
+    status: "timed_out", message: "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。",
+    text: "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。",
+  });
+  render(<GentleTranslatorCard />);
+  fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
+  fireEvent.click(getTranslateButton());
+  expect(await screen.findByRole("alert")).toHaveTextContent("応答に時間がかかっています。");
+  expect(screen.getByRole("status")).toHaveTextContent("今はAIがお休み中のようです。");
+  expect(getTextbox()).toHaveValue("保持する入力");
+  expect(getTextbox()).toBeEnabled();
+  expect(getTranslateButton()).toBeEnabled();
+  const retry = createDeferred<GeminiActionResult>();
+  translatorMocks.translateHarshVoice.mockReturnValueOnce(retry.promise);
+  fireEvent.click(getTranslateButton());
+  fireEvent.click(getTranslateButton());
+  expect(translatorMocks.translateHarshVoice).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(getTextbox()).toBeDisabled();
+  await act(async () => { retry.resolve({ status: "success", text: "再試行成功" }); });
+  expect(screen.getByRole("status")).toHaveTextContent("再試行成功");
+  expect(getTextbox()).toBeEnabled();
+  expect(getTranslateButton()).toBeEnabled();
+});

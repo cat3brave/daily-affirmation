@@ -7,6 +7,7 @@ export function useAffirmationGenerator() {
   const [text, setText] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
   const [rateLimitError, setRateLimitError] = useState<string>("");
+  const [timeoutError, setTimeoutError] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const isGeneratingRef = useRef(false);
 
@@ -20,6 +21,7 @@ export function useAffirmationGenerator() {
     setText("");
     setAuthError("");
     setRateLimitError("");
+    setTimeoutError("");
 
     try {
       const result = await generateAffirmation();
@@ -28,6 +30,9 @@ export function useAffirmationGenerator() {
         setAuthError(result.message);
       } else if (result.status === "rate_limited") {
         setRateLimitError(result.message);
+      } else if (result.status === "timed_out") {
+        setTimeoutError(result.message);
+        setText(result.text);
       } else if (result.status === "success" || result.status === "fallback") {
         setText(result.text);
       }
@@ -46,6 +51,7 @@ export function useAffirmationGenerator() {
     text,
     authError,
     rateLimitError,
+    timeoutError,
     isLoading,
     handleGenerateAffirmation,
   };

@@ -8,6 +8,7 @@ type HomeTabProps = {
   text: string;
   affirmationAuthError: string;
   affirmationRateLimitError: string;
+  affirmationTimeoutError?: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   handleRemoveFavoriteAffirmation: (affirmation: string) => void;
@@ -34,6 +35,7 @@ export default function HomeTab({
   text,
   affirmationAuthError,
   affirmationRateLimitError,
+  affirmationTimeoutError,
   handleClick,
   handleFavoriteAffirmation,
   handleRemoveFavoriteAffirmation,
@@ -61,6 +63,7 @@ export default function HomeTab({
         text={text}
         authError={affirmationAuthError}
         rateLimitError={affirmationRateLimitError}
+        timeoutError={affirmationTimeoutError}
         handleClick={handleClick}
         handleFavoriteAffirmation={handleFavoriteAffirmation}
         isFavoriteDisabled={isFavoriteDisabled}

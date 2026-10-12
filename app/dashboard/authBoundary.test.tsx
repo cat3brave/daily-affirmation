@@ -57,7 +57,7 @@ function Owned({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
     <output data-testid="favorites">{favorites.favoriteAffirmations.join(",")}</output>
     <output data-testid="favorite-error">{favorites.favoriteError}{favorites.favoriteLoadError}</output>
     <output data-testid="garden">{JSON.stringify([garden.growth, garden.totalBlooms, garden.currentFlower, garden.isBloomSaving, garden.flowerError, garden.flowerLoadError])}</output>
-    <output data-testid="ai">{ai.text}{ai.authError}{ai.rateLimitError}{String(ai.isLoading)}</output>
+    <output data-testid="ai">{ai.text}{ai.authError}{ai.rateLimitError}{ai.timeoutError}{String(ai.isLoading)}</output>
     <button onClick={() => favorites.handleFavoriteAffirmation("same")}>save</button>
     <button onClick={() => favorites.handleRemoveFavoriteAffirmation("same")}>delete</button>
     <button onClick={garden.handleWalk}>walk</button>
@@ -248,6 +248,67 @@ describe("dashboard authentication boundary (mock only)", () => {
     await click("成長記録を再読み込み");
     expect(screen.getByRole("region", { name: "お花の成長記録（過去3ヶ月）" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "成長記録を再読み込み" })).not.toBeInTheDocument();
+  });
+
+  it.each(["timed_out", "success", "reject"])("old AI %s cannot update or unlock new requests after authentication changes", async (outcome) => {
+    const oldAI = deferred<unknown>(); const oldTranslation = deferred<unknown>();
+    const newAI = deferred<unknown>(); const newTranslation = deferred<unknown>();
+    mocks.generate.mockReturnValueOnce(oldAI.promise).mockReturnValueOnce(newAI.promise);
+    mocks.translate.mockReturnValueOnce(oldTranslation.promise).mockReturnValueOnce(newTranslation.promise);
+    render(<Boundary />); await flush(); await click("generate");
+    const input = "優しい言葉に翻訳したい自分への厳しい声";
+    fireEvent.change(screen.getByLabelText(input), { target: { value: "old input" } });
+    await click("優しい言葉に翻訳する 🪄");
+    await change("B"); await change("A"); await click("generate");
+    fireEvent.change(screen.getByLabelText(input), { target: { value: "new input" } });
+    await click("優しい言葉に翻訳する 🪄");
+    await act(async () => {
+      if (outcome === "reject") {
+        oldAI.reject(new Error("old failure")); oldTranslation.reject(new Error("old failure"));
+      } else {
+        const value = { status: outcome, text: "old result", message: "old timeout" };
+        oldAI.resolve(value); oldTranslation.resolve(value);
+      }
+    });
+    expect(screen.getByTestId("ai")).toHaveTextContent("true");
+    expect(screen.getByTestId("ai")).not.toHaveTextContent(/old/);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("old result")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(input)).toHaveValue("new input");
+    expect(screen.getByLabelText(input)).toBeDisabled();
+    await click("generate"); expect(mocks.generate).toHaveBeenCalledTimes(2);
+    expect(mocks.translate).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      newAI.resolve({ status: "success", text: "new AI" });
+      newTranslation.resolve({ status: "success", text: "new translation" });
+    });
+    expect(screen.getByTestId("ai")).toHaveTextContent("new AIfalse");
+    expect(screen.getByLabelText(input)).toBeEnabled();
+    expect(screen.getByText("new translation")).toBeInTheDocument();
+  });
+
+  it.each(["timed_out", "success", "reject"])("discards AI %s after logout or unmount", async (outcome) => {
+    for (const logout of [true, false]) {
+      const ai = deferred<unknown>(); const translation = deferred<unknown>();
+      mocks.generate.mockReturnValueOnce(ai.promise); mocks.translate.mockReturnValueOnce(translation.promise);
+      mocks.getUser.mockResolvedValue({ data: { user: { id: "A" } }, error: null });
+      const view = render(<Boundary />); await flush(); await click("generate");
+      fireEvent.change(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声"), { target: { value: "old input" } });
+      await click("優しい言葉に翻訳する 🪄");
+      if (logout) await change(null); else view.unmount();
+      await act(async () => {
+        if (outcome === "reject") {
+          ai.reject(new Error("old failure")); translation.reject(new Error("old failure"));
+        } else {
+          const value = { status: outcome, text: "old result", message: "old timeout" };
+          ai.resolve(value); translation.resolve(value);
+        }
+      });
+      expect(screen.queryByTestId("ai")).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText("old result")).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 
 });

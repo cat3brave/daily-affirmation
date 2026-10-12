@@ -182,3 +182,29 @@ describe("useAffirmationGenerator", () => {
     expect(result.current.isLoading).toBe(false);
   });
 });
+
+it("時間切れは案内とフォールバックを保持し、次の操作で消して成功へ復帰する", async () => {
+  affirmationMocks.generateAffirmation.mockResolvedValueOnce({
+    status: "timed_out", message: "応答に時間がかかっています。", text: "あなたは、そのままで素晴らしい存在です。",
+  });
+  const { result } = renderHook(() => useAffirmationGenerator());
+  await act(async () => { await result.current.handleGenerateAffirmation(); });
+  expect(result.current.timeoutError).toBe("応答に時間がかかっています。");
+  expect(result.current.text).toBe("あなたは、そのままで素晴らしい存在です。");
+  expect(result.current.authError).toBe("");
+  expect(result.current.rateLimitError).toBe("");
+  expect(result.current.isLoading).toBe(false);
+  const retry = createDeferred<GeminiActionResult>();
+  affirmationMocks.generateAffirmation.mockReturnValueOnce(retry.promise);
+  act(() => {
+    void result.current.handleGenerateAffirmation();
+    void result.current.handleGenerateAffirmation();
+  });
+  expect(affirmationMocks.generateAffirmation).toHaveBeenCalledTimes(2);
+  expect(result.current.timeoutError).toBe("");
+  expect(result.current.text).toBe("");
+  expect(result.current.isLoading).toBe(true);
+  await act(async () => { retry.resolve({ status: "success", text: "再試行成功" }); });
+  expect(result.current.text).toBe("再試行成功");
+  expect(result.current.isLoading).toBe(false);
+});

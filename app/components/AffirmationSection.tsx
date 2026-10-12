@@ -5,6 +5,7 @@ type AffirmationSectionProps = {
   text: string;
   authError: string;
   rateLimitError: string;
+  timeoutError?: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   isFavoriteDisabled: boolean;
@@ -15,6 +16,7 @@ export default function AffirmationSection({
   text,
   authError,
   rateLimitError,
+  timeoutError,
   handleClick,
   handleFavoriteAffirmation,
   isFavoriteDisabled,
@@ -62,6 +64,14 @@ export default function AffirmationSection({
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="flex flex-col items-center gap-4"
             >
+              {timeoutError && (
+                <p
+                  role="alert"
+                  className="text-center text-red-700 text-sm leading-relaxed"
+                >
+                  {timeoutError}
+                </p>
+              )}
               <p
                 role="status"
                 aria-atomic="true"
