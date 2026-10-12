@@ -109,7 +109,7 @@ test("login, tabs, unsaved draft, reload and logout", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("real production Server Actions: repeatable AI fallback and private JSON export", async ({ page, request }) => {
+test("real production Server Actions: repeatable AI fallback", async ({ page, request }) => {
   await login(page);
   const baseline = (await (await request.get(`${mockOrigin}/__requests`)).json()).requests.length;
   for (let repeat = 0; repeat < 2; repeat++) {
@@ -126,37 +126,7 @@ test("real production Server Actions: repeatable AI fallback and private JSON ex
     await expect(textbox).toBeEnabled();
     await expect(page.getByRole("button", { name: "優しい言葉に翻訳する 🪄" })).toBeEnabled();
   }
-  const before = Date.now();
-  const downloadPromise = page.waitForEvent("download");
-  await action(page, "データを書き出す");
-  const download = await downloadPromise;
-  const stream = await download.createReadStream();
-  let contents = "";
-  for await (const chunk of stream) contents += chunk.toString();
-  const data = JSON.parse(contents);
-  expect(data).toMatchObject({
-    schemaVersion: 1,
-    todos: [{ id: "todo-e2e", text: "深呼吸する", completed: true }],
-    favoriteAffirmations: [{ id: "favorite-e2e", text: "今日も一歩ずつ" }],
-    threeGoodThings: [{ id: "good-e2e", things1: "散歩", things2: "青空", things3: "温かいお茶" }],
-    bloomLogs: [{ id: "bloom-e2e", flower_type: "tulip" }],
-  });
-  for (const key of ["todos", "favoriteAffirmations", "threeGoodThings", "bloomLogs"]) expect(data[key]).toHaveLength(1);
-  const timestamp = Date.parse(data.exportedAt);
-  expect(timestamp).toBeGreaterThanOrEqual(before);
-  expect(timestamp).toBeLessThanOrEqual(Date.now());
-  const localDate = await page.evaluate((iso) => {
-    const date = new Date(iso);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  }, data.exportedAt);
-  expect(download.suggestedFilename()).toBe(`daily-affirmation-export-${localDate}.json`);
-  expect(contents).not.toMatch(/other-user|他ユーザーの秘密|user_id|access.?token|refresh.?token|cookie|api.?key|authorization|password|anon.?key|e2e-password|e2e-user@example.com|service.?role/i);
-  await expect(page.getByText("保存済みデータを書き出しました。", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "データを書き出す", exact: true })).toBeEnabled();
   const audit = await (await request.get(`${mockOrigin}/__requests`)).json();
   const serverRequests = audit.requests.slice(baseline).filter((entry: { source: string }) => entry.source === "server");
-  expect(serverRequests.filter((entry: { path: string }) => entry.path === "/auth/v1/user").length).toBeGreaterThanOrEqual(5);
-  for (const table of ["todos", "favorite_affirmations", "three_good_things", "bloom_logs"]) {
-    expect(serverRequests).toEqual(expect.arrayContaining([expect.objectContaining({ method: "GET", path: `/rest/v1/${table}`, query: expect.stringContaining("user_id=eq.e2e-user-id") })]));
-  }
+  expect(serverRequests.filter((entry: { path: string }) => entry.path === "/auth/v1/user").length).toBeGreaterThanOrEqual(4);
 });

@@ -103,83 +103,85 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
 
         <FloatingCloudLayer floatingClouds={floatingClouds} />
 
-        <BirdViewPanel
-          currentTab={currentTab}
-          isBirdView={isBirdView}
-          totalBlooms={totalBlooms}
-        />
+        <div className="relative mt-6 w-full max-w-lg">
+          <BirdViewPanel
+            currentTab={currentTab}
+            isBirdView={isBirdView}
+            totalBlooms={totalBlooms}
+          />
 
-        <motion.div
-          id="main-content"
-          tabIndex={-1}
-          animate={{
-            scale: isBirdView ? 0.75 : 1,
-            opacity: isBirdView ? 0.3 : 1,
-            y: isBirdView ? 120 : 0,
-          }}
-          transition={{ duration: 1, ease: "easeInOut" }}
-          className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom mt-16"
-        >
-          {dashboardTabs.map(({ id }) => (
-            <div
-              key={id}
-              id={getDashboardPanelId(id)}
-              role="tabpanel"
-              aria-labelledby={getDashboardTabId(id)}
-              hidden={currentTab !== id}
-              className="w-full"
-            >
-              <AnimatePresence mode="wait">
+          <motion.div
+            id="main-content"
+            tabIndex={-1}
+            animate={{
+              scale: isBirdView ? 0.75 : 1,
+              opacity: isBirdView ? 0.3 : 1,
+              y: isBirdView ? 120 : 0,
+            }}
+            transition={{ duration: 1, ease: "easeInOut" }}
+            className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom"
+          >
+            {dashboardTabs.map(({ id }) => (
+              <div
+                key={id}
+                id={getDashboardPanelId(id)}
+                role="tabpanel"
+                aria-labelledby={getDashboardTabId(id)}
+                hidden={currentTab !== id}
+                className="w-full"
+              >
+                <AnimatePresence mode="wait">
+                  {id === "home" && currentTab === id && (
+                    <HomeTab
+                      isLoading={isLoading}
+                      text={text}
+                      affirmationAuthError={authError}
+                      affirmationRateLimitError={rateLimitError}
+                      affirmationTimeoutError={timeoutError}
+                      handleClick={handleGenerateAffirmation}
+                      handleFavoriteAffirmation={handleFavoriteAffirmation}
+                      isFavoriteDisabled={isFavoriteDisabled}
+                      favoriteAffirmations={favoriteAffirmations}
+                      favoriteError={favoriteError}
+                      favoriteLoadError={favoriteLoadError}
+                      isReloadingFavorites={isReloadingFavorites}
+                      reloadFavoriteAffirmations={reloadFavoriteAffirmations}
+                      handleRemoveFavoriteAffirmation={
+                        handleRemoveFavoriteAffirmation
+                      }
+                      totalBlooms={totalBlooms}
+                      growth={growth}
+                      currentFlower={currentFlower}
+                      isBloomSaving={isBloomSaving}
+                      flowerError={flowerError}
+                      flowerLoadError={flowerLoadError}
+                      isReloadingBlooms={isReloadingBlooms}
+                      reloadBlooms={reloadBlooms}
+                      handleWalk={handleWalk}
+                      setShowTada={setShowTada}
+                    />
+                  )}
+
+                  {id === "work" && currentTab === id && (
+                    <WorkTab handleFloatCloud={handleFloatCloud} />
+                  )}
+
+                  {id === "amulet" && currentTab === id && (
+                    <AmuletTab setShowTada={setShowTada} />
+                  )}
+                </AnimatePresence>
+
+                {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
+                {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
                 {id === "home" && currentTab === id && (
-                  <HomeTab
-                    isLoading={isLoading}
-                    text={text}
-                    affirmationAuthError={authError}
-                    affirmationRateLimitError={rateLimitError}
-                    affirmationTimeoutError={timeoutError}
-                    handleClick={handleGenerateAffirmation}
-                    handleFavoriteAffirmation={handleFavoriteAffirmation}
-                    isFavoriteDisabled={isFavoriteDisabled}
-                    favoriteAffirmations={favoriteAffirmations}
-                    favoriteError={favoriteError}
-                    favoriteLoadError={favoriteLoadError}
-                    isReloadingFavorites={isReloadingFavorites}
-                    reloadFavoriteAffirmations={reloadFavoriteAffirmations}
-                    handleRemoveFavoriteAffirmation={
-                      handleRemoveFavoriteAffirmation
-                    }
-                    totalBlooms={totalBlooms}
-                    growth={growth}
-                    currentFlower={currentFlower}
-                    isBloomSaving={isBloomSaving}
-                    flowerError={flowerError}
-                    flowerLoadError={flowerLoadError}
-                    isReloadingBlooms={isReloadingBlooms}
-                    reloadBlooms={reloadBlooms}
-                    handleWalk={handleWalk}
-                    setShowTada={setShowTada}
-                  />
+                  <div className="w-full mt-8">
+                    <BloomGraph userId={userId!} refreshKey={bloomRefreshKey} />
+                  </div>
                 )}
-
-                {id === "work" && currentTab === id && (
-                  <WorkTab handleFloatCloud={handleFloatCloud} />
-                )}
-
-                {id === "amulet" && currentTab === id && (
-                  <AmuletTab setShowTada={setShowTada} />
-                )}
-              </AnimatePresence>
-
-              {/* 🟢 ここにグラフを配置して、上部に少し余白(mt-8)を作ります */}
-              {/* 👇 波括弧で囲んで、ホーム画面の時だけ表示するようにする！ */}
-              {id === "home" && currentTab === id && (
-                <div className="w-full mt-8">
-                  <BloomGraph userId={userId!} refreshKey={bloomRefreshKey} />
-                </div>
-              )}
-            </div>
-          ))}
-        </motion.div>
+              </div>
+            ))}
+          </motion.div>
+        </div>
 
         <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
       </div>
