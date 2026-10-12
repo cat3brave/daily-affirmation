@@ -21,7 +21,7 @@ export default function BirdViewPanel({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="absolute top-24 z-40 flex flex-col items-center"
+          className="absolute top-0 z-40 w-full flex flex-col items-center"
         >
           <div className="bg-white/90 backdrop-blur-md p-6 rounded-3xl shadow-lg border border-sky-100 text-center max-w-sm">
             <h2 className="text-sky-800 font-bold mb-3">🕊️ 空からの景色</h2>

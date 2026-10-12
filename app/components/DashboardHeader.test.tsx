@@ -41,3 +41,24 @@ describe("DashboardHeader", () => {
     expect(screen.queryByText("hanako さん🌷")).not.toBeInTheDocument();
   });
 });
+
+
+describe("ヘッダーの操作とユーザー表示", () => {
+  it("書き出し導線を外し、プライバシーと現在ユーザーのログアウトを残す", () => {
+    render(<DashboardHeader currentTab="home" isBirdView={false} onToggleBirdView={vi.fn()} userEmail="hanako@example.com" userId="user-1" />);
+    expect(screen.queryByRole("button", { name: "データを書き出す" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Supabaseへ保存済みのデータのみ")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "プライバシーとデータ" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("button", { name: "ログアウト" })).toHaveAttribute("data-user-id", "user-1");
+  });
+
+  it("長いユーザー名の全文をヘッダー内に保持する", () => {
+    const name = "long-user-name-".repeat(20);
+    render(<DashboardHeader currentTab="work" isBirdView={false} onToggleBirdView={vi.fn()} userEmail={`${name}@example.com`} userId="user-1" />);
+    const user = screen.getByText(`${name} さん🌷`);
+    expect(user.closest("header")).toBeInTheDocument();
+    expect(user).toHaveAttribute("title", `${name} さん🌷`);
+    expect(screen.getByRole("link", { name: "プライバシーとデータ" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
+  });
+});

@@ -10,6 +10,8 @@ describe("PrivacyPage", () => {
     expect(screen.getByText(/localStorageへ、ユーザー別/)).toHaveTextContent("未保存の下書き");
     expect(screen.getByText(/ログアウトが成功した後/)).toHaveTextContent("現在のユーザー");
     expect(screen.getByText(/アファメーション生成にGemini API/)).toHaveTextContent("機微な情報は翻訳欄へ入力しない");
+    expect(screen.getByText("現在、画面からデータを書き出す操作は利用できません。")).toBeInTheDocument();
+    expect(screen.queryByText(/JSONでエクスポートできます/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "ログイン画面へ" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: "ダッシュボードへ" })).toHaveAttribute("href", "/dashboard");
   });
