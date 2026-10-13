@@ -8,7 +8,7 @@
 開始時は `work`、`git status -sb` は `## work`、`git status --short` は空。
 端末のfetchはプロキシ接続エラーのため、GitHub連携のmainブランチ情報とHEAD一致で確認した。
 旧PR #52、そのブランチ、既存アカウント削除SQL案には変更・適用を行わない。
-`supabase/schema.sql`、migration、アプリ、依存関係、認証、CI、本番設定は変更しない。
+`supabase/schema.sql`、migration、アプリ、依存関係、認証、既存CI、本番設定は変更しない。
 
 ## 暫定仕様
 
@@ -123,27 +123,71 @@ timeout 300s python3 supabase/review/ai-usage-limit/04-test-local.py
 TCP listenは無効、継承PG環境変数を除去、ディレクトリは所有者限定。
 fixture → 構築案 → 権限確認 → 下記試験 → ロールバック → sentinel確認を順に実施し、
 finallyで自分のクラスタを停止・一時ディレクトリを削除する。
-異常終了・外部timeout時に残ったクラスタは、表示された一時パスを確認し、そのクラスタだけ停止する。
+SIGTERM（専用workflowの300秒timeoutを含む）と通常例外はfinallyで停止・削除する。
+SIGKILL・runner障害・jobの強制終了ではfinallyは保証できない。GitHub-hosted runnerの使い捨てVM廃棄で
+クラスタと一時ファイルも破棄される。ローカルで強制終了した場合は表示された一時パスを確認し、そのクラスタだけ停止する。
 他のDBへfixtureを流用してはいけない。管理者のfixture操作と実際のauthenticatedのRPC操作を分ける。
 
 | 試験 | 検証内容・期待値 | 今回の実行 |
 | --- | --- | --- |
-| A/B独立 | 各自初回の日次残り19。Aのロック中もBが許可。所有者にもFORCE RLSでB非表示 | 未実施 |
-| 認証・権限 | anon 42501、uidなし28000。他人参照・全直接DML・TRUNCATE・ALTER・owner切替拒否。任意ID引数は不存在 | 未実施 |
-| 初回並行 | 12接続。先頭の初回確保を未コミットで保持し、11接続のDBロック待ちを観測して解放。許可合計3 | 未実施 |
-| 日次残り1 | fixtureで19回に設定。同じ12接続・ロック待ちを観測。許可合計が正確に1 | 未実施 |
-| 共通枠・拒否 | 両操作に同じRPCを使用。3回後拒否。日次拒否も含め前後の保存値一致 | 未実施 |
-| 日付・60秒境界 | 管理fixtureの時計でJST 23:59:59→00:00:00、前日の時刻保持、ちょうど60秒の除外 | 未実施 |
-| 両枠retry | 午前0時より60秒枠終了が遅い場合/早い場合の双方でmaxを返す | 未実施 |
-| DBエラー・timeout | UPDATEに管理fixtureの例外トリガー→初回INSERTもrollback。確保後のゼロ除算もrollback。行ロックtimeoutで不変 | 未実施 |
-| 削除・rollback | A削除で新利用行のみcascade。rollback後の新オブジェクト不存在、sentinelとB保持 | 未実施 |
+| A/B独立 | 各自初回の日次残り19。Aのロック中もBが許可。所有者にもFORCE RLSでB非表示 | 成功（15.19 / 17.11） |
+| 認証・権限 | anon 42501、uidなし28000。他人参照・全直接DML・TRUNCATE・ALTER・owner切替拒否。任意ID引数は不存在 | 成功（15.19 / 17.11） |
+| 初回並行 | 12接続。先頭の初回確保を未コミットで保持し、11接続のDBロック待ちを観測して解放。許可合計3 | 成功（15.19 / 17.11） |
+| 日次残り1 | fixtureで19回に設定。同じ12接続・ロック待ちを観測。許可合計が正確に1 | 成功（15.19 / 17.11） |
+| 共通枠・拒否 | 両操作に同じRPCを使用。3回後拒否。日次拒否も含め前後の保存値一致 | 成功（15.19 / 17.11） |
+| 日付・60秒境界 | 管理fixtureの時計でJST 23:59:59→00:00:00、前日の時刻保持、ちょうど60秒の除外 | 成功（15.19 / 17.11） |
+| 両枠retry | 午前0時より60秒枠終了が遅い場合/早い場合の双方でmaxを返す | 成功（15.19 / 17.11） |
+| DBエラー・timeout | UPDATEに管理fixtureの例外トリガー→初回INSERTもrollback。確保後のゼロ除算もrollback。行ロックtimeoutで不変 | 成功（15.19 / 17.11） |
+| 削除・rollback | A削除で新利用行のみcascade。rollback後の新オブジェクト不存在、sentinelとB保持 | 成功（15.19 / 17.11） |
 
 時計fixtureは使い捨てDB内に管理者専用時計を作り、`pg_get_functiondef` で取得した
 内部関数の**2箇所のclock_timestamp式だけ**を一時的に差し替える。引数や上限は変えない。
 日付境界試験後に元の関数定義へ戻す。元の関数の実時計・実並行試験と、時計差替えによる境界試験は区別する。
 本番SQLには試験用の時刻・上限パラメーターや時計関数を入れない。
 
-### 今回実際に確認したこと
+### 専用GitHub Actions試験
+
+`.github/workflows/ai-usage-limit-db.yml` はmain向けpull_request/mainへのpushで、
+このディレクトリ・設計文書・workflow自身の変更時に自動実行する。手動実行は不要。
+Postgres 15/17のmatrix、ubuntu-24.04の使い捨てVM、contents: read、10分job上限、
+同じrefの古い実行を取り消すconcurrencyを設定する。既存Verify・rulesetは変更しない。
+
+[PostgreSQL公式Ubuntu配布手順](https://www.postgresql.org/download/linux/ubuntu/)の手動PGDG設定を使用。
+HTTPSで公式公開鍵を取得しfingerprintを確認、Signed-Byを指定したaptで署名とパッケージhashを検証する。
+外部スクリプトは実行せず、メジャー版を指定して導入する。パッチ版は更新されるためログのdpkg-query、
+initdb/pg_ctl/psql --version、SELECT version()を実行時の証拠とする。
+パッケージによる既定クラスタ作成を抑止し、版指定のbinをPATH先頭に追加する。
+試験はsudoを使わず非rootのrunnerユーザーで実行し、既存Postgresサービスを利用しない。
+
+DB子プロセスへ渡す環境はPATH/ロケール/TZと一時HOMEだけで、PG接続設定や資格情報を継承しない。
+TCP listenを無効にし自身の所有者限定Unixソケットを明示する。秘密情報・本番資格情報は不要。
+CIログには各PASS、12接続の許可数と11ロック待ち、rollback/sentinel、後始末を記録する。
+クライアント試験はSET SESSION AUTHORIZATIONでsession userも対象ロールにし、
+管理者session userのSET ROLE権限で所有者切替の拒否試験を歪めない。
+時計差替え後は構築直後のpg_get_functiondefとの完全一致とカタログ権限を再確認する。
+
+2026-10-14（日本時間）、最新main `ea05d5f32853ed48853d9518eb289d97fca88ab5` から追加した
+[PR #60](https://github.com/cat3brave/daily-affirmation/pull/60) の
+[DB試験run](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057) が全matrix成功。
+試験対象commitは `9d3c9da5eae4ddb2f21ddf177a59e7e956d048ae`。
+[Postgres 15 job](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057/job/115542026297) は
+15.19（Ubuntu 15.19-1.pgdg24.04+2）、
+[Postgres 17 job](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057/job/115542025904) は
+17.11（Ubuntu 17.11-1.pgdg24.04+2）。ホスト既定版の推測ではなくバイナリとDB自身の出力で確認した。
+
+両版で `04-test-local.py` が完走し、上表の全項目とSQL構築・カタログassertionが成功。
+初回行作成の12接続は許可3回、日次残り1回の12接続は許可1回。
+各並行試験は11接続のLock待ちをpg_stat_activityで観測し、Aのロック中にBが許可された。
+時計境界試験後の関数定義は構築直後と一致し、権限assertionも再実行成功。
+ユーザー削除のcascade、削除済みuidのFK拒否、rollback後の新オブジェクト不存在、sentinelとB保持、
+自身のクラスタ停止・一時ファイルの後始末もログで確認した。制限SQLの修正は不要だった。
+
+ランナーの修正は、管理者session userのままではSET ROLE拒否を正しく検証できない問題の解消、
+DB子プロセス環境の限定、SIGTERM終了処理、バージョン出力と関数復元assertion等。
+アサーション削除・許可数変更・権限緩和・競合待ちの固定延長は行っていない。
+ローカルDBはバイナリ不在で未実行のまま。成功証拠はGitHub Actions上の隔離Postgresに限る。
+
+### PR #59の準備時点の確認（履歴）
 
 - `docker info --format '{{.ServerVersion}}'`：ソケット権限で利用不可。既存隔離DBと判断できる環境なし。
 - `python3 supabase/review/ai-usage-limit/04-test-local.py --help`：成功。
@@ -155,7 +199,8 @@ finallyで自分のクラスタを停止・一時ディレクトリを削除す�
   既存CIのVerify・Vercelの結果はPRで別途確認する。
 
 本番・共有DB・実ユーザー・実Geminiは使用していない。
-全DB試験は未実施。ランナー自体のDB実行経路も未検証であり、準備資料としてレビューする。
+PR #59の時点では全DB試験とランナーのDB実行経路は未検証だった。
+今回、上記GitHub Actionsの隔離Postgresで完走した範囲だけを確認済みに更新した。
 さらに実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
 既定権限・イベントトリガー、Exposed schemas、匿名/失効トークン、スキーマキャッシュを確認する必要がある。
 ローカルfixtureはこれらの代替にはならない。Advisorsも未実施。
