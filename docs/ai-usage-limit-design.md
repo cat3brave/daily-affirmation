@@ -130,15 +130,15 @@ SIGKILL・runner障害・jobの強制終了ではfinallyは保証できない。
 
 | 試験 | 検証内容・期待値 | 今回の実行 |
 | --- | --- | --- |
-| A/B独立 | 各自初回の日次残り19。Aのロック中もBが許可。所有者にもFORCE RLSでB非表示 | 未実施 |
-| 認証・権限 | anon 42501、uidなし28000。他人参照・全直接DML・TRUNCATE・ALTER・owner切替拒否。任意ID引数は不存在 | 未実施 |
-| 初回並行 | 12接続。先頭の初回確保を未コミットで保持し、11接続のDBロック待ちを観測して解放。許可合計3 | 未実施 |
-| 日次残り1 | fixtureで19回に設定。同じ12接続・ロック待ちを観測。許可合計が正確に1 | 未実施 |
-| 共通枠・拒否 | 両操作に同じRPCを使用。3回後拒否。日次拒否も含め前後の保存値一致 | 未実施 |
-| 日付・60秒境界 | 管理fixtureの時計でJST 23:59:59→00:00:00、前日の時刻保持、ちょうど60秒の除外 | 未実施 |
-| 両枠retry | 午前0時より60秒枠終了が遅い場合/早い場合の双方でmaxを返す | 未実施 |
-| DBエラー・timeout | UPDATEに管理fixtureの例外トリガー→初回INSERTもrollback。確保後のゼロ除算もrollback。行ロックtimeoutで不変 | 未実施 |
-| 削除・rollback | A削除で新利用行のみcascade。rollback後の新オブジェクト不存在、sentinelとB保持 | 未実施 |
+| A/B独立 | 各自初回の日次残り19。Aのロック中もBが許可。所有者にもFORCE RLSでB非表示 | 成功（15.19 / 17.11） |
+| 認証・権限 | anon 42501、uidなし28000。他人参照・全直接DML・TRUNCATE・ALTER・owner切替拒否。任意ID引数は不存在 | 成功（15.19 / 17.11） |
+| 初回並行 | 12接続。先頭の初回確保を未コミットで保持し、11接続のDBロック待ちを観測して解放。許可合計3 | 成功（15.19 / 17.11） |
+| 日次残り1 | fixtureで19回に設定。同じ12接続・ロック待ちを観測。許可合計が正確に1 | 成功（15.19 / 17.11） |
+| 共通枠・拒否 | 両操作に同じRPCを使用。3回後拒否。日次拒否も含め前後の保存値一致 | 成功（15.19 / 17.11） |
+| 日付・60秒境界 | 管理fixtureの時計でJST 23:59:59→00:00:00、前日の時刻保持、ちょうど60秒の除外 | 成功（15.19 / 17.11） |
+| 両枠retry | 午前0時より60秒枠終了が遅い場合/早い場合の双方でmaxを返す | 成功（15.19 / 17.11） |
+| DBエラー・timeout | UPDATEに管理fixtureの例外トリガー→初回INSERTもrollback。確保後のゼロ除算もrollback。行ロックtimeoutで不変 | 成功（15.19 / 17.11） |
+| 削除・rollback | A削除で新利用行のみcascade。rollback後の新オブジェクト不存在、sentinelとB保持 | 成功（15.19 / 17.11） |
 
 時計fixtureは使い捨てDB内に管理者専用時計を作り、`pg_get_functiondef` で取得した
 内部関数の**2箇所のclock_timestamp式だけ**を一時的に差し替える。引数や上限は変えない。
@@ -166,9 +166,28 @@ CIログには各PASS、12接続の許可数と11ロック待ち、rollback/sent
 管理者session userのSET ROLE権限で所有者切替の拒否試験を歪めない。
 時計差替え後は構築直後のpg_get_functiondefとの完全一致とカタログ権限を再確認する。
 
-この追加時点ではローカルDBバイナリがなくDB未実行。PRイベントのCI完走後に成功項目だけ更新する。
+2026-10-14（日本時間）、最新main `ea05d5f32853ed48853d9518eb289d97fca88ab5` から追加した
+[PR #60](https://github.com/cat3brave/daily-affirmation/pull/60) の
+[DB試験run](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057) が全matrix成功。
+試験対象commitは `9d3c9da5eae4ddb2f21ddf177a59e7e956d048ae`。
+[Postgres 15 job](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057/job/115542026297) は
+15.19（Ubuntu 15.19-1.pgdg24.04+2）、
+[Postgres 17 job](https://github.com/cat3brave/daily-affirmation/actions/runs/38468741057/job/115542025904) は
+17.11（Ubuntu 17.11-1.pgdg24.04+2）。ホスト既定版の推測ではなくバイナリとDB自身の出力で確認した。
 
-### 今回実際に確認したこと
+両版で `04-test-local.py` が完走し、上表の全項目とSQL構築・カタログassertionが成功。
+初回行作成の12接続は許可3回、日次残り1回の12接続は許可1回。
+各並行試験は11接続のLock待ちをpg_stat_activityで観測し、Aのロック中にBが許可された。
+時計境界試験後の関数定義は構築直後と一致し、権限assertionも再実行成功。
+ユーザー削除のcascade、削除済みuidのFK拒否、rollback後の新オブジェクト不存在、sentinelとB保持、
+自身のクラスタ停止・一時ファイルの後始末もログで確認した。制限SQLの修正は不要だった。
+
+ランナーの修正は、管理者session userのままではSET ROLE拒否を正しく検証できない問題の解消、
+DB子プロセス環境の限定、SIGTERM終了処理、バージョン出力と関数復元assertion等。
+アサーション削除・許可数変更・権限緩和・競合待ちの固定延長は行っていない。
+ローカルDBはバイナリ不在で未実行のまま。成功証拠はGitHub Actions上の隔離Postgresに限る。
+
+### PR #59の準備時点の確認（履歴）
 
 - `docker info --format '{{.ServerVersion}}'`：ソケット権限で利用不可。既存隔離DBと判断できる環境なし。
 - `python3 supabase/review/ai-usage-limit/04-test-local.py --help`：成功。
@@ -180,7 +199,8 @@ CIログには各PASS、12接続の許可数と11ロック待ち、rollback/sent
   既存CIのVerify・Vercelの結果はPRで別途確認する。
 
 本番・共有DB・実ユーザー・実Geminiは使用していない。
-全DB試験は未実施。ランナー自体のDB実行経路も未検証であり、準備資料としてレビューする。
+PR #59の時点では全DB試験とランナーのDB実行経路は未検証だった。
+今回、上記GitHub Actionsの隔離Postgresで完走した範囲だけを確認済みに更新した。
 さらに実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
 既定権限・イベントトリガー、Exposed schemas、匿名/失効トークン、スキーマキャッシュを確認する必要がある。
 ローカルfixtureはこれらの代替にはならない。Advisorsも未実施。
