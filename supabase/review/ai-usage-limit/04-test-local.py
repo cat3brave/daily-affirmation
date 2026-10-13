@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -27,11 +28,19 @@ def main():
         return
     if hasattr(os, 'geteuid') and os.geteuid() == 0:
         parser.exit(2, 'DB TEST NOT RUN: run initdb as an unprivileged OS user\n')
-    # No inherited PGHOST, PGDATABASE, PGOPTIONS, service file, or remote credentials.
-    env = {k: v for k, v in os.environ.items() if not k.startswith('PG')}
+    # Pass no inherited connection settings or credentials to PostgreSQL tools.
+    env = {k: os.environ[k] for k in ('PATH', 'LANG', 'LC_ALL', 'TZ') if k in os.environ}
+
+    def terminate(signum, frame):
+        raise SystemExit(f'DB TEST INTERRUPTED: signal {signum}')
+
+    signal.signal(signal.SIGTERM, terminate)
     with tempfile.TemporaryDirectory(prefix='ai-usage-local-') as directory:
         base = Path(directory)
         print(f'Disposable cluster: {base}', flush=True)
+        env['HOME'] = str(base)  # No inherited .pgpass / .pg_service.conf.
+        for name, binary in binaries.items():
+            print(subprocess.check_output([binary, '--version'], env=env, text=True).strip(), flush=True)
         data = base / 'data'
         socket = base / 'socket'
         socket.mkdir(mode=0o700)
@@ -56,7 +65,7 @@ def main():
 
             def call(uid=A, role='authenticated', statement='SELECT row_to_json(r) FROM public.reserve_ai_usage() r;'):
                 # All identifiers/UUIDs here are fixed fixtures, never user input.
-                return f"BEGIN; SET LOCAL ROLE {role}; SET LOCAL request.jwt.claim.sub = '{uid}'; {statement} COMMIT;"
+                return f"SET SESSION AUTHORIZATION {role}; BEGIN; SET LOCAL ROLE {role}; SET LOCAL request.jwt.claim.sub = '{uid}'; {statement} COMMIT;"
 
             import json
 
@@ -115,7 +124,9 @@ def main():
             sql((ROOT / '03-fixture.local-only.sql').read_text())
             sql((ROOT / '01-setup.proposed.sql').read_text())
             sql((ROOT / '02-verify.readonly.sql').read_text())
-            print('PASS catalog privileges / RLS / function owners')
+            print('DB server: ' + sql('SELECT version();'))
+            print('PASS SQL setup / catalog privileges / RLS / function owners')
+            print('PRODUCTION FUNCTION tests: original clock_timestamp definition')
             sql(call(role='anon'), error='42501')
             sql(call(uid=''), error='28000')
             sql(call(statement="SELECT * FROM ai_usage_private.usage;"), error='42501')
@@ -153,6 +164,7 @@ def main():
 
             # Admin-only clock fixture in this disposable cluster. Replace ONLY the two
             # clock_timestamp() expressions locally; no production args / config knobs.
+            print('CLOCK FIXTURE tests: only boundary tests replace clock_timestamp')
             original = sql("SELECT pg_get_functiondef('ai_usage_private.reserve()'::regprocedure);")
             sql("CREATE TABLE public.ai_usage_test_clock (t timestamptz NOT NULL); "
                 "INSERT INTO public.ai_usage_test_clock VALUES ('2026-10-13 14:59:59+00'); "
@@ -183,6 +195,8 @@ def main():
             reset(20, "ARRAY['2026-10-13 02:59:50+00'::timestamptz,'2026-10-13 02:59:55+00'::timestamptz,'2026-10-13 02:59:59+00'::timestamptz]", "'2026-10-13'::date")
             assert reserve()['retry_at'].startswith('2026-10-13T15:00:00')
             sql(original)
+            assert sql("SELECT pg_get_functiondef('ai_usage_private.reserve()'::regprocedure);") == original
+            sql((ROOT / '02-verify.readonly.sql').read_text())
             sql('DROP FUNCTION public.ai_usage_test_now(); DROP TABLE public.ai_usage_test_clock;')
             print('PASS admin clock fixture: JST boundary / cross-day window / exact 60s / max retry_at; original restored')
 
@@ -225,6 +239,9 @@ def main():
             # Only the new FK cascade: synthetic auth user deletion.
             sql(f"DELETE FROM auth.users WHERE id='{A}';")
             assert sql('SELECT count(*) FROM ai_usage_private.usage;') == '0'
+            sql(call(), error='23503')
+            assert sql('SELECT count(*) FROM ai_usage_private.usage;') == '0'
+            print('PASS deleted uid rejected by FK; no usage row recreated')
             sql((ROOT / '05-rollback.proposed.sql').read_text())
             assert sql("SELECT to_regprocedure('public.reserve_ai_usage()') IS NULL;") == 't'
             assert sql("SELECT count(*) FROM pg_namespace WHERE nspname='ai_usage_private';") == '0'
@@ -235,7 +252,8 @@ def main():
             print('PASS ALL isolated PostgreSQL tests (auth stub; real Supabase API not tested)')
         finally:
             subprocess.run(ctl + ['-m', 'immediate', '-w', 'stop'], env=env,
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+                           stdout=subprocess.DEVNULL, timeout=30, check=True)
+            print('CLEANUP: own PostgreSQL cluster stopped; temporary files removed on exit', flush=True)
 
 
 if __name__ == '__main__':

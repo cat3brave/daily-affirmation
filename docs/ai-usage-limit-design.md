@@ -8,7 +8,7 @@
 開始時は `work`、`git status -sb` は `## work`、`git status --short` は空。
 端末のfetchはプロキシ接続エラーのため、GitHub連携のmainブランチ情報とHEAD一致で確認した。
 旧PR #52、そのブランチ、既存アカウント削除SQL案には変更・適用を行わない。
-`supabase/schema.sql`、migration、アプリ、依存関係、認証、CI、本番設定は変更しない。
+`supabase/schema.sql`、migration、アプリ、依存関係、認証、既存CI、本番設定は変更しない。
 
 ## 暫定仕様
 
@@ -123,7 +123,9 @@ timeout 300s python3 supabase/review/ai-usage-limit/04-test-local.py
 TCP listenは無効、継承PG環境変数を除去、ディレクトリは所有者限定。
 fixture → 構築案 → 権限確認 → 下記試験 → ロールバック → sentinel確認を順に実施し、
 finallyで自分のクラスタを停止・一時ディレクトリを削除する。
-異常終了・外部timeout時に残ったクラスタは、表示された一時パスを確認し、そのクラスタだけ停止する。
+SIGTERM（専用workflowの300秒timeoutを含む）と通常例外はfinallyで停止・削除する。
+SIGKILL・runner障害・jobの強制終了ではfinallyは保証できない。GitHub-hosted runnerの使い捨てVM廃棄で
+クラスタと一時ファイルも破棄される。ローカルで強制終了した場合は表示された一時パスを確認し、そのクラスタだけ停止する。
 他のDBへfixtureを流用してはいけない。管理者のfixture操作と実際のauthenticatedのRPC操作を分ける。
 
 | 試験 | 検証内容・期待値 | 今回の実行 |
@@ -142,6 +144,29 @@ finallyで自分のクラスタを停止・一時ディレクトリを削除す�
 内部関数の**2箇所のclock_timestamp式だけ**を一時的に差し替える。引数や上限は変えない。
 日付境界試験後に元の関数定義へ戻す。元の関数の実時計・実並行試験と、時計差替えによる境界試験は区別する。
 本番SQLには試験用の時刻・上限パラメーターや時計関数を入れない。
+
+### 専用GitHub Actions試験
+
+`.github/workflows/ai-usage-limit-db.yml` はmain向けpull_request/mainへのpushで、
+このディレクトリ・設計文書・workflow自身の変更時に自動実行する。手動実行は不要。
+Postgres 15/17のmatrix、ubuntu-24.04の使い捨てVM、contents: read、10分job上限、
+同じrefの古い実行を取り消すconcurrencyを設定する。既存Verify・rulesetは変更しない。
+
+[PostgreSQL公式Ubuntu配布手順](https://www.postgresql.org/download/linux/ubuntu/)の手動PGDG設定を使用。
+HTTPSで公式公開鍵を取得しfingerprintを確認、Signed-Byを指定したaptで署名とパッケージhashを検証する。
+外部スクリプトは実行せず、メジャー版を指定して導入する。パッチ版は更新されるためログのdpkg-query、
+initdb/pg_ctl/psql --version、SELECT version()を実行時の証拠とする。
+パッケージによる既定クラスタ作成を抑止し、版指定のbinをPATH先頭に追加する。
+試験はsudoを使わず非rootのrunnerユーザーで実行し、既存Postgresサービスを利用しない。
+
+DB子プロセスへ渡す環境はPATH/ロケール/TZと一時HOMEだけで、PG接続設定や資格情報を継承しない。
+TCP listenを無効にし自身の所有者限定Unixソケットを明示する。秘密情報・本番資格情報は不要。
+CIログには各PASS、12接続の許可数と11ロック待ち、rollback/sentinel、後始末を記録する。
+クライアント試験はSET SESSION AUTHORIZATIONでsession userも対象ロールにし、
+管理者session userのSET ROLE権限で所有者切替の拒否試験を歪めない。
+時計差替え後は構築直後のpg_get_functiondefとの完全一致とカタログ権限を再確認する。
+
+この追加時点ではローカルDBバイナリがなくDB未実行。PRイベントのCI完走後に成功項目だけ更新する。
 
 ### 今回実際に確認したこと
 
