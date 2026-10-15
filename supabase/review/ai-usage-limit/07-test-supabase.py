@@ -24,6 +24,8 @@ CLI_VERSION = '2.81.3'
 # Only this task's own local daemon; ignore inherited remote Docker selectors.
 DOCKER = ['docker', '--host=unix:///var/run/docker.sock']
 ENV = {k: os.environ[k] for k in ('PATH', 'LANG', 'LC_ALL', 'DOCKER_CONFIG') if k in os.environ}
+# Official CLI registry mirror, also selected by supabase/setup-cli. Fixed, not user input.
+ENV['SUPABASE_INTERNAL_IMAGE_REGISTRY'] = 'ghcr.io'
 # Workflow fallback knows only a non-secret path, never keys or Auth responses.
 MARKER = Path(os.environ.get('RUNNER_TEMP', tempfile.gettempdir())) / 'ai-usage-supabase-owned.json'
 
@@ -41,7 +43,8 @@ def run(command, *, data=None, timeout=60):
         for hint in ('permission denied', 'connection refused', 'failed to pull', 'manifest unknown',
                      'no space left', 'unhealthy', 'network is unreachable', 'TLS handshake timeout',
                      'i/o timeout', 'context deadline exceeded', 'unknown field', 'invalid config',
-                     'failed to parse', 'Error response from daemon', '403 Forbidden'):
+                     'failed to parse', 'Error response from daemon', '403 Forbidden', '429 Too Many Requests',
+                     'toomanyrequests', 'denied', 'not found'):
             if hint.lower() in result.stderr.lower():
                 print('Diagnostic category: ' + hint, flush=True)
         raise RuntimeError(f'{Path(command[0]).name} failed (exit {result.returncode})')

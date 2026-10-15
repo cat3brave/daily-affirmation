@@ -317,3 +317,6 @@ Docker 28.4.0は利用可能だが、CLI startはimage pull失敗で終了した
 初回CIはAuth発行JWTをHS256と仮定したランナーのassertionで失敗した。
 CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認するようランナーを修正した。
 構築SQLの変更や署名検証の置換は行っていない。
+
+2回目のCIはimage pullで失敗しHTTP未実行。setup-cliが指定する公式GHCR mirrorを、
+限定子プロセス環境で失わないよう固定した。外部DB接続設定を継承する変更ではない。
