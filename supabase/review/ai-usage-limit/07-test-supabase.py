@@ -262,7 +262,16 @@ def main():
 
         def reserve(token):
             code, rows = request('POST', '/rest/v1/rpc/reserve_ai_usage', token, {})
-            require(code == 200 and type(rows) is list and len(rows) == 1, 'RPC status/row count')
+            if code != 200 or type(rows) is not list or len(rows) != 1:
+                error_code = rows.get('code', '') if isinstance(rows, dict) else ''
+                require(re.fullmatch(r'[A-Za-z0-9_]*', error_code) is not None, 'Unexpected RPC error code')
+                print(f'RPC diagnostic: HTTP {code}; code={error_code}; shape={type(rows).__name__}', flush=True)
+                message = rows.get('message', '') if isinstance(rows, dict) else ''
+                for category in ('permission denied', 'row-level security', 'Authentication required',
+                                 'does not exist', 'ambiguous', 'violates', 'invalid input', 'schema cache'):
+                    if category.lower() in message.lower():
+                        print('RPC error category: ' + category, flush=True)
+                raise RuntimeError('RPC status/row count')
             contract(rows[0])
             return rows[0]
 
