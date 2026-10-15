@@ -201,7 +201,7 @@ DB子プロセス環境の限定、SIGTERM終了処理、バージョン出力�
 本番・共有DB・実ユーザー・実Geminiは使用していない。
 PR #59の時点では全DB試験とランナーのDB実行経路は未検証だった。
 今回、上記GitHub Actionsの隔離Postgresで完走した範囲だけを確認済みに更新した。
-さらに実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
+PR #60時点では、実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
 既定権限・イベントトリガー、Exposed schemas、匿名/失効トークン、スキーマキャッシュを確認する必要がある。
 ローカルfixtureはこれらの代替にはならない。Advisorsも未実施。
 
@@ -211,7 +211,8 @@ PR #59の時点では全DB試験とランナーのDB実行経路は未検証だ�
    実Supabaseの使い捨て環境でもRPC権限/JWT境界を検証し、Advisorsで今回のオブジェクトを確認する。
    `03-fixture` は実Supabaseに適用しない。偽ユーザーをその隔離環境の正規Auth機能で準備する。
 2. 本番適用は別作業で承認を得る。対象DB、管理ロール、既存同名オブジェクト不在、既定権限、
-   postgresの専用ロール作成・SET/所有者変更権限を読み取りで確認する。環境制約があれば案を再レビュー。
+   適用管理者の専用ロール作成・SET/所有者変更権限とauth USAGE/auth.uid EXECUTEのgrant optionを読み取りで確認する。
+   managed postgresで不足する場合は適用を止め、正規の管理手段と設計を再レビューする。
    ai_usage_privateを非公開のまま保ち、01を1トランザクションで手動適用、02のassertionを確認する。
    必要ならその別作業でPostgRESTのスキーマキャッシュ更新を行う。今回migration登録はしない。
 3. アプリ接続も別PR。既存 `app/actions.ts` と `app/lib/supabaseServer.ts` のgetUser方式を維持し、
@@ -243,3 +244,135 @@ PR #59の時点では全DB試験とランナーのDB実行経路は未検証だ�
 - [Supabase changelog](https://supabase.com/changelog)：Markdown取得はツールのcontent-type制約で失敗、HTML版を確認。
   [15.19/17.11変更](https://supabase.com/changelog/postgres-15-19-17-11-breaking-changes)を確認し、
   今回利用しないltree/pgcrypto/btree_gist等の変更と区別。対象DBの版・更新状態は隔離検証/本番適用時に確認する。
+
+## 使い捨てSupabase Auth / PostgREST統合試験
+
+`AI usage limit Supabase` workflowは、main向けPRとmain pushの関連ファイル変更時に、
+GitHub-hosted Ubuntu 24.04で `07-test-supabase.py` を実行する。contents: read、20分job上限、
+15分試験timeout（TERM後90秒のcleanup猶予）、concurrencyを設定する。既存Verify・PG15/17試験・
+rulesetは変更しない。アプリtest/coverage/lint/build/E2Eはローカル重複実行を省略し、Verifyで確認する。
+
+CLIは **2.81.3** 固定。`--version` と start/stop/status/db advisors の `--help` を確認した。
+最新CLIと同一という意味ではなく、試験対象版の固定である。起動時にCLI版、DB `server_version`、
+DB/Auth/PostgREST/Kongのimage tagとimage IDを記録する。成功したCIの版・URLは検証後に追記する。
+`06-supabase.config.toml` は使い捨て専用テンプレートで、リポジトリの設定/migration/seedをコピーしない。
+一時ディレクトリとランダムproject IDを作り、migration/seedを無効化し、公開schemaはpublicのみとする。
+CLIのstart/statusは捕捉し生出力しない。鍵・パスワード・JWT・Auth応答はメモリだけに保持し、artifactも作らない。
+
+接続先オプションは設けない。HTTPは自身のスタックの固定loopbackポート56321へ直接接続し、
+proxy/DNS/redirectを使わない。起動前に使用ポートの空きを検査し、起動後にコンテナの所有project labelと
+API origin、PostgRESTの公開schemaを検査する。DockerはローカルUnixソケットを明示する。
+管理SQLは当該DBコンテナ内のUnixソケットへpsqlで接続し、HTTP利用者操作と分離する。
+クラウド作成、login/link、リモートdb push/reset、GitHub Secrets、本番資格情報は不要・不使用。
+既存サービスの停止・共有DBへの操作は行わない。
+
+01のSQLだけをこのDBへ適用し、02のカタログassertionも実行する。03-fixtureは使わず、auth.users/auth.uidを
+置き換えない。ローカルのservice_roleはAuth管理APIによる試験ユーザー作成・削除専用。
+本人は公開anon API keyと正規password loginで得たAuth発行JWTでRPCを呼ぶ。API keyだけの呼び出しも別途検査する。
+JWT方式はこのCLI既定のローカル **ES256 (P-256)** を期待値としてassertする。
+Authの公開JWKSと鍵の一致も検査する。ホスト環境の実鍵/rotation設定の試験ではない。
+
+- Aの引数なしRPC3回、4回目minute_limit、B独立、実auth.uidとDB行の一致。
+  管理SQLで別ユーザーの日次上限状態を準備し、daily_limit/両枠拒否とretry_atも検査する。
+- 別の新規ユーザーに12 HTTP同時送信し許可3回。全応答の行数・型・reason・残量・retry_atを検査し、DBのcount/recentと一致確認。
+- API keyのみ、不正JWT、異なる署名、AのsubをBへ改ざん、正しく署名した期限切れJWTを拒否。
+- 任意user_id/上限引数、テーブルGET/PATCH/DELETE（既定profile/非公開profile）、内部関数RPC（同2profile）を拒否。
+  各操作の直前・直後に**全利用行**を比較するため、A/Bの非消費も含む。
+- 専用NOLOGIN/NOBYPASSRLSロール・所有者・FORCE RLS・function/table ACL・ロールmembershipを02でassertする。
+  Supabase固有の既定ACLとイベントトリガーもカタログから記録する。HTTP拒否だけで安全とは結論しない。
+- `NOTIFY pgrst, 'reload schema'` は当該DB限定で行い、本人のOpenAPIメタデータで反映を待つ。
+  枠確保RPCは自動再試行しない。ai_usage_privateを公開schemaへ追加しない。
+- CLI `db advisors --local --type all --level info` を実行し、出力は名前・severityだけ記録する。
+  hosted Advisors / Dashboardの設定監査は未実施。
+
+期限切れ試験では隔離AuthコンテナのGOTRUE_JWT_KEYSをメモリで読み、正規Authトークンのclaimsを基に
+Authのkidに一致するP-256鍵でES256署名する。同じ方法で署名した有効トークンが新規試験ユーザーの枠を確保できるpositive controlも行う。
+expired側はexpを現在より120秒前（検証側のclock skew猶予を超える）、iatも過去へ設定する。
+OpenSSLとメモリ内fd（memfd）で署名し、秘密鍵ファイルは作成しない。
+HTTP 401かつexpired理由、DB状態不変をassertする。単なる署名破壊試験ではない。
+通常のA/B/12同時送信は全てAuth発行JWTを使用する。ログアウト後の発行済みJWT即時無効化は期待しない。
+
+finallyで正規Auth管理APIからユーザーを削除しcascade、05による限定rollbackとオブジェクト/ロール不存在を確認する。
+成功・例外・TERM/INTで必ず、自身のprojectだけ `stop --project-id … --no-backup` し、
+container/volume/networkの不存在を確認して一時ファイルを削除する。秘密を含まない所有path/projectのmarkerを使い、
+workflowの `if: always()` でも同じcleanupを実行する。SIGKILL、runner喪失、jobのhard timeoutでは
+プロセス側cleanup/always stepを保証できない。GitHub-hosted使い捨てVMの破棄が最後の境界である。
+
+公式資料: [CLI config](https://supabase.com/docs/guides/local-development/cli/config)、
+[JWT](https://supabase.com/docs/guides/auth/jwts)、
+[Custom schemas](https://supabase.com/docs/guides/api/using-custom-schemas)、
+[PostgREST schema cache](https://docs.postgrest.org/en/stable/references/schema_cache.html)。
+2026-10-16日本時間に公式changelog.mdを取得試行したがHTTP403/content-type制約のためHTML版を確認した。
+直近のTLS 1.2 CBC廃止はhosted HTTPSの変更で、このloopback HTTP試験対象とは異なる。
+
+本番適用・アプリ接続は未実施で、利用者別制限はまだ有効になっていない。
+ローカルSupabaseでの成功は、ホストされた本番Supabaseの設定・管理権限制約まで保証しない。
+本番導入前には管理権限・既定ACL・公開schema・実署名方式/鍵rotation・Advisorsを再確認し、
+別PRで本人認証を保持したアプリ接続と本番適用の承認を行う。
+
+ローカル検証: Python AST/compile、TOML parse、workflow YAML parse、actionlint 1.7.11、--help、空状態cleanup、git diff --checkは成功。
+Docker 28.4.0は利用可能だが、CLI startはimage pull失敗で終了したためローカルHTTP試験は未実施。
+両試行とも自身のprojectのstop/no-backupとcontainer/volume/network/一時ファイルの後始末が成功。
+未実行を統合試験成功とは扱わず、CIでの完走がマージの前提となる。
+
+初回CIはAuth発行JWTをHS256と仮定したランナーのassertionで失敗した。
+CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認するようランナーを修正した。
+この署名方式修正の段階では構築SQLの変更や署名検証の置換は行っていない。
+
+2回目のCIはimage pullで失敗しHTTP未実行。setup-cliが指定する公式GHCR mirrorを、
+限定子プロセス環境で失わないよう固定した。外部DB接続設定を継承する変更ではない。
+
+
+### 実Supabaseで判明した適用権限の不足
+
+実DBではpostgresのauth USAGEはtrueだが、専用所有者へのGRANT後も所有者のauth USAGEがfalseで、
+本人RPCはHTTP403 / 42501 / permission denied for schema authになった。
+postgresにauth schemaの再付与権限がなく、GRANTがエラーではなく警告/no-opになるためである。
+02がこの付与結果を検査していなかった点も修正した。
+01はauth USAGEとauth.uid EXECUTEのgrant optionを処理前に要求し、権限不足なら原子的に停止する。
+02では専用所有者の実USAGE/EXECUTEとauth.users SELECT不可をassertする。
+管理権限を取得・追加するSQLではなく、無権限のまま「構築成功」と判定しないための最小修正である。
+
+統合ランナーの構築/rollbackだけは、使い捨てDB内の既存ローカルsupabase_adminで行う。
+状態観測・試験準備はpostgres、HTTP利用者は公開key+本人Auth JWTのまま分離する。
+専用所有者はNOLOGIN/NOBYPASSRLSとFORCE RLSを維持し、auth.usersの読取権も与えない。
+ホストされた本番Supabaseのpostgresで同じ付与が可能とは扱わない。本番管理権限制約により適用できない場合は、
+その環境で利用できる正規の付与手段と設計を別途レビューする必要があり、今回の結果を本番適用許可にしない。
+[公式の管理スキーマ権限制約](https://github.com/orgs/supabase/discussions/34270)も参照。
+ローカル起動中のSIGTERM試験でも、自身のcontainer/volume/networkと一時ファイルのcleanup成功を確認した。
+
+ローカル管理接続はCLIのrestore処理と同様に、当該DBコンテナ内のPOSTGRES_PASSWORDを
+PGPASSWORDへ渡す。ホスト環境・引数・ログへ資格情報をコピーしない。
+権限不足のpostgresで01を実行すると事前条件で失敗し、role/schemaが残らないことも回帰検査する。
+
+
+### 実行成功の証拠（2026-10-16 日本時間）
+
+[PR #61](https://github.com/cat3brave/daily-affirmation/pull/61) の
+[Supabase統合試験run](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012203)
+（[job](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012203/job/116673802059)）が完走。
+対象commitは `ad361572451d4ad5c9a12e7fae7c18c76f4d9b78`。CLI 2.81.3、DB server 17.6（image `17.6.1.095`）、
+Auth/GoTrue v2.187.0、PostgREST v14.5、Kong 2.8.1。image IDもjobログに記録した。
+通常のA/B/並行試験はAuth発行のES256/P-256 JWT。期限切れも同じkid/鍵のES256で、
+公開JWKS一致、有効署名positive control、正しく署名した期限切れの401/PGRST303を確認した。
+
+正常なRPC、実auth.uidのA/B分離、3回許可と4回目拒否、日次/両枠reasonとretry_at、
+12 HTTP同時送信で許可3回、応答とDB count/recentの一致が成功。
+未認証は401/42501、不正JWT・署名・sub改ざんは401/PGRST301、余分な引数と内部関数は404/PGRST202、
+内部テーブル既定profileは404/PGRST205、非公開profileは406/PGRST106。
+各拒否前後でA/Bを含む全利用行が不変だった。
+専用所有者の実auth USAGE/uid EXECUTE、FORCE RLS、membership/function/table ACL、auth.users読取不可が成功。
+権限不足のpostgresによる01は、role/schema作成前に事前条件で拒否されることも確認した。
+既定ACL・イベントトリガーを記録し、local Advisorsは**実行済み・指摘0件**。
+Authユーザーの正規削除、usage cascade、限定rollback後のrole/schema/function不存在、
+自身のcontainer/volume/network/一時ファイル撤去、always stepで残留なしの確認まで成功。
+
+SQL修正後の[PG15/17 run](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012354)も両方成功。
+実版は15.19 / 17.11。既存SQL/並行性/時計境界/権限/rollback全試験を維持して完走した。
+構文確認はPython compile、TOML parse、workflow YAML parse、actionlint 1.7.11、shell構文、git diff --check。
+アプリの `npm run test` / `npm run test:coverage` / `npm run lint` / `npm run build` / `npm run e2e` の
+ローカル実行は、アプリ実行コードを変更しないためユーザー指定で省略し、既存Verifyで確認する。
+
+未確認: hosted管理権限での正規付与手段、実プロジェクトの公開schema/既定ACL/鍵rotationとAdvisors、
+本番でのアプリ接続。ローカル管理者の利用可否をhostedでも利用可能とはみなさない。
+本番適用・アプリ接続は未実施で、利用者別制限はまだ有効になっていない。

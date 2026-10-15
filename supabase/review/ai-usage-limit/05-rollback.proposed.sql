@@ -1,4 +1,4 @@
--- REVIEW ONLY: stop future callers first. Removes only objects from 01-setup.
+-- REVIEW ONLY: run with the same authorized administrator as setup; stop future callers first. Removes only objects from 01-setup.
 -- Usage history in the NEW table is lost. No existing application table is touched.
 -- No CASCADE / DROP OWNED: unexpected dependencies cause a safe failure.
 BEGIN;
