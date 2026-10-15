@@ -201,7 +201,7 @@ DB子プロセス環境の限定、SIGTERM終了処理、バージョン出力�
 本番・共有DB・実ユーザー・実Geminiは使用していない。
 PR #59の時点では全DB試験とランナーのDB実行経路は未検証だった。
 今回、上記GitHub Actionsの隔離Postgresで完走した範囲だけを確認済みに更新した。
-さらに実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
+PR #60時点では、実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、専用ロール作成/所有者変更、
 既定権限・イベントトリガー、Exposed schemas、匿名/失効トークン、スキーマキャッシュを確認する必要がある。
 ローカルfixtureはこれらの代替にはならない。Advisorsも未実施。
 
@@ -317,7 +317,7 @@ Docker 28.4.0は利用可能だが、CLI startはimage pull失敗で終了した
 
 初回CIはAuth発行JWTをHS256と仮定したランナーのassertionで失敗した。
 CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認するようランナーを修正した。
-構築SQLの変更や署名検証の置換は行っていない。
+この署名方式修正の段階では構築SQLの変更や署名検証の置換は行っていない。
 
 2回目のCIはimage pullで失敗しHTTP未実行。setup-cliが指定する公式GHCR mirrorを、
 限定子プロセス環境で失わないよう固定した。外部DB接続設定を継承する変更ではない。
@@ -344,3 +344,35 @@ postgresにauth schemaの再付与権限がなく、GRANTがエラーではな�
 ローカル管理接続はCLIのrestore処理と同様に、当該DBコンテナ内のPOSTGRES_PASSWORDを
 PGPASSWORDへ渡す。ホスト環境・引数・ログへ資格情報をコピーしない。
 権限不足のpostgresで01を実行すると事前条件で失敗し、role/schemaが残らないことも回帰検査する。
+
+
+### 実行成功の証拠（2026-10-16 日本時間）
+
+[PR #61](https://github.com/cat3brave/daily-affirmation/pull/61) の
+[Supabase統合試験run](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012203)
+（[job](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012203/job/116673802059)）が完走。
+対象commitは `ad361572451d4ad5c9a12e7fae7c18c76f4d9b78`。CLI 2.81.3、DB server 17.6（image `17.6.1.095`）、
+Auth/GoTrue v2.187.0、PostgREST v14.5、Kong 2.8.1。image IDもjobログに記録した。
+通常のA/B/並行試験はAuth発行のES256/P-256 JWT。期限切れも同じkid/鍵のES256で、
+公開JWKS一致、有効署名positive control、正しく署名した期限切れの401/PGRST303を確認した。
+
+正常なRPC、実auth.uidのA/B分離、3回許可と4回目拒否、日次/両枠reasonとretry_at、
+12 HTTP同時送信で許可3回、応答とDB count/recentの一致が成功。
+未認証は401/42501、不正JWT・署名・sub改ざんは401/PGRST301、余分な引数と内部関数は404/PGRST202、
+内部テーブル既定profileは404/PGRST205、非公開profileは406/PGRST106。
+各拒否前後でA/Bを含む全利用行が不変だった。
+専用所有者の実auth USAGE/uid EXECUTE、FORCE RLS、membership/function/table ACL、auth.users読取不可が成功。
+権限不足のpostgresによる01は、role/schema作成前に事前条件で拒否されることも確認した。
+既定ACL・イベントトリガーを記録し、local Advisorsは**実行済み・指摘0件**。
+Authユーザーの正規削除、usage cascade、限定rollback後のrole/schema/function不存在、
+自身のcontainer/volume/network/一時ファイル撤去、always stepで残留なしの確認まで成功。
+
+SQL修正後の[PG15/17 run](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012354)も両方成功。
+実版は15.19 / 17.11。既存SQL/並行性/時計境界/権限/rollback全試験を維持して完走した。
+構文確認はPython compile、TOML parse、workflow YAML parse、actionlint 1.7.11、shell構文、git diff --check。
+アプリの `npm run test` / `npm run test:coverage` / `npm run lint` / `npm run build` / `npm run e2e` の
+ローカル実行は、アプリ実行コードを変更しないためユーザー指定で省略し、既存Verifyで確認する。
+
+未確認: hosted管理権限での正規付与手段、実プロジェクトの公開schema/既定ACL/鍵rotationとAdvisors、
+本番でのアプリ接続。ローカル管理者の利用可否をhostedでも利用可能とはみなさない。
+本番適用・アプリ接続は未実施で、利用者別制限はまだ有効になっていない。
