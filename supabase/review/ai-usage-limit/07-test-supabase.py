@@ -209,6 +209,10 @@ def main():
         sql((ROOT / '01-setup.proposed.sql').read_text())
         applied = True
         sql((ROOT / '02-verify.readonly.sql').read_text())
+        print('Auth schema permissions: ' + sql("SELECT json_agg(row_to_json(x)) FROM (SELECT rolname, has_schema_privilege(oid, 'auth', 'USAGE') AS auth_usage, has_function_privilege(oid, 'auth.uid()', 'EXECUTE') AS uid_execute FROM pg_roles WHERE rolname IN ('ai_usage_limit_owner','authenticated','authenticator','supabase_auth_admin','postgres') ORDER BY rolname) x;"), flush=True)
+        print('Auth uid config: ' + sql("SELECT json_build_object('owner', proowner::regrole::text, 'definer', prosecdef, 'config', proconfig) FROM pg_proc WHERE oid='auth.uid()'::regprocedure;"), flush=True)
+        sql('BEGIN; SET LOCAL ROLE ai_usage_limit_owner; SELECT auth.uid(); ROLLBACK;')
+        print('PASS dedicated owner can call real auth.uid', flush=True)
         # Official PostgREST notification, local DB only. Poll metadata, never retry a reservation.
         sql("NOTIFY pgrst, 'reload schema';")
 
