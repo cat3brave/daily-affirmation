@@ -267,6 +267,9 @@ def main():
                 require(re.fullmatch(r'[A-Za-z0-9_]*', error_code) is not None, 'Unexpected RPC error code')
                 print(f'RPC diagnostic: HTTP {code}; code={error_code}; shape={type(rows).__name__}', flush=True)
                 message = rows.get('message', '') if isinstance(rows, dict) else ''
+                match = re.fullmatch(r'permission denied for (schema|table|function|sequence|relation) \"?([a-zA-Z_][a-zA-Z0-9_]*)\"?', message)
+                if match and match[2] in ('auth', 'uid', 'ai_usage_private', 'usage', 'reserve', 'reserve_ai_usage', 'public'):
+                    print(f'RPC permission object: {match[1]} {match[2]}', flush=True)
                 for category in ('permission denied', 'row-level security', 'Authentication required',
                                  'does not exist', 'ambiguous', 'violates', 'invalid input', 'schema cache'):
                     if category.lower() in message.lower():
