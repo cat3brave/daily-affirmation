@@ -133,11 +133,13 @@ def main():
             print('Cleanup: no owned stack remains')
         return
     require(not MARKER.exists(), 'Previous owned stack marker exists; refusing to reuse')
-    require(run(['supabase', '--version']) == CLI_VERSION, 'Unexpected CLI version')
-    print(f'Supabase CLI {CLI_VERSION}', flush=True)
-    # Discover supported flags on the installed pinned CLI, without emitting status secrets.
-    for command in ([], ['start'], ['stop'], ['status'], ['db', 'advisors']):
-        run(['supabase'] + command + ['--help'])
+    # Isolate CLI update-check files too, even before the owned project is created.
+    with tempfile.TemporaryDirectory(prefix='ai-usage-cli-check-') as scratch:
+        check_cli = ['supabase', '--workdir', scratch]
+        require(run(check_cli + ['--version']) == CLI_VERSION, 'Unexpected CLI version')
+        print(f'Supabase CLI {CLI_VERSION}', flush=True)
+        for command in ([], ['start'], ['stop'], ['status'], ['db', 'advisors']):
+            run(check_cli + command + ['--help'])
     run(DOCKER + ['info', '--format', '{{.ServerVersion}}'])
     # Fail before start if any requested host port is already in use. Never stop its owner.
     for port in (56320, 56321, 56322):
@@ -162,9 +164,9 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
 
-    def sql(statement):
+    def sql(statement, administrator=False):
         # Separate admin channel: Unix socket INSIDE exactly our own DB container.
-        return run(DOCKER + ['exec', '-i', db, 'psql', '-XqAt', '-U', 'postgres',
+        return run(DOCKER + ['exec', '-i', db, 'psql', '-XqAt', '-U', 'supabase_admin' if administrator else 'postgres',
                              '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], data=statement)
 
     def request(method, path, token=None, body=None, profile=None, admin=False):
@@ -206,7 +208,12 @@ def main():
         # Observe Supabase-specific default ACLs/event triggers, never change them to pass.
         print('Default ACL catalog: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT defaclrole::regrole::text, defaclnamespace::regnamespace::text, defaclobjtype, defaclacl::text FROM pg_default_acl ORDER BY 1,2,3) x;"), flush=True)
         print('Event triggers: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT evtname, evtevent, evtenabled FROM pg_event_trigger ORDER BY evtname) x;"), flush=True)
-        sql((ROOT / '01-setup.proposed.sql').read_text())
+        # CLI's postgres cannot re-grant auth USAGE. Use only our local bootstrap admin
+        # for DDL; all user RPCs below still use the public API key +本人 Auth JWT.
+        require(sql("SELECT rolsuper FROM pg_roles WHERE rolname=current_user;", administrator=True) == 't',
+                'Local bootstrap administrator unavailable')
+        print('Setup/rollback: local supabase_admin; observations: postgres; HTTP:本人 Auth JWT', flush=True)
+        sql((ROOT / '01-setup.proposed.sql').read_text(), administrator=True)
         applied = True
         sql((ROOT / '02-verify.readonly.sql').read_text())
         print('Auth schema permissions: ' + sql("SELECT json_agg(row_to_json(x)) FROM (SELECT rolname, has_schema_privilege(oid, 'auth', 'USAGE') AS auth_usage, has_function_privilege(oid, 'auth.uid()', 'EXECUTE') AS uid_execute FROM pg_roles WHERE rolname IN ('ai_usage_limit_owner','authenticated','authenticator','supabase_auth_admin','postgres') ORDER BY rolname) x;"), flush=True)
@@ -403,7 +410,7 @@ def main():
                     code, _ = request('DELETE', '/auth/v1/admin/users/' + uid, service, admin=True)
                     require(code in (200, 204), 'Auth cleanup failed')
                 require(sql('SELECT count(*) FROM ai_usage_private.usage;') == '0', 'User cleanup cascade failed')
-                sql((ROOT / '05-rollback.proposed.sql').read_text())
+                sql((ROOT / '05-rollback.proposed.sql').read_text(), administrator=True)
                 require(sql("SELECT to_regnamespace('ai_usage_private') IS NULL AND to_regprocedure('public.reserve_ai_usage()') IS NULL AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't', 'Rollback cleanup failed')
                 print('PASS cleanup: Auth users deleted, usage cascade, SQL objects/role removed', flush=True)
         finally:

@@ -36,6 +36,13 @@ BEGIN
       AND relowner = 'ai_usage_limit_owner'::regrole) THEN
     RAISE EXCEPTION 'Table owner / RLS mismatch';
   END IF;
+  IF NOT has_schema_privilege('ai_usage_limit_owner', 'auth', 'USAGE') OR
+     NOT has_function_privilege('ai_usage_limit_owner', 'auth.uid()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Owner lacks actual auth.uid access (GRANT may have been a warning/no-op)';
+  END IF;
+  IF has_table_privilege('ai_usage_limit_owner', 'auth.users', 'SELECT') THEN
+    RAISE EXCEPTION 'Owner must not read auth.users';
+  END IF;
   IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'ai_usage_limit_owner'
       AND (rolcanlogin OR rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication)) THEN
     RAISE EXCEPTION 'Owner is too privileged';

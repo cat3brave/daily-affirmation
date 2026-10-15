@@ -320,3 +320,22 @@ CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認�
 
 2回目のCIはimage pullで失敗しHTTP未実行。setup-cliが指定する公式GHCR mirrorを、
 限定子プロセス環境で失わないよう固定した。外部DB接続設定を継承する変更ではない。
+
+
+### 実Supabaseで判明した適用権限の不足
+
+実DBではpostgresのauth USAGEはtrueだが、専用所有者へのGRANT後も所有者のauth USAGEがfalseで、
+本人RPCはHTTP403 / 42501 / permission denied for schema authになった。
+postgresにauth schemaの再付与権限がなく、GRANTがエラーではなく警告/no-opになるためである。
+02がこの付与結果を検査していなかった点も修正した。
+01はauth USAGEとauth.uid EXECUTEのgrant optionを処理前に要求し、権限不足なら原子的に停止する。
+02では専用所有者の実USAGE/EXECUTEとauth.users SELECT不可をassertする。
+管理権限を取得・追加するSQLではなく、無権限のまま「構築成功」と判定しないための最小修正である。
+
+統合ランナーの構築/rollbackだけは、使い捨てDB内の既存ローカルsupabase_adminで行う。
+状態観測・試験準備はpostgres、HTTP利用者は公開key+本人Auth JWTのまま分離する。
+専用所有者はNOLOGIN/NOBYPASSRLSとFORCE RLSを維持し、auth.usersの読取権も与えない。
+ホストされた本番Supabaseのpostgresで同じ付与が可能とは扱わない。本番管理権限制約により適用できない場合は、
+その環境で利用できる正規の付与手段と設計を別途レビューする必要があり、今回の結果を本番適用許可にしない。
+[公式の管理スキーマ権限制約](https://github.com/orgs/supabase/discussions/34270)も参照。
+ローカル起動中のSIGTERM試験でも、自身のcontainer/volume/networkと一時ファイルのcleanup成功を確認した。

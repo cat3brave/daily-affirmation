@@ -1,8 +1,19 @@
 -- REVIEW ONLY: manual deployment after isolated verification. Not a migration.
--- Run as postgres (role creation/ownership privileges required). Name collisions fail.
+-- Run as an administrator with role/ownership rights AND auth schema USAGE grant option.
+-- Managed postgres may lack this grant option. Do not weaken RLS or grant client table access.
+-- Name collisions fail; this script does not acquire missing administrator privileges.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
+DO $preflight$
+BEGIN
+  IF NOT has_schema_privilege(current_user, 'auth', 'USAGE WITH GRANT OPTION') OR
+     NOT has_function_privilege(current_user, 'auth.uid()', 'EXECUTE WITH GRANT OPTION') THEN
+    RAISE EXCEPTION 'Setup requires auth USAGE and auth.uid EXECUTE grant options; use an authorized administrator'
+      USING ERRCODE = '42501';
+  END IF;
+END;
+$preflight$;
 CREATE ROLE ai_usage_limit_owner NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 GRANT ai_usage_limit_owner TO postgres;
 CREATE SCHEMA ai_usage_private AUTHORIZATION ai_usage_limit_owner;
