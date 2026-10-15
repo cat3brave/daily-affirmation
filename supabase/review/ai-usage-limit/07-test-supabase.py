@@ -164,10 +164,23 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
 
-    def sql(statement, administrator=False):
+    def sql(statement, administrator=False, expected_error=None):
         # Separate admin channel: Unix socket INSIDE exactly our own DB container.
-        return run(DOCKER + ['exec', '-i', db, 'psql', '-XqAt', '-U', 'supabase_admin' if administrator else 'postgres',
-                             '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], data=statement)
+        command = DOCKER + ['exec', '-i', db]
+        if administrator:
+            # Same local credential mechanism as CLI restore.sh; expand only inside
+            # our container, never copy the password into argv, host env or logs.
+            command += ['sh', '-c', 'PGPASSWORD="$POSTGRES_PASSWORD" exec "$@"', 'ai-usage-admin']
+        command += ['psql', '-XqAt', '-h', '/var/run/postgresql', '-U',
+                    'supabase_admin' if administrator else 'postgres',
+                    '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
+        if expected_error:
+            result = subprocess.run(command, input=statement, text=True, capture_output=True,
+                                    env=ENV, cwd=tempfile.gettempdir(), timeout=60)
+            require(result.returncode != 0 and expected_error in result.stderr,
+                    'Expected setup privilege preflight rejection')
+            return ''
+        return run(command, data=statement)
 
     def request(method, path, token=None, body=None, profile=None, admin=False):
         require(path.startswith(('/auth/v1/', '/rest/v1/')) and not path.startswith('//'),
@@ -208,6 +221,12 @@ def main():
         # Observe Supabase-specific default ACLs/event triggers, never change them to pass.
         print('Default ACL catalog: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT defaclrole::regrole::text, defaclnamespace::regnamespace::text, defaclobjtype, defaclacl::text FROM pg_default_acl ORDER BY 1,2,3) x;"), flush=True)
         print('Event triggers: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT evtname, evtevent, evtenabled FROM pg_event_trigger ORDER BY evtname) x;"), flush=True)
+        # A failed setup must be a hard error before creating even the owner role.
+        sql((ROOT / '01-setup.proposed.sql').read_text(),
+            expected_error='Setup requires auth USAGE and auth.uid EXECUTE grant options')
+        require(sql("SELECT to_regnamespace('ai_usage_private') IS NULL AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't',
+                'Privilege preflight left objects behind')
+        print('PASS restricted postgres setup rejected atomically before object creation', flush=True)
         # CLI's postgres cannot re-grant auth USAGE. Use only our local bootstrap admin
         # for DDL; all user RPCs below still use the public API key +本人 Auth JWT.
         require(sql("SELECT rolsuper FROM pg_roles WHERE rolname=current_user;", administrator=True) == 't',

@@ -211,7 +211,8 @@ PR #59の時点では全DB試験とランナーのDB実行経路は未検証だ�
    実Supabaseの使い捨て環境でもRPC権限/JWT境界を検証し、Advisorsで今回のオブジェクトを確認する。
    `03-fixture` は実Supabaseに適用しない。偽ユーザーをその隔離環境の正規Auth機能で準備する。
 2. 本番適用は別作業で承認を得る。対象DB、管理ロール、既存同名オブジェクト不在、既定権限、
-   postgresの専用ロール作成・SET/所有者変更権限を読み取りで確認する。環境制約があれば案を再レビュー。
+   適用管理者の専用ロール作成・SET/所有者変更権限とauth USAGE/auth.uid EXECUTEのgrant optionを読み取りで確認する。
+   managed postgresで不足する場合は適用を止め、正規の管理手段と設計を再レビューする。
    ai_usage_privateを非公開のまま保ち、01を1トランザクションで手動適用、02のassertionを確認する。
    必要ならその別作業でPostgRESTのスキーマキャッシュ更新を行う。今回migration登録はしない。
 3. アプリ接続も別PR。既存 `app/actions.ts` と `app/lib/supabaseServer.ts` のgetUser方式を維持し、
@@ -339,3 +340,7 @@ postgresにauth schemaの再付与権限がなく、GRANTがエラーではな�
 その環境で利用できる正規の付与手段と設計を別途レビューする必要があり、今回の結果を本番適用許可にしない。
 [公式の管理スキーマ権限制約](https://github.com/orgs/supabase/discussions/34270)も参照。
 ローカル起動中のSIGTERM試験でも、自身のcontainer/volume/networkと一時ファイルのcleanup成功を確認した。
+
+ローカル管理接続はCLIのrestore処理と同様に、当該DBコンテナ内のPOSTGRES_PASSWORDを
+PGPASSWORDへ渡す。ホスト環境・引数・ログへ資格情報をコピーしない。
+権限不足のpostgresで01を実行すると事前条件で失敗し、role/schemaが残らないことも回帰検査する。
