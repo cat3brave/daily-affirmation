@@ -243,3 +243,72 @@ PR #59の時点では全DB試験とランナーのDB実行経路は未検証だ�
 - [Supabase changelog](https://supabase.com/changelog)：Markdown取得はツールのcontent-type制約で失敗、HTML版を確認。
   [15.19/17.11変更](https://supabase.com/changelog/postgres-15-19-17-11-breaking-changes)を確認し、
   今回利用しないltree/pgcrypto/btree_gist等の変更と区別。対象DBの版・更新状態は隔離検証/本番適用時に確認する。
+
+## 使い捨てSupabase Auth / PostgREST統合試験
+
+`AI usage limit Supabase` workflowは、main向けPRとmain pushの関連ファイル変更時に、
+GitHub-hosted Ubuntu 24.04で `07-test-supabase.py` を実行する。contents: read、20分job上限、
+15分試験timeout（TERM後90秒のcleanup猶予）、concurrencyを設定する。既存Verify・PG15/17試験・
+rulesetは変更しない。アプリtest/coverage/lint/build/E2Eはローカル重複実行を省略し、Verifyで確認する。
+
+CLIは **2.81.3** 固定。`--version` と start/stop/status/db advisors の `--help` を確認した。
+最新CLIと同一という意味ではなく、試験対象版の固定である。起動時にCLI版、DB `server_version`、
+DB/Auth/PostgREST/Kongのimage tagとimage IDを記録する。成功したCIの版・URLは検証後に追記する。
+`06-supabase.config.toml` は使い捨て専用テンプレートで、リポジトリの設定/migration/seedをコピーしない。
+一時ディレクトリとランダムproject IDを作り、migration/seedを無効化し、公開schemaはpublicのみとする。
+CLIのstart/statusは捕捉し生出力しない。鍵・パスワード・JWT・Auth応答はメモリだけに保持し、artifactも作らない。
+
+接続先オプションは設けない。HTTPは自身のスタックの固定loopbackポート56321へ直接接続し、
+proxy/DNS/redirectを使わない。起動前に使用ポートの空きを検査し、起動後にコンテナの所有project labelと
+API origin、PostgRESTの公開schemaを検査する。DockerはローカルUnixソケットを明示する。
+管理SQLは当該DBコンテナ内のUnixソケットへpsqlで接続し、HTTP利用者操作と分離する。
+クラウド作成、login/link、リモートdb push/reset、GitHub Secrets、本番資格情報は不要・不使用。
+既存サービスの停止・共有DBへの操作は行わない。
+
+01のSQLだけをこのDBへ適用し、02のカタログassertionも実行する。03-fixtureは使わず、auth.users/auth.uidを
+置き換えない。ローカルのservice_roleはAuth管理APIによる試験ユーザー作成・削除専用。
+本人は公開anon API keyと正規password loginで得たAuth発行JWTでRPCを呼ぶ。API keyだけの呼び出しも別途検査する。
+JWT方式はこのCLI既定のローカル **HS256** を期待値としてassertする。
+これはホスト環境の非対称署名鍵の互換試験ではない。
+
+- Aの引数なしRPC3回、4回目minute_limit、B独立、実auth.uidとDB行の一致。
+  管理SQLで別ユーザーの日次上限状態を準備し、daily_limit/両枠拒否とretry_atも検査する。
+- 別の新規ユーザーに12 HTTP同時送信し許可3回。全応答の行数・型・reason・残量・retry_atを検査し、DBのcount/recentと一致確認。
+- API keyのみ、不正JWT、異なる署名、AのsubをBへ改ざん、正しく署名した期限切れJWTを拒否。
+- 任意user_id/上限引数、テーブルGET/PATCH/DELETE（既定profile/非公開profile）、内部関数RPC（同2profile）を拒否。
+  各操作の直前・直後に**全利用行**を比較するため、A/Bの非消費も含む。
+- 専用NOLOGIN/NOBYPASSRLSロール・所有者・FORCE RLS・function/table ACL・ロールmembershipを02でassertする。
+  Supabase固有の既定ACLとイベントトリガーもカタログから記録する。HTTP拒否だけで安全とは結論しない。
+- `NOTIFY pgrst, 'reload schema'` は当該DB限定で行い、本人のOpenAPIメタデータで反映を待つ。
+  枠確保RPCは自動再試行しない。ai_usage_privateを公開schemaへ追加しない。
+- CLI `db advisors --local --type all --level info` を実行し、出力は名前・severityだけ記録する。
+  hosted Advisors / Dashboardの設定監査は未実施。
+
+期限切れ試験では隔離AuthコンテナのGOTRUE_JWT_SECRETをメモリで読み、正規Authトークンのclaimsを基に
+HS256で署名する。同じ方法で署名した有効トークンが新規試験ユーザーの枠を確保できるpositive controlも行う。
+expired側はexpを現在より120秒前（検証側のclock skew猶予を超える）、iatも過去へ設定する。
+HTTP 401かつexpired理由、DB状態不変をassertする。単なる署名破壊試験ではない。
+通常のA/B/12同時送信は全てAuth発行JWTを使用する。ログアウト後の発行済みJWT即時無効化は期待しない。
+
+finallyで正規Auth管理APIからユーザーを削除しcascade、05による限定rollbackとオブジェクト/ロール不存在を確認する。
+成功・例外・TERM/INTで必ず、自身のprojectだけ `stop --project-id … --no-backup` し、
+container/volume/networkの不存在を確認して一時ファイルを削除する。秘密を含まない所有path/projectのmarkerを使い、
+workflowの `if: always()` でも同じcleanupを実行する。SIGKILL、runner喪失、jobのhard timeoutでは
+プロセス側cleanup/always stepを保証できない。GitHub-hosted使い捨てVMの破棄が最後の境界である。
+
+公式資料: [CLI config](https://supabase.com/docs/guides/local-development/cli/config)、
+[JWT](https://supabase.com/docs/guides/auth/jwts)、
+[Custom schemas](https://supabase.com/docs/guides/api/using-custom-schemas)、
+[PostgREST schema cache](https://docs.postgrest.org/en/stable/references/schema_cache.html)。
+2026-10-16日本時間に公式changelog.mdを取得試行したがHTTP403/content-type制約のためHTML版を確認した。
+直近のTLS 1.2 CBC廃止はhosted HTTPSの変更で、このloopback HTTP試験対象とは異なる。
+
+本番適用・アプリ接続は未実施で、利用者別制限はまだ有効になっていない。
+ローカルSupabaseでの成功は、ホストされた本番Supabaseの設定・管理権限制約まで保証しない。
+本番導入前には管理権限・既定ACL・公開schema・実署名方式/鍵rotation・Advisorsを再確認し、
+別PRで本人認証を保持したアプリ接続と本番適用の承認を行う。
+
+ローカル検証: Python AST/compile、TOML parse、workflow YAML parse、actionlint 1.7.11、--help、空状態cleanup、git diff --checkは成功。
+Docker 28.4.0は利用可能だが、CLI startはimage pull失敗で終了したためローカルHTTP試験は未実施。
+両試行とも自身のprojectのstop/no-backupとcontainer/volume/network/一時ファイルの後始末が成功。
+未実行を統合試験成功とは扱わず、CIでの完走がマージの前提となる。

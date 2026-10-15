@@ -1,0 +1,42 @@
+name: AI usage limit Supabase
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/review/ai-usage-limit/**'
+      - 'docs/ai-usage-limit-design.md'
+      - '.github/workflows/ai-usage-limit-supabase.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/review/ai-usage-limit/**'
+      - 'docs/ai-usage-limit-design.md'
+      - '.github/workflows/ai-usage-limit-supabase.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  supabase:
+    name: Supabase Auth and RPC integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.81.3
+      - name: Test disposable Auth, PostgREST and DB boundaries
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: timeout --signal=TERM --kill-after=90s 900s python3 supabase/review/ai-usage-limit/07-test-supabase.py
+      - name: Final scoped cleanup (also after cancellation)
+        if: always()
+        run: python3 supabase/review/ai-usage-limit/07-test-supabase.py --cleanup
