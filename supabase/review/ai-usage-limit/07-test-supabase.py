@@ -4,8 +4,6 @@ import argparse
 import base64
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-import hashlib
-import hmac
 import http.client
 import json
 import os
@@ -82,6 +80,42 @@ def decode(part):
 
 def encode(value):
     return base64.urlsafe_b64encode(json.dumps(value, separators=(',', ':')).encode()).decode().rstrip('=')
+
+
+def unbase64(value):
+    return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
+
+
+def sign_es256(header, payload, key):
+    """Use OpenSSL with a memory-only SEC1 key; convert DER ECDSA to JWT r||s."""
+    require(header['alg'] == 'ES256' and key['kty'] == 'EC' and key['crv'] == 'P-256'
+            and key['kid'] == header['kid'], 'ES256 key/header mismatch')
+    d, x, y = (unbase64(key[name]) for name in ('d', 'x', 'y'))
+    require(all(len(v) == 32 for v in (d, x, y)), 'Unexpected P-256 key length')
+    # RFC 5915 ECPrivateKey, named curve prime256v1, uncompressed public point.
+    der_key = bytes.fromhex('30770201010420') + d + bytes.fromhex('a00a06082a8648ce3d030107a14403420004') + x + y
+    message = encode(header) + '.' + encode(payload)
+    fd = os.memfd_create('ai-usage-ephemeral-signing-key', os.MFD_CLOEXEC)
+    try:
+        os.write(fd, der_key)
+        os.lseek(fd, 0, os.SEEK_SET)
+        result = subprocess.run(['openssl', 'dgst', '-sha256', '-keyform', 'DER',
+                                 '-sign', f'/proc/self/fd/{fd}'], input=message.encode(),
+                                capture_output=True, env=ENV, pass_fds=(fd,), timeout=10)
+        require(result.returncode == 0, 'OpenSSL ES256 signing failed')
+    finally:
+        os.close(fd)
+    signature = result.stdout
+    require(len(signature) >= 8 and signature[0] == 0x30 and signature[1] == len(signature)-2,
+            'Unexpected ECDSA DER sequence')
+    offset, values = 2, []
+    for _ in range(2):
+        require(signature[offset] == 2, 'Unexpected ECDSA DER integer')
+        length = signature[offset+1]
+        values.append(int.from_bytes(signature[offset+2:offset+2+length], 'big').to_bytes(32, 'big'))
+        offset += 2 + length
+    require(offset == len(signature), 'Unexpected ECDSA DER trailer')
+    return message + '.' + base64.urlsafe_b64encode(b''.join(values)).decode().rstrip('=')
 
 
 def main():
@@ -161,7 +195,7 @@ def main():
         require(status['API_URL'] == 'http://127.0.0.1:56321', 'Unexpected API origin')
         anon, service = status['ANON_KEY'], status['SERVICE_ROLE_KEY']
         auth_env = dict(item.split('=', 1) for item in inspect('supabase_auth_' + project)['Config']['Env'])
-        signing_secret = auth_env['GOTRUE_JWT_SECRET']
+        signing_keys = json.loads(auth_env['GOTRUE_JWT_KEYS'])
         rest_env = dict(item.split('=', 1) for item in inspect('supabase_rest_' + project)['Config']['Env'])
         require(rest_env['PGRST_DB_SCHEMAS'] == 'public', 'Unexpected exposed schemas')
         print('DB version: ' + sql('show server_version;'), flush=True)
@@ -188,7 +222,7 @@ def main():
             require(code == 200, 'Regular Auth password login failed')
             token = session['access_token']
             header, claims = decode(token.split('.')[0]), decode(token.split('.')[1])
-            require(header['alg'] == 'HS256' and claims['sub'] == uid and claims['role'] == 'authenticated',
+            require(header['alg'] == 'ES256' and claims['sub'] == uid and claims['role'] == 'authenticated',
                     'Unexpected Auth JWT contract')
             return uid, token
 
@@ -202,7 +236,7 @@ def main():
         else:
             raise RuntimeError('RPC schema cache did not become ready')
 
-        print('PASS regular Auth login A/B; JWT HS256 (CLI local legacy shared signing secret)', flush=True)
+        print('PASS regular Auth login A/B; JWT ES256 (Auth-issued P-256 signing key)', flush=True)
 
         def snapshot():
             return sql("SELECT coalesce(json_agg(row_to_json(u) ORDER BY user_id), '[]') FROM ai_usage_private.usage u;")
@@ -295,26 +329,30 @@ def main():
         denied('malformed JWT', 'invalid.jwt', statuses=(401,))
         parts = at.split('.')
         claims = decode(parts[1])
-        wrong_signature = base64.urlsafe_b64encode(hmac.new(secrets.token_bytes(32),
-            '.'.join(parts[:2]).encode(), hashlib.sha256).digest()).decode().rstrip('=')
+        damaged = bytearray(unbase64(parts[2]))
+        damaged[0] ^= 1  # Preserve signature encoding and length; change only signature bytes.
+        wrong_signature = base64.urlsafe_b64encode(damaged).decode().rstrip('=')
         denied('wrong signature', '.'.join(parts[:2] + [wrong_signature]), statuses=(401,))
         changed = dict(claims, sub=b)
         denied('A sub tampered to B', '.'.join([parts[0], encode(changed), parts[2]]), statuses=(401,))
 
-        def signed(payload):
-            message = parts[0] + '.' + encode(payload)
-            signature = base64.urlsafe_b64encode(hmac.new(signing_secret.encode(), message.encode(), hashlib.sha256).digest()).decode().rstrip('=')
-            return message + '.' + signature
-
         # Positive signature control on a fresh user; same key/claims, only time differs.
         d, dt = new_user()
-        dclaims = decode(dt.split('.')[1])
+        dheader, dclaims = (decode(part) for part in dt.split('.')[:2])
+        key = next(key for key in signing_keys if key['kid'] == dheader['kid'])
+        code, jwks = request('GET', '/auth/v1/.well-known/jwks.json')
+        require(code == 200 and any(k['kid'] == key['kid'] and k['x'] == key['x'] and k['y'] == key['y']
+                                   for k in jwks['keys']), 'Auth JWKS key mismatch')
+
+        def signed(payload):
+            return sign_es256(dheader, payload, key)
+
         require(reserve(signed(dclaims))['allowed'] and state(d)['daily_count'] == 1,
                 'Local signing positive control failed')
         expired = dict(dclaims, exp=int(time.time()) - 120, iat=int(time.time()) - 7200)
         error = denied('correctly signed expired JWT', signed(expired), statuses=(401,))
         require('expired' in error.get('message', '').lower(), 'Expiration was not rejection reason')
-        print('PASS expired JWT: correct local HS256 signature, positive control accepted, exp 120s in past', flush=True)
+        print('PASS expired JWT: correct local ES256 signature, positive control accepted, exp 120s in past', flush=True)
         for body in ({'user_id': b}, {'daily_limit': 999}, {'user_id': b, 'minute_limit': 999}):
             denied('extra RPC arguments', at, body, statuses=(404,))
         for token_name, token in (('authenticated', at), ('anon', None)):

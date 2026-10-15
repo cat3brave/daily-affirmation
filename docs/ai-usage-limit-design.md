@@ -268,8 +268,8 @@ API origin、PostgRESTの公開schemaを検査する。DockerはローカルUnix
 01のSQLだけをこのDBへ適用し、02のカタログassertionも実行する。03-fixtureは使わず、auth.users/auth.uidを
 置き換えない。ローカルのservice_roleはAuth管理APIによる試験ユーザー作成・削除専用。
 本人は公開anon API keyと正規password loginで得たAuth発行JWTでRPCを呼ぶ。API keyだけの呼び出しも別途検査する。
-JWT方式はこのCLI既定のローカル **HS256** を期待値としてassertする。
-これはホスト環境の非対称署名鍵の互換試験ではない。
+JWT方式はこのCLI既定のローカル **ES256 (P-256)** を期待値としてassertする。
+Authの公開JWKSと鍵の一致も検査する。ホスト環境の実鍵/rotation設定の試験ではない。
 
 - Aの引数なしRPC3回、4回目minute_limit、B独立、実auth.uidとDB行の一致。
   管理SQLで別ユーザーの日次上限状態を準備し、daily_limit/両枠拒否とretry_atも検査する。
@@ -284,9 +284,10 @@ JWT方式はこのCLI既定のローカル **HS256** を期待値としてassert
 - CLI `db advisors --local --type all --level info` を実行し、出力は名前・severityだけ記録する。
   hosted Advisors / Dashboardの設定監査は未実施。
 
-期限切れ試験では隔離AuthコンテナのGOTRUE_JWT_SECRETをメモリで読み、正規Authトークンのclaimsを基に
-HS256で署名する。同じ方法で署名した有効トークンが新規試験ユーザーの枠を確保できるpositive controlも行う。
+期限切れ試験では隔離AuthコンテナのGOTRUE_JWT_KEYSをメモリで読み、正規Authトークンのclaimsを基に
+Authのkidに一致するP-256鍵でES256署名する。同じ方法で署名した有効トークンが新規試験ユーザーの枠を確保できるpositive controlも行う。
 expired側はexpを現在より120秒前（検証側のclock skew猶予を超える）、iatも過去へ設定する。
+OpenSSLとメモリ内fd（memfd）で署名し、秘密鍵ファイルは作成しない。
 HTTP 401かつexpired理由、DB状態不変をassertする。単なる署名破壊試験ではない。
 通常のA/B/12同時送信は全てAuth発行JWTを使用する。ログアウト後の発行済みJWT即時無効化は期待しない。
 
@@ -312,3 +313,7 @@ workflowの `if: always()` でも同じcleanupを実行する。SIGKILL、runner
 Docker 28.4.0は利用可能だが、CLI startはimage pull失敗で終了したためローカルHTTP試験は未実施。
 両試行とも自身のprojectのstop/no-backupとcontainer/volume/network/一時ファイルの後始末が成功。
 未実行を統合試験成功とは扱わず、CIでの完走がマージの前提となる。
+
+初回CIはAuth発行JWTをHS256と仮定したランナーのassertionで失敗した。
+CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認するようランナーを修正した。
+構築SQLの変更や署名検証の置換は行っていない。
