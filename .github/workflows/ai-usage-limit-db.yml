@@ -73,3 +73,20 @@ jobs:
           set -euo pipefail
           test "$(id -u)" != 0
           timeout --signal=TERM --kill-after=30s 300s python3 supabase/review/ai-usage-limit/04-test-local.py
+
+      - name: Verify failure and SIGTERM cleanup after setup
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          set -euo pipefail
+          probe_log="$(mktemp)"
+          trap 'rm -f "$probe_log"' EXIT
+          for probe in failure sigterm; do
+            if timeout --signal=TERM --kill-after=90s 600s python3 supabase/review/ai-usage-limit/04-test-local.py --cleanup-probe "$probe" >"$probe_log" 2>&1; then
+              echo 'Expected deliberate failure, got success'
+              exit 1
+            fi
+            cat "$probe_log"
+            rg -F "INJECTED cleanup probe: $probe" "$probe_log"
+            rg -F 'CLEANUP: own PostgreSQL cluster stopped' "$probe_log"
+          done

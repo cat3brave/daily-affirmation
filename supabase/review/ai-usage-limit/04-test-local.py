@@ -18,6 +18,8 @@ B = '00000000-0000-0000-0000-000000000002'
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='Check binaries only; do not create a DB')
+    parser.add_argument('--cleanup-probe', choices=('failure', 'sigterm'),
+                        help='Disposable lifecycle probe; intentionally exits nonzero after setup')
     args = parser.parse_args()
     binaries = {name: shutil.which(name) for name in ('initdb', 'pg_ctl', 'psql')}
     missing = [name for name, path in binaries.items() if path is None]
@@ -44,7 +46,7 @@ def main():
         data = base / 'data'
         socket = base / 'socket'
         socket.mkdir(mode=0o700)
-        subprocess.run([binaries['initdb'], '-D', str(data), '-U', 'postgres', '--auth=trust', '--no-locale'],
+        subprocess.run([binaries['initdb'], '-D', str(data), '-U', 'fixture_admin', '--auth=trust', '--no-locale'],
                        env=env, check=True, stdout=subprocess.DEVNULL, timeout=30)
         ctl = [binaries['pg_ctl'], '-D', str(data)]
         try:
@@ -52,10 +54,13 @@ def main():
                            f"-k {socket} -h '' -p 55439", '-w', 'start'],
                            env=env, check=True, stdout=subprocess.DEVNULL, timeout=30)
             command = [binaries['psql'], '-X', '-qAt', '-v', 'ON_ERROR_STOP=1',
-                       '-h', str(socket), '-p', '55439', '-U', 'postgres', '-d', 'postgres']
+                       '-h', str(socket), '-p', '55439', '-U', 'fixture_admin', '-d', 'postgres']
 
-            def sql(statement, error=None):
-                result = subprocess.run(command, input="\\set VERBOSITY verbose\nSET timezone='UTC';\n" + statement,
+            def sql(statement, error=None, deploy=False):
+                selected = command.copy()
+                if deploy:
+                    selected[selected.index('-U') + 1] = 'postgres'
+                result = subprocess.run(selected, input="\\set VERBOSITY verbose\nSET timezone='UTC';\n" + statement,
                                         text=True, capture_output=True, env=env, timeout=20)
                 if error:
                     assert result.returncode != 0 and error in result.stderr, result.stderr
@@ -122,8 +127,21 @@ def main():
                     holder.stderr.close()
 
             sql((ROOT / '03-fixture.local-only.sql').read_text())
-            sql((ROOT / '01-setup.proposed.sql').read_text())
-            sql((ROOT / '02-verify.readonly.sql').read_text())
+            sql('CREATE ROLE postgres LOGIN NOSUPERUSER CREATEROLE BYPASSRLS; '
+                'GRANT authenticated TO postgres; '
+                'GRANT CREATE ON DATABASE postgres TO postgres; '
+                'GRANT CREATE ON SCHEMA public TO postgres; '
+                'GRANT USAGE ON SCHEMA auth TO postgres; '
+                'GRANT REFERENCES ON auth.users TO postgres;')
+            from deployment_checks import check_deployment
+            deploy = lambda statement, error=None: sql(statement, error=error, deploy=True)
+            check_deployment(deploy, sql)
+            deploy((ROOT / '02-verify.readonly.sql').read_text())
+            if args.cleanup_probe:
+                print('INJECTED cleanup probe: ' + args.cleanup_probe, flush=True)
+                if args.cleanup_probe == 'sigterm':
+                    os.kill(os.getpid(), signal.SIGTERM)
+                raise RuntimeError('Intentional cleanup failure probe')
             print('DB server: ' + sql('SELECT version();'))
             print('PASS SQL setup / catalog privileges / RLS / function owners')
             print('PRODUCTION FUNCTION tests: original clock_timestamp definition')
@@ -242,7 +260,7 @@ def main():
             sql(call(), error='23503')
             assert sql('SELECT count(*) FROM ai_usage_private.usage;') == '0'
             print('PASS deleted uid rejected by FK; no usage row recreated')
-            sql((ROOT / '05-rollback.proposed.sql').read_text())
+            deploy((ROOT / '05-rollback.proposed.sql').read_text())
             assert sql("SELECT to_regprocedure('public.reserve_ai_usage()') IS NULL;") == 't'
             assert sql("SELECT count(*) FROM pg_namespace WHERE nspname='ai_usage_private';") == '0'
             assert sql("SELECT count(*) FROM pg_roles WHERE rolname='ai_usage_limit_owner';") == '0'

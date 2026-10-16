@@ -2,13 +2,88 @@
 
 ## 状態と範囲
 
-2026-10-14（日本時間）の準備資料。**未適用・アプリ未接続・制限未有効化**。
+2026-10-16（日本時間）更新の準備資料。**未適用・アプリ未接続・制限未有効化**。
 このPRがマージされても利用者別の回数制限は有効にならない。
-最新main `9ca104fc47b5b1d1c81498fa9874164b81e50276` から専用ブランチで作成した。
+今回の開始mainは `cb8cbde96da1a0ff216a04158427e8fdaed38c0f`（PR #61統合後）。
+専用ブランチ `codex/ai-usage-postgres-privileges` をGitHub連携とローカルで作成した。
 開始時は `work`、`git status -sb` は `## work`、`git status --short` は空。
 端末のfetchはプロキシ接続エラーのため、GitHub連携のmainブランチ情報とHEAD一致で確認した。
 旧PR #52、そのブランチ、既存アカウント削除SQL案には変更・適用を行わない。
 `supabase/schema.sql`、migration、アプリ、依存関係、認証、既存CI、本番設定は変更しない。
+
+## 今回採用する方式と権限の境界
+
+PR #59の原案、#60のPG15/17試験、#61の実Auth/PostgREST試験を確認した。
+#61のsupabase_adminによる構築成功は、本番postgresで導入できる証拠ではない。
+以下が今回の現行設計であり、末尾の#61の管理者構築手順は履歴として残している。
+本番へ接続・変更せず、提示された読み取り結果（PG17.6、postgres非superuser、
+CREATEROLE/BYPASSRLS、auth権限のgrant optionなし）を前提に比較した。
+
+| 候補 | 認証の信頼境界 | 追加権限・RLS | 保守性と判断 |
+| --- | --- | --- | --- |
+| auth USAGE/uid EXECUTEを専用所有者へ再付与 | 実auth.uid | 専用所有者にauth権限が必要。FORCE RLS維持 | grant option不足のため不採用。管理権限を取得しない |
+| 専用所有者でrequest.jwt.claimsを直接読む | PostgRESTのJWT検証に依存 | auth権限不要。FORCE RLS維持 | auth.uidのフォールバック・型変換の実装を複製するため不採用 |
+| postgres所有の引数なしcurrent_uid補助関数 | PostgRESTのJWT検証→実auth.uid | 専用所有者だけに補助関数EXECUTE。利用表は専用所有者＋FORCE RLS | **採用**。既存auth権限を使う範囲を本人ID読取1文に限定 |
+| 公開RPC全体をpostgres所有のdefinerにする | 実auth.uid | カウンター更新がBYPASSRLSで実行される | 専用所有者とRLSの条件に合わず不採用 |
+
+`ai_usage_private.current_uid()` は **postgres所有・SECURITY DEFINER・STABLE・引数なし・uuid返却**。
+本文は完全修飾の `SELECT auth.uid();` だけ。固定search_pathは `pg_catalog, pg_temp`。
+テーブル参照/DML、動的SQL、JWT解析、設定書換え、任意ID受取りを行わない。
+PUBLIC/anon/authenticated/service_roleのEXECUTEは剥奪し、専用所有者だけに付与する。
+postgresが既に持つauth USAGE/uid EXECUTEをこの1処理だけ利用するためであり、
+利用枠更新をpostgresへ移すものではない。補助関数から戻ると専用所有者の権限へ戻り、FORCE RLSが働く。
+公開RPCは従来どおりinvoker、内部reserveは専用所有者のdefinerである。
+
+| 主体 | 今回の付与・所有権 |
+| --- | --- |
+| postgres | 新ownerの管理membership、新規の公開入口とcurrent_uidの所有権。既存auth権限は変更しない |
+| ai_usage_limit_owner | private schema/usage/reserve所有、current_uid EXECUTE。NOLOGIN/NOINHERIT/NOSUPERUSER/NOBYPASSRLS、他ロールへのmembershipなし |
+| authenticated | private schema USAGE、公開入口/reserve EXECUTEのみ。表DMLとcurrent_uid EXECUTEなし |
+| anon / service_role / PUBLIC | 今回のschema/table/functionへの付与なし |
+
+auth.uid自体はJWT署名を検証しない。正規PostgRESTが署名・期限・roleを検証してrequest contextを設定する境界を維持する。
+補助関数はこの境界を強化・代替するものではない。直接SQL資格情報やclaimを書き換える任意SQL RPCを
+一般利用者へ渡さないことが前提。user_metadataや任意IDを認可根拠にしない。
+実Auth発行JWT、偽署名、sub改ざん、正しく署名した期限切れ、任意ID引数の拒否をHTTP試験で維持する。
+
+構築は1 transaction。authの実USAGE/EXECUTE、名前衝突、所有者変更などが失敗すれば全体がrollbackする。
+COMMIT前に02と同じカタログ検査を実行し、未知の既定ACL/イベントトリガーによる追加権限も検知して失敗する。
+既定ACLやイベントトリガーを無効化・書き換えず、通らない環境では停止する。
+rollbackも同じ所有者/ACL/RLS/導入markerを確認し、作成した3関数・1表・schema・ownerだけをRESTRICTで削除する。
+未知の依存は全rollbackを失敗させる。authへのREVOKE、CASCADE、DROP OWNEDは不要・不使用。
+
+導入前提: postgresのCREATEROLE、新ownerのSET/所有権変更と管理権限、database/public CREATE、
+auth USAGE/auth.uid EXECUTE、auth.users(id) REFERENCES、plpgsql/sql利用権。
+public上の既存の権限・イベントトリガーにより必要権限が不足する場合、権限を緩めて適用しない。
+Exposed schemasにprivate schemaを含めないこと、信頼済みPostgREST/Auth設定、実際の鍵rotationと
+既存SQL関数によるclaim設定の露出は本番導入前に別途確認する。既存5表のRLSを変更しない。
+
+`deployment_checks.py` は導入接続が非superuser postgresで、auth両grant optionと管理ロールの直接membershipが
+ないことをassertする。PG試験のfixture_adminはクラスタ初期化と試験データ準備だけに使用し、導入/検証/撤去は
+別の `-U postgres` 接続で実施。実Supabase試験はpostgres接続だけを使い、supabase_admin接続経路と
+DBコンテナパスワード読取を削除した。CLI自身による使い捨てスタック初期化と、導入SQLの権限証明を区別する。
+
+両ランナーで衝突・無権限・RESTRICT・撤去/再導入、専用所有者の実権限/membership/ACLを検査する。
+専用workflowは通常試験の後に、構築後の意図的例外とSIGTERMを別実行し後始末ログをassertする。
+既存のPG15/17の境界/12接続/拒否時不変と、実Supabaseの12 HTTP同時送信/本人A/B/JWT試験を維持する。
+通常rollback後の既存データ保持はPG試験のsentinel/auth.usersで確認する。
+
+今回のローカルDB試験は**未実行**。`04-test-local.py --check` はinitdb/pg_ctl/psql不在でexit 2、
+Dockerローカルソケットはoperation not permittedであり、DB成功とは扱わない。
+Python構文・workflow構文・Git差分を確認して検証用PRを作り、GitHubのPG15/17・Supabase統合・Verify・Vercelを確認する。
+アプリ実行コード/依存関係は変更しないため、ローカルtest/coverage/lint/build/E2Eはユーザー指示で省略。
+自動マージは設定せず、全チェックと差分を確認できる状態で停止する。本番適用・アプリ接続は行わない。
+
+公式資料（2026-10-16確認）:
+[Supabase functions](https://supabase.com/docs/guides/database/functions)、
+[Auth architecture](https://supabase.com/docs/guides/auth/architecture)、
+[PostgREST authentication](https://docs.postgrest.org/en/stable/references/auth.html)、
+[PG17 CREATE FUNCTION](https://www.postgresql.org/docs/17/sql-createfunction.html)、
+[PG17 GRANT](https://www.postgresql.org/docs/17/sql-grant.html)、
+[CREATE ROLE](https://www.postgresql.org/docs/17/sql-createrole.html)。
+changelog.mdはcontent-type制約で取得不可のため[HTML](https://supabase.com/changelog)を確認した。
+直近のTLS変更は今回の権限設計/loopback試験とは別。auth.uidを複製せず既存関数を呼ぶ判断と、
+固定search_path/同一transactionでのACL剥奪は上記仕様に基づく。
 
 ## 暫定仕様
 
@@ -80,9 +155,10 @@ allowed/reason/retry_atの矛盾などでは、将来の呼び出し側はGemini
   `ai_usage_private` はSupabaseのExposed schemasへ登録しない。
 - 内部関数はカウンターへの直接DMLを利用者へ付与しないため `SECURITY DEFINER` が必要。
   所有者は専用 `ai_usage_limit_owner`：NOLOGIN/NOINHERIT/NOSUPERUSER/NOBYPASSRLS、DB・ロール作成不可。
-  authスキーマUSAGEとauth.uid EXECUTE、新規スキーマ・テーブル・内部関数の所有権だけを持つ。
+  新規スキーマ・テーブル・内部関数の所有権と、本人ID補助関数のEXECUTEだけを持つ。
+  authスキーマUSAGEも広いロールのmembershipも付与しない。
   postgresだけが管理用にこのロールのメンバーになる。クライアントロールには付与しない。
-- テーブルはENABLE + FORCE RLS。専用所有者だけに `user_id = auth.uid()` のUSING/WITH CHECKを設定。
+- テーブルはENABLE + FORCE RLS。専用所有者だけに `user_id = ai_usage_private.current_uid()` のUSING/WITH CHECKを設定。
   通常の所有者もRLSの対象にし、認証ユーザーにはテーブル権限もRLSポリシーも付与しない。
   本人・他人ともテーブル参照、INSERT/UPDATE/DELETE/TRUNCATE、リセットは禁止。
 - 全関数で固定 `search_path = pg_catalog, pg_temp`、テーブル・認証関数・内部関数は完全修飾。
@@ -211,8 +287,8 @@ PR #60時点では、実Supabaseの隔離環境でJWT/PostgREST、実auth.uid、
    実Supabaseの使い捨て環境でもRPC権限/JWT境界を検証し、Advisorsで今回のオブジェクトを確認する。
    `03-fixture` は実Supabaseに適用しない。偽ユーザーをその隔離環境の正規Auth機能で準備する。
 2. 本番適用は別作業で承認を得る。対象DB、管理ロール、既存同名オブジェクト不在、既定権限、
-   適用管理者の専用ロール作成・SET/所有者変更権限とauth USAGE/auth.uid EXECUTEのgrant optionを読み取りで確認する。
-   managed postgresで不足する場合は適用を止め、正規の管理手段と設計を再レビューする。
+   postgresの専用ロール作成・SET/所有者変更権限、auth USAGE/auth.uid EXECUTE（grant option不要）、
+   auth.users REFERENCES、database/public CREATEを読み取りで確認する。必要権限が不足すれば停止する。
    ai_usage_privateを非公開のまま保ち、01を1トランザクションで手動適用、02のassertionを確認する。
    必要ならその別作業でPostgRESTのスキーマキャッシュ更新を行う。今回migration登録はしない。
 3. アプリ接続も別PR。既存 `app/actions.ts` と `app/lib/supabaseServer.ts` のgetUser方式を維持し、
@@ -323,7 +399,7 @@ CLI 2.81.3の実AuthはES256であり、通常/期限切れともES256で確認�
 限定子プロセス環境で失わないよう固定した。外部DB接続設定を継承する変更ではない。
 
 
-### 実Supabaseで判明した適用権限の不足
+### PR #61で判明した適用権限の不足（旧方式の履歴）
 
 実DBではpostgresのauth USAGEはtrueだが、専用所有者へのGRANT後も所有者のauth USAGEがfalseで、
 本人RPCはHTTP403 / 42501 / permission denied for schema authになった。
@@ -346,7 +422,7 @@ PGPASSWORDへ渡す。ホスト環境・引数・ログへ資格情報をコピ�
 権限不足のpostgresで01を実行すると事前条件で失敗し、role/schemaが残らないことも回帰検査する。
 
 
-### 実行成功の証拠（2026-10-16 日本時間）
+### PR #61の実行成功の証拠（旧方式・2026-10-16 日本時間）
 
 [PR #61](https://github.com/cat3brave/daily-affirmation/pull/61) の
 [Supabase統合試験run](https://github.com/cat3brave/daily-affirmation/actions/runs/38808012203)

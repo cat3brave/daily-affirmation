@@ -124,6 +124,8 @@ def sign_es256(header, payload, key):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cleanup', action='store_true', help='Workflow fallback for this run only')
+    parser.add_argument('--cleanup-probe', choices=('failure', 'sigterm'),
+                        help='Disposable lifecycle probe; intentionally exits nonzero after setup')
     args = parser.parse_args()
     if args.cleanup:
         if MARKER.exists():
@@ -164,21 +166,18 @@ def main():
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGINT, terminate)
 
-    def sql(statement, administrator=False, expected_error=None):
-        # Separate admin channel: Unix socket INSIDE exactly our own DB container.
-        command = DOCKER + ['exec', '-i', db]
-        if administrator:
-            # Same local credential mechanism as CLI restore.sh; expand only inside
-            # our container, never copy the password into argv, host env or logs.
-            command += ['sh', '-c', 'PGPASSWORD="$POSTGRES_PASSWORD" exec "$@"', 'ai-usage-admin']
-        command += ['psql', '-XqAt', '-h', '/var/run/postgresql', '-U',
-                    'supabase_admin' if administrator else 'postgres',
+    def sql(statement, error=None):
+        # Deployment and observation channel: postgres only, inside our own DB.
+        # No supabase_admin connection or container database password access.
+        command = DOCKER + ['exec', '-i', db, 'psql', '-XqAt', '-h',
+                    '/var/run/postgresql', '-U', 'postgres',
                     '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
-        if expected_error:
-            result = subprocess.run(command, input=statement, text=True, capture_output=True,
+        if error:
+            result = subprocess.run(command, input="\\set VERBOSITY verbose\n" + statement,
+                                    text=True, capture_output=True,
                                     env=ENV, cwd=tempfile.gettempdir(), timeout=60)
-            require(result.returncode != 0 and expected_error in result.stderr,
-                    'Expected setup privilege preflight rejection')
+            require(result.returncode != 0 and error in result.stderr,
+                    'Expected SQL rejection was not observed')
             return ''
         return run(command, data=statement)
 
@@ -221,24 +220,20 @@ def main():
         # Observe Supabase-specific default ACLs/event triggers, never change them to pass.
         print('Default ACL catalog: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT defaclrole::regrole::text, defaclnamespace::regnamespace::text, defaclobjtype, defaclacl::text FROM pg_default_acl ORDER BY 1,2,3) x;"), flush=True)
         print('Event triggers: ' + sql("SELECT coalesce(json_agg(row_to_json(x)), '[]') FROM (SELECT evtname, evtevent, evtenabled FROM pg_event_trigger ORDER BY evtname) x;"), flush=True)
-        # A failed setup must be a hard error before creating even the owner role.
-        sql((ROOT / '01-setup.proposed.sql').read_text(),
-            expected_error='Setup requires auth USAGE and auth.uid EXECUTE grant options')
-        require(sql("SELECT to_regnamespace('ai_usage_private') IS NULL AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't',
-                'Privilege preflight left objects behind')
-        print('PASS restricted postgres setup rejected atomically before object creation', flush=True)
-        # CLI's postgres cannot re-grant auth USAGE. Use only our local bootstrap admin
-        # for DDL; all user RPCs below still use the public API key +本人 Auth JWT.
-        require(sql("SELECT rolsuper FROM pg_roles WHERE rolname=current_user;", administrator=True) == 't',
-                'Local bootstrap administrator unavailable')
-        print('Setup/rollback: local supabase_admin; observations: postgres; HTTP:本人 Auth JWT', flush=True)
-        sql((ROOT / '01-setup.proposed.sql').read_text(), administrator=True)
+        from deployment_checks import check_deployment
+        print('Setup/verify/rollback: non-superuser postgres only; Auth fixtures: local admin API', flush=True)
+        check_deployment(sql, sql)
         applied = True
         sql((ROOT / '02-verify.readonly.sql').read_text())
         print('Auth schema permissions: ' + sql("SELECT json_agg(row_to_json(x)) FROM (SELECT rolname, has_schema_privilege(oid, 'auth', 'USAGE') AS auth_usage, has_function_privilege(oid, 'auth.uid()', 'EXECUTE') AS uid_execute FROM pg_roles WHERE rolname IN ('ai_usage_limit_owner','authenticated','authenticator','supabase_auth_admin','postgres') ORDER BY rolname) x;"), flush=True)
         print('Auth uid config: ' + sql("SELECT json_build_object('owner', proowner::regrole::text, 'definer', prosecdef, 'config', proconfig) FROM pg_proc WHERE oid='auth.uid()'::regprocedure;"), flush=True)
-        sql('BEGIN; SET LOCAL ROLE ai_usage_limit_owner; SELECT auth.uid(); ROLLBACK;')
-        print('PASS dedicated owner can call real auth.uid', flush=True)
+        sql('BEGIN; SET LOCAL ROLE ai_usage_limit_owner; SELECT ai_usage_private.current_uid(); ROLLBACK;')
+        print('PASS dedicated owner calls real auth.uid through narrow capability', flush=True)
+        if args.cleanup_probe:
+            print('INJECTED cleanup probe: ' + args.cleanup_probe, flush=True)
+            if args.cleanup_probe == 'sigterm':
+                os.kill(os.getpid(), signal.SIGTERM)
+            raise RuntimeError('Intentional cleanup failure probe')
         # Official PostgREST notification, local DB only. Poll metadata, never retry a reservation.
         sql("NOTIFY pgrst, 'reload schema';")
 
@@ -401,6 +396,9 @@ def main():
         for body in ({'user_id': b}, {'daily_limit': 999}, {'user_id': b, 'minute_limit': 999}):
             denied('extra RPC arguments', at, body, statuses=(404,))
         for token_name, token in (('authenticated', at), ('anon', None)):
+            for profile in (None, 'ai_usage_private'):
+                denied(f'{token_name} identity helper profile={profile}', token,
+                       path='/rest/v1/rpc/current_uid', profile=profile, statuses=(404, 406))
             for method in ('GET', 'PATCH', 'DELETE'):
                 for profile in (None, 'ai_usage_private'):
                     denied(f'{token_name} direct table {method} profile={profile}', token,
@@ -429,7 +427,7 @@ def main():
                     code, _ = request('DELETE', '/auth/v1/admin/users/' + uid, service, admin=True)
                     require(code in (200, 204), 'Auth cleanup failed')
                 require(sql('SELECT count(*) FROM ai_usage_private.usage;') == '0', 'User cleanup cascade failed')
-                sql((ROOT / '05-rollback.proposed.sql').read_text(), administrator=True)
+                sql((ROOT / '05-rollback.proposed.sql').read_text())
                 require(sql("SELECT to_regnamespace('ai_usage_private') IS NULL AND to_regprocedure('public.reserve_ai_usage()') IS NULL AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't', 'Rollback cleanup failed')
                 print('PASS cleanup: Auth users deleted, usage cascade, SQL objects/role removed', flush=True)
         finally:
