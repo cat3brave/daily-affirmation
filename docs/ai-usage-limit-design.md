@@ -46,7 +46,7 @@ auth.uid自体はJWT署名を検証しない。正規PostgRESTが署名・期限
 一般利用者へ渡さないことが前提。user_metadataや任意IDを認可根拠にしない。
 実Auth発行JWT、偽署名、sub改ざん、正しく署名した期限切れ、任意ID引数の拒否をHTTP試験で維持する。
 
-構築は1 transaction。authの実USAGE/EXECUTE、名前衝突、所有者変更などが失敗すれば全体がrollbackする。
+構築は1 transaction。authの実USAGE/EXECUTE、同名RPCのオーバーロードを含む名前衝突、所有者変更などが失敗すれば全体がrollbackする。
 COMMIT前に02と同じカタログ検査を実行し、未知の既定ACL/イベントトリガーによる追加権限も検知して失敗する。
 既定ACLやイベントトリガーを無効化・書き換えず、通らない環境では停止する。
 rollbackも同じ所有者/ACL/RLS/導入markerを確認し、作成した3関数・1表・schema・ownerだけをRESTRICTで削除する。
@@ -84,6 +84,28 @@ Python構文・workflow構文・Git差分を確認して検証用PRを作り、G
 changelog.mdはcontent-type制約で取得不可のため[HTML](https://supabase.com/changelog)を確認した。
 直近のTLS変更は今回の権限設計/loopback試験とは別。auth.uidを複製せず既存関数を呼ぶ判断と、
 固定search_path/同一transactionでのACL剥奪は上記仕様に基づく。
+
+### 今回のCI証拠
+
+[PR #62](https://github.com/cat3brave/daily-affirmation/pull/62)で結果を追跡する。
+`4cee2262e3dfbff66fdcd59d38c1bbe9aabd80a9` の
+[PG15/17 run](https://github.com/cat3brave/daily-affirmation/actions/runs/38857745351)は両方成功。
+非superuser postgres、auth grant optionなしで構築/02/rollback/再導入、RLS/ACL/membership、
+12接続で許可3回/日次残1回、日次/60秒境界、拒否時不変、sentinel/Auth既存データ保持、
+通常/例外/SIGTERMの後始末を確認した。PGの認証fixtureはJWT署名検証の証拠ではない。
+
+初回 `7ff40b9` の[実Supabase run](https://github.com/cat3brave/daily-affirmation/actions/runs/38857526196)は
+通常統合試験と例外後のSQL/スタック撤去まで成功し、ログ検査コマンドrg不在でjob全体は失敗した。
+実Auth ES256、DB17.6、GoTrue v2.187.0、PostgREST v14.5、Kong2.8.1。
+本人A/B・12 HTTP同時で許可3・偽署名/sub改ざん/期限切れ/任意引数/補助関数直接呼出の拒否、
+全行不変、既定ACL/イベントトリガー保持、Advisors指摘0を確認した範囲だけが証拠である。
+検査を標準grepへ修正した `4cee2262` の
+[実Supabase再試験](https://github.com/cat3brave/daily-affirmation/actions/runs/38857744913)は、
+通常・例外・SIGTERM・always cleanupの全step成功。構築/撤去は全てpostgres接続で、
+auth両grant optionなし・非superuser・管理者への直接membershipなしを毎回assertした。
+同名オーバーロード拒否を追加した最終SHAの全結果と差分はPR本文で記録する。
+本番postgresでの実行可能性の根拠は、今回の制約付きpostgres試験に限り、#61の管理者試験と区別する。
+本番のExposed schemas・鍵rotation・Advisorsと実導入/アプリ接続は未確認・未実施。
 
 ## 暫定仕様
 

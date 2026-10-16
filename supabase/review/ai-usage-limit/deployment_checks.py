@@ -33,13 +33,18 @@ def check_deployment(deploy, fixture):
            setup.replace('BEGIN;\nSET LOCAL lock_timeout', 'SET LOCAL lock_timeout', 1),
            error='42501')
     absent()
-    # Later public function collision must roll back the newly created role/schema.
+    # Public name collisions, including overloads, must preserve the existing function.
     fixture('CREATE FUNCTION public.reserve_ai_usage() RETURNS integer LANGUAGE sql AS $$ SELECT 7 $$;')
     deploy(setup, error='42723')
     assert deploy('SELECT public.reserve_ai_usage();') == '7'
     assert deploy("SELECT to_regnamespace('ai_usage_private') IS NULL AND NOT EXISTS "
                   "(SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't'
     fixture('DROP FUNCTION public.reserve_ai_usage();')
+    fixture('CREATE FUNCTION public.reserve_ai_usage(integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 $$;')
+    deploy(setup, error='42723')
+    assert deploy('SELECT public.reserve_ai_usage(8);') == '8'
+    fixture('DROP FUNCTION public.reserve_ai_usage(integer);')
+    absent()
     # Early role and schema collisions must preserve the pre-existing objects.
     fixture('CREATE ROLE ai_usage_limit_owner NOLOGIN;')
     deploy(setup, error='42710')

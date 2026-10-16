@@ -13,6 +13,10 @@ BEGIN
     RAISE EXCEPTION 'Setup requires postgres with auth USAGE and auth.uid EXECUTE'
       USING ERRCODE = '42501';
   END IF;
+  IF EXISTS (SELECT FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+             AND proname = 'reserve_ai_usage') THEN
+    RAISE EXCEPTION 'Public RPC name already exists (including overloads)' USING ERRCODE = '42723';
+  END IF;
 END;
 $preflight$;
 CREATE ROLE ai_usage_limit_owner NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
