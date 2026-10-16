@@ -5,6 +5,10 @@ DECLARE
   r text;
   p text;
 BEGIN
+  IF obj_description('ai_usage_private'::regnamespace, 'pg_namespace') IS DISTINCT FROM
+     'daily-affirmation ai-usage-limit v2 identity-capability' THEN
+    RAISE EXCEPTION 'Installation marker mismatch';
+  END IF;
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
     FOREACH p IN ARRAY ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'] LOOP
       IF has_table_privilege(r, 'ai_usage_private.usage', p) THEN
@@ -20,6 +24,9 @@ BEGIN
        IS DISTINCT FROM (r = 'authenticated') THEN
       RAISE EXCEPTION 'Unexpected EXECUTE privileges: %', r;
     END IF;
+    IF has_function_privilege(r, 'ai_usage_private.current_uid()', 'EXECUTE') THEN
+      RAISE EXCEPTION 'Client may not call identity capability: %', r;
+    END IF;
     IF pg_has_role(r, 'ai_usage_limit_owner', 'MEMBER') THEN
       RAISE EXCEPTION 'Unexpected owner membership: %', r;
     END IF;
@@ -27,24 +34,68 @@ BEGIN
   IF EXISTS (SELECT FROM pg_proc AS f,
              LATERAL aclexplode(COALESCE(f.proacl, acldefault('f', f.proowner))) AS a
              WHERE f.oid IN ('public.reserve_ai_usage()'::regprocedure,
-                             'ai_usage_private.reserve()'::regprocedure)
+                             'ai_usage_private.reserve()'::regprocedure,
+                             'ai_usage_private.current_uid()'::regprocedure)
                AND a.grantee = 0 AND a.privilege_type = 'EXECUTE') THEN
     RAISE EXCEPTION 'PUBLIC has EXECUTE';
+  END IF;
+  IF (SELECT count(*) FROM pg_policy WHERE polrelid='ai_usage_private.usage'::regclass) <> 1 OR
+     NOT EXISTS (SELECT FROM pg_policy WHERE polrelid='ai_usage_private.usage'::regclass
+       AND polname='ai_usage_owner_only' AND polcmd='*' AND polpermissive
+       AND polroles=ARRAY['ai_usage_limit_owner'::regrole::oid]
+       AND pg_get_expr(polqual, polrelid) LIKE '%current_uid()%'
+       AND pg_get_expr(polwithcheck, polrelid) = pg_get_expr(polqual, polrelid)) THEN
+    RAISE EXCEPTION 'RLS policy mismatch';
   END IF;
   IF NOT EXISTS (SELECT FROM pg_class WHERE oid = 'ai_usage_private.usage'::regclass
       AND relrowsecurity AND relforcerowsecurity
       AND relowner = 'ai_usage_limit_owner'::regrole) THEN
     RAISE EXCEPTION 'Table owner / RLS mismatch';
   END IF;
-  IF NOT has_schema_privilege('ai_usage_limit_owner', 'auth', 'USAGE') OR
-     NOT has_function_privilege('ai_usage_limit_owner', 'auth.uid()', 'EXECUTE') THEN
-    RAISE EXCEPTION 'Owner lacks actual auth.uid access (GRANT may have been a warning/no-op)';
+  IF has_schema_privilege('ai_usage_limit_owner', 'auth', 'USAGE') OR
+     NOT has_function_privilege('ai_usage_limit_owner', 'ai_usage_private.current_uid()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Owner must use narrow identity capability, not auth schema access';
+  END IF;
+  IF EXISTS (SELECT FROM pg_auth_members WHERE member = 'ai_usage_limit_owner'::regrole) THEN
+    RAISE EXCEPTION 'Owner must not inherit or SET any other role';
+  END IF;
+  IF EXISTS (SELECT FROM pg_auth_members WHERE roleid = 'ai_usage_limit_owner'::regrole
+             AND member <> 'postgres'::regrole) THEN
+    RAISE EXCEPTION 'Only postgres may be a member of the owner';
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_proc WHERE oid = 'ai_usage_private.current_uid()'::regprocedure
+      AND prosecdef AND pronargs = 0 AND provolatile = 's'
+      AND proowner = 'postgres'::regrole
+      AND proconfig = ARRAY['search_path=pg_catalog, pg_temp']
+      AND prosrc = ' SELECT auth.uid(); ') THEN
+    RAISE EXCEPTION 'Identity capability configuration mismatch';
+  END IF;
+  -- Reject unknown grants from default ACLs/event triggers as well as known clients.
+  IF EXISTS (SELECT FROM pg_proc f,
+      LATERAL aclexplode(COALESCE(f.proacl, acldefault('f', f.proowner))) a
+      WHERE f.oid IN ('public.reserve_ai_usage()'::regprocedure,
+                      'ai_usage_private.reserve()'::regprocedure,
+                      'ai_usage_private.current_uid()'::regprocedure)
+        AND a.grantee <> f.proowner
+        AND (a.is_grantable OR a.grantee <> CASE
+          WHEN f.oid = 'ai_usage_private.current_uid()'::regprocedure
+          THEN 'ai_usage_limit_owner'::regrole ELSE 'authenticated'::regrole END)) THEN
+    RAISE EXCEPTION 'Unexpected function ACL';
+  END IF;
+  IF EXISTS (SELECT FROM pg_class c, LATERAL aclexplode(c.relacl) a
+      WHERE c.oid = 'ai_usage_private.usage'::regclass AND a.grantee <> c.relowner) THEN
+    RAISE EXCEPTION 'Unexpected table ACL';
+  END IF;
+  IF EXISTS (SELECT FROM pg_namespace n, LATERAL aclexplode(n.nspacl) a
+      WHERE n.nspname = 'ai_usage_private' AND a.grantee <> n.nspowner
+        AND (a.grantee <> 'authenticated'::regrole OR a.privilege_type <> 'USAGE' OR a.is_grantable)) THEN
+    RAISE EXCEPTION 'Unexpected schema ACL';
   END IF;
   IF has_table_privilege('ai_usage_limit_owner', 'auth.users', 'SELECT') THEN
     RAISE EXCEPTION 'Owner must not read auth.users';
   END IF;
   IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'ai_usage_limit_owner'
-      AND (rolcanlogin OR rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication)) THEN
+      AND (rolinherit OR rolcanlogin OR rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication)) THEN
     RAISE EXCEPTION 'Owner is too privileged';
   END IF;
   IF NOT EXISTS (SELECT FROM pg_proc WHERE oid = 'ai_usage_private.reserve()'::regprocedure
@@ -53,12 +104,13 @@ BEGIN
       AND proconfig @> ARRAY['search_path=pg_catalog, pg_temp']) OR
      NOT EXISTS (SELECT FROM pg_proc WHERE oid = 'public.reserve_ai_usage()'::regprocedure
       AND NOT prosecdef AND pronargs = 0 AND provolatile = 'v'
+      AND proowner = 'postgres'::regrole
       AND proconfig @> ARRAY['search_path=pg_catalog, pg_temp']) THEN
     RAISE EXCEPTION 'Function configuration mismatch';
   END IF;
 END;
 $verify$;
--- Inspect: only owner policy with auth.uid(), no client policy.
+-- Inspect: only owner policy through current_uid(), no client policy.
 SELECT policyname, roles, cmd, qual, with_check FROM pg_policies
   WHERE schemaname = 'ai_usage_private';
 SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint

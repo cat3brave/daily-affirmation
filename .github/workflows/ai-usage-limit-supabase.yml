@@ -37,6 +37,23 @@ jobs:
         env:
           PYTHONUNBUFFERED: '1'
         run: timeout --signal=TERM --kill-after=90s 900s python3 supabase/review/ai-usage-limit/07-test-supabase.py
+
+      - name: Verify failure and SIGTERM cleanup after setup
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          set -euo pipefail
+          probe_log="$(mktemp)"
+          trap 'rm -f "$probe_log"' EXIT
+          for probe in failure sigterm; do
+            if timeout --signal=TERM --kill-after=90s 600s python3 supabase/review/ai-usage-limit/07-test-supabase.py --cleanup-probe "$probe" >"$probe_log" 2>&1; then
+              echo 'Expected deliberate failure, got success'
+              exit 1
+            fi
+            cat "$probe_log"
+            grep -F "INJECTED cleanup probe: $probe" "$probe_log"
+            grep -F 'PASS cleanup: owned containers/volumes/network and temporary files removed' "$probe_log"
+          done
       - name: Final scoped cleanup (also after cancellation)
         if: always()
         run: python3 supabase/review/ai-usage-limit/07-test-supabase.py --cleanup
