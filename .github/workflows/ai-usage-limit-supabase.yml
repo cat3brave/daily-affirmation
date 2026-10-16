@@ -51,8 +51,8 @@ jobs:
               exit 1
             fi
             cat "$probe_log"
-            rg -F "INJECTED cleanup probe: $probe" "$probe_log"
-            rg -F 'PASS cleanup: owned containers/volumes/network and temporary files removed' "$probe_log"
+            grep -F "INJECTED cleanup probe: $probe" "$probe_log"
+            grep -F 'PASS cleanup: owned containers/volumes/network and temporary files removed' "$probe_log"
           done
       - name: Final scoped cleanup (also after cancellation)
         if: always()

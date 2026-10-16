@@ -25,6 +25,9 @@ def check_deployment(deploy, fixture):
                       "AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname='ai_usage_limit_owner');") == 't'
 
     absent()
+    fixture("CREATE TABLE public.ai_usage_deployment_sentinel (value text); "
+            "INSERT INTO public.ai_usage_deployment_sentinel VALUES ('keep');")
+    existing_users = fixture("SELECT coalesce(json_agg(id ORDER BY id), '[]') FROM auth.users;")
     # A client role cannot deploy, even when reached through a postgres session.
     deploy("BEGIN; SET LOCAL ROLE authenticated;\n" +
            setup.replace('BEGIN;\nSET LOCAL lock_timeout', 'SET LOCAL lock_timeout', 1),
@@ -64,6 +67,9 @@ def check_deployment(deploy, fixture):
     fixture('DROP VIEW public.ai_usage_dependency_probe;')
     deploy(rollback)
     absent()
+    assert fixture('SELECT value FROM public.ai_usage_deployment_sentinel;') == 'keep'
+    assert fixture("SELECT coalesce(json_agg(id ORDER BY id), '[]') FROM auth.users;") == existing_users
+    fixture('DROP TABLE public.ai_usage_deployment_sentinel;')
     assert fixture(catalogs) == before
     deploy(setup)
     deploy(verify)

@@ -87,6 +87,6 @@ jobs:
               exit 1
             fi
             cat "$probe_log"
-            rg -F "INJECTED cleanup probe: $probe" "$probe_log"
-            rg -F 'CLEANUP: own PostgreSQL cluster stopped' "$probe_log"
+            grep -F "INJECTED cleanup probe: $probe" "$probe_log"
+            grep -F 'CLEANUP: own PostgreSQL cluster stopped' "$probe_log"
           done
