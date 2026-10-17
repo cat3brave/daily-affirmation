@@ -303,3 +303,19 @@ export function expectSafeAuthenticatedRequests(mock: AuthenticatedSupabaseMock)
   expect(mock.unexpectedAuthRequests).toEqual([]);
   expect(mock.unexpectedRestRequests).toEqual([]);
 }
+
+// UI-only Server Action boundary mock. The app server has an empty Gemini key;
+// this response never reaches Supabase or Gemini and adds no production branches.
+export async function stubAiActionResults(page: Page, results: unknown[]) {
+  let calls = 0;
+  await page.route("**/dashboard", async (route) => {
+    if (route.request().method() !== "POST" || !route.request().headers()["next-action"]) {
+      return route.fallback();
+    }
+    const result = results[calls++];
+    if (!result) throw new Error("Unexpected extra AI action");
+    await route.fulfill({ status: 200, contentType: "text/x-component",
+      body: `0:{"a":"$@1","f":"","b":"test"}\n1:${JSON.stringify(result)}\n` });
+  });
+  return () => calls;
+}

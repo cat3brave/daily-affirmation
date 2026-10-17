@@ -2,14 +2,50 @@
 
 ## 状態と範囲
 
-2026-10-16（日本時間）更新の準備資料。**未適用・アプリ未接続・制限未有効化**。
-このPRがマージされても利用者別の回数制限は有効にならない。
-今回の開始mainは `cb8cbde96da1a0ff216a04158427e8fdaed38c0f`（PR #61統合後）。
-専用ブランチ `codex/ai-usage-postgres-privileges` をGitHub連携とローカルで作成した。
-開始時は `work`、`git status -sb` は `## work`、`git status --short` は空。
-端末のfetchはプロキシ接続エラーのため、GitHub連携のmainブランチ情報とHEAD一致で確認した。
-旧PR #52、そのブランチ、既存アカウント削除SQL案には変更・適用を行わない。
-`supabase/schema.sql`、migration、アプリ、依存関係、認証、既存CI、本番設定は変更しない。
+2026-10-18（日本時間）更新。状態を次の3段階で区別する。
+
+- **DB導入済み**：ユーザーからの適用報告では、本番SupabaseへPR #62の確定SQLを適用済み。
+  適用記録は `20261017213728_add_ai_usage_limit_from_pr62`。所有者・権限・FORCE RLSと未認証拒否は確認済み。
+  本作業では本番SQLの再適用・migration追加・枠消費・設定変更を行わない。
+- **アプリ接続の実装・モック試験**：本PRで両Server Actionを接続する。検証結果はPR本文に記録する。
+- **本番で有効化・実通信確認**：本PRは未マージでレビュー待ちに止める。本番JWT経由のHTTP正常系、
+  デプロイ後のアプリ接続、実Supabase・実Geminiの通信は未検証。本番で有効化済みとは扱わない。
+
+開始mainは `840c3d7b1d9dbb823be539e66b5b35774cd73cfd`。
+SQL・RLS・上限値・依存関係・認証方式・workflowと旧PR #52は変更しない。
+以下のDB導入前・未接続の記述は、PR #59〜#62時点の履歴である。
+
+## アプリの利用枠確認
+
+入力検証 → Cookie対応クライアントの `auth.getUser()` → Gemini APIキー存在確認 →
+同じクライアントで引数なし `public.reserve_ai_usage()` を最大1回 → 許可時のみモデル作成・Gemini呼出。
+`getAuthenticatedContext()` はサーバー内部で本人情報とクライアントを保持し、既存の
+`getAuthenticatedUser()` は従来どおりIDとメールだけを返す。クライアント・Cookie・JWTはAction結果に含めない。
+
+共通 `aiUsage.ts` で単一行、型・整数範囲・既知reason・残量・retry_atの整合性を実行時に検証する。
+許可後の残量は日次0〜19・短時間0〜2で、両方0でも今回の確保は許可。
+拒否はreasonに対応する残量だけ0（両方拒否なら両方0）、retry_atはタイムゾーン付きの有効な日時を要求する。
+SDKの `.abortSignal()` と `.retry(false)` を使い、RPCだけに5秒の期限を設ける。
+タイムアウト時は中断要求、全終了経路でタイマー解除。raceにより遅い許可・失敗を採用せず、
+Promiseの遅延rejectionにもハンドラーを保持する。実際のDB処理停止・未消費は保証しない。
+エラー・例外・期限切れ・契約違反は `usage_unavailable` の固定案内で閉じ、Geminiを呼ばない。
+枠確保後のGemini失敗や応答不明でも再予約・自動再試行・推測による返却は行わない。
+
+上限到達は `usage_limited`（reason/retryAt/message）で、Gemini側429の `rate_limited` と区別。
+DBのretry_atをAsia/Tokyoで整形した目安をalert表示する。ブラウザー時計で再利用を判定せず、
+時刻到達時の自動送信も行わない。翻訳入力・再操作・連打防止・認証世代/マウントによる古い応答破棄を維持する。
+
+テストは実SDK＋モックfetchでCookieの同じ利用者トークンがAuthとPOST RPCへ渡ることを検査する。
+これは本番JWTの有効性やDB境界の検証ではない。fake timerで5秒期限・遅延成功/失敗・中断・後始末を検査する。
+UIのE2Eは既存ローカル専用モックとServer Action応答境界のモックを使い、390/1280pxで上限案内・
+入力保持・再操作を検査する。実Supabase・実Geminiへ到達させず、本番コードに試験専用分岐は追加しない。
+本番スモークはAPIキーなしのフォールバックと既存認証・下書き等の回帰を引き続き検査する。
+
+公式仕様は [RPC](https://supabase.com/docs/reference/javascript/rpc)、
+[AbortSignal](https://supabase.com/docs/reference/javascript/using-modifiers-abortsignal)、
+[getUser](https://supabase.com/docs/reference/javascript/auth-getuser) と導入済みSDKのソースで確認。
+2026-10-18にchangelog.mdを取得試行したがcontent-type制約のためHTML版を確認。
+直近のTLS変更はこのCookie/RPC APIの契約変更ではない。
 
 ## 今回採用する方式と権限の境界
 

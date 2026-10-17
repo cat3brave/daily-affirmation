@@ -44,6 +44,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
     authError,
     rateLimitError,
     timeoutError,
+    usageError,
     isLoading,
     handleGenerateAffirmation,
   } = useAffirmationGenerator();
@@ -138,6 +139,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
                       affirmationAuthError={authError}
                       affirmationRateLimitError={rateLimitError}
                       affirmationTimeoutError={timeoutError}
+                      affirmationUsageError={usageError}
                       handleClick={handleGenerateAffirmation}
                       handleFavoriteAffirmation={handleFavoriteAffirmation}
                       isFavoriteDisabled={isFavoriteDisabled}

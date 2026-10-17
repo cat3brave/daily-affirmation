@@ -35,13 +35,18 @@ export async function createSupabaseServerClient() {
 }
 
 // Cookie内のsessionを信用せず、Authサーバーで検証した最小限の情報だけ返す。
-export async function getAuthenticatedUser(): Promise<{ id: string; email: string } | null> {
+export async function getAuthenticatedContext() {
   try {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) return null;
-    return { id: data.user.id, email: data.user.email ?? "" };
+    return { supabase, user: { id: data.user.id, email: data.user.email ?? "" } };
   } catch {
     return null;
   }
+}
+
+// 既存の呼び出し側へは本人情報だけを返す。クライアントはサーバー内部に留める。
+export async function getAuthenticatedUser(): Promise<{ id: string; email: string } | null> {
+  return (await getAuthenticatedContext())?.user ?? null;
 }

@@ -6,6 +6,7 @@ type AffirmationSectionProps = {
   authError: string;
   rateLimitError: string;
   timeoutError?: string;
+  usageError?: string;
   handleClick: () => void;
   handleFavoriteAffirmation: () => void;
   isFavoriteDisabled: boolean;
@@ -17,6 +18,7 @@ export default function AffirmationSection({
   authError,
   rateLimitError,
   timeoutError,
+  usageError,
   handleClick,
   handleFavoriteAffirmation,
   isFavoriteDisabled,
@@ -48,12 +50,12 @@ export default function AffirmationSection({
                 ログイン画面へ
               </a>
             </div>
-          ) : rateLimitError ? (
+          ) : usageError || rateLimitError ? (
             <p
               role="alert"
               className="text-center text-red-700 text-sm leading-relaxed"
             >
-              {rateLimitError}
+              {usageError || rateLimitError}
             </p>
           ) : text ? (
             <motion.div

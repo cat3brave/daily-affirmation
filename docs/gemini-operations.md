@@ -4,13 +4,30 @@ Gemini APIの利用プランや制限、データ取扱いは変更される可�
 
 ## 応答時間の制限
 
-`generateAffirmation`と`translateHarshVoice`は、Gemini呼び出し開始からレスポンス本文・テキスト取得までを共通の15秒で制限します。入力検証、`auth.getUser()`による認証確認、APIキー確認の順序は従来どおりです。認証確認やServer Actionの通信全体が15秒以内に完了する保証ではありません。
+`generateAffirmation`と`translateHarshVoice`は、Gemini呼び出し開始からレスポンス本文・テキスト取得までを共通の15秒で制限します。入力検証、`auth.getUser()`による認証確認、APIキー確認、利用枠RPC確認の順序です。認証確認やServer Actionの通信全体が15秒以内に完了する保証ではありません。
 
 導入済み`@google/generative-ai` 0.24.1の[公式SingleRequestOptions](https://github.com/google-gemini/generative-ai-js/blob/v0.24.1/types/requests.ts)がサポートするAbortSignalを使用し、期限時に中断を要求します。SDK内蔵timeoutは独自タイマーの後始末をできないため使用せず、共通ヘルパーでタイマーとSDKの中断転送リスナーを後始末します。通信が直ちに停止しない場合も時間切れを返し、遅い成功・失敗を採用しません。サービス側の処理や課金まで取り消せるとは保証しません。
 
-時間切れは`timed_out`として固定案内と既存フォールバックを表示し、入力を保持して再操作可能に戻します。自動再試行は行いません。Geminiの429は従来の`rate_limited`として扱います。利用者別の回数制限は未実装です。
+時間切れは`timed_out`として固定案内と既存フォールバックを表示し、入力を保持して再操作可能に戻します。自動再試行は行いません。Geminiの429は従来の`rate_limited`として扱います。利用者別の利用枠は共通の引数なし `reserve_ai_usage()` で確認し、上限は `usage_limited`、確認失敗は `usage_unavailable` として区別します。
 
 実SDKとモックfetchを組み合わせたfake timerテストで、fetch・本文待機中の中断、遅延応答の破棄、タイマー・リスナーの後始末を検証します。実Supabase・実Geminiには接続しません。
+
+## 利用枠との接続
+
+2026-10-18のユーザー報告では、DBはPR #62のSQLを本番へ導入済み（適用記録：
+`20261017213728_add_ai_usage_limit_from_pr62`）。生成・翻訳で20回/JST日・直近60秒3回を共用します。
+本PRではアプリ接続を実装し、実SDK＋モックfetch・UI試験で検証します。PRは未マージで止めるため、
+本番での有効化・本人JWT経由HTTP正常系・実Geminiとの接続確認は未実施です。
+
+APIキーがなければRPCもGeminiも呼ばず既存フォールバックを返します。キーがあるときは
+getUserで本人確認した同じCookie対応クライアントでRPCを1回だけ実行します。
+5秒のRPC期限は認証やAction全体・Geminiの15秒期限とは別です。中断要求後もDB確保の有無は断定せず、
+応答不明・Gemini側429・例外・15秒期限切れでも枠の再確保や返却を行いません。
+応答の実行時検証に失敗したらGeminiを呼ばず固定案内を表示します。内部情報は結果・ログへ出しません。
+
+上限理由とDBのretry_atに基づく日本時間の再利用目安をalertで案内します。
+目安時刻以降の許可は保証せず、自動再送しません。詳細は
+[利用枠設計](ai-usage-limit-design.md#アプリの利用枠確認)を参照してください。
 
 ## 定期確認
 

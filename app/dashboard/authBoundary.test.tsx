@@ -57,7 +57,7 @@ function Owned({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
     <output data-testid="favorites">{favorites.favoriteAffirmations.join(",")}</output>
     <output data-testid="favorite-error">{favorites.favoriteError}{favorites.favoriteLoadError}</output>
     <output data-testid="garden">{JSON.stringify([garden.growth, garden.totalBlooms, garden.currentFlower, garden.isBloomSaving, garden.flowerError, garden.flowerLoadError])}</output>
-    <output data-testid="ai">{ai.text}{ai.authError}{ai.rateLimitError}{ai.timeoutError}{String(ai.isLoading)}</output>
+    <output data-testid="ai">{ai.text}{ai.authError}{ai.rateLimitError}{ai.timeoutError}{ai.usageError}{String(ai.isLoading)}</output>
     <button onClick={() => favorites.handleFavoriteAffirmation("same")}>save</button>
     <button onClick={() => favorites.handleRemoveFavoriteAffirmation("same")}>delete</button>
     <button onClick={garden.handleWalk}>walk</button>
@@ -311,4 +311,19 @@ describe("dashboard authentication boundary (mock only)", () => {
     }
   });
 
+});
+
+it.each(["B", null, "unmount"])("discards late usage denials after %s", async (destination) => {
+  const ai = deferred<unknown>(); const translation = deferred<unknown>();
+  mocks.generate.mockReturnValueOnce(ai.promise); mocks.translate.mockReturnValueOnce(translation.promise);
+  const view = render(<Boundary />); await flush(); await click("generate");
+  fireEvent.change(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声"), { target: { value: "old input" } });
+  await click("優しい言葉に翻訳する 🪄");
+  if (destination === "unmount") view.unmount(); else await change(destination);
+  await act(async () => {
+    ai.resolve({ status: "usage_limited", reason: "daily_limit", retryAt: "2026-10-18T15:00:00Z", message: "old usage denial" });
+    translation.resolve({ status: "usage_unavailable", message: "old usage failure" });
+  });
+  expect(screen.queryByText(/old usage/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

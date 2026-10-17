@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeminiActionResult } from "./actions";
 import { GEMINI_TIMEOUT_MS } from "./lib/geminiRequest";
 
-const auth = vi.hoisted(() => ({ getAuthenticatedUser: vi.fn() }));
+const auth = vi.hoisted(() => ({ getAuthenticatedContext: vi.fn(), rpc: vi.fn(), retry: vi.fn() }));
 vi.mock("./lib/supabaseServer", () => auth);
 // The Gemini SDK is real. Only the network boundary is replaced.
 import { generateAffirmation, translateHarshVoice } from "./actions";
@@ -24,7 +24,9 @@ let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("GEMINI_API_KEY", "private-api-key-secret");
-  auth.getAuthenticatedUser.mockResolvedValue({ id: "test-user" });
+  auth.retry.mockResolvedValue({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
+  auth.rpc.mockImplementation(() => ({ abortSignal: () => ({ retry: auth.retry }) }));
+  auth.getAuthenticatedContext.mockResolvedValue({ user: { id: "test-user" }, supabase: { rpc: auth.rpc } });
   fetchMock = vi.fn<typeof fetch>();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -150,12 +152,13 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { message: "private-input-secret private-api-key-secret" } }), { status: 429 }));
     const result = await call();
     expect(result.status).toBe("rate_limited");
+    expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
     expect(JSON.stringify(result)).not.toMatch(/secret/);
     checkCleanup();
   });
 
   it("does not invoke fetch without authentication or API key", async () => {
-    auth.getAuthenticatedUser.mockResolvedValueOnce(null);
+    auth.getAuthenticatedContext.mockResolvedValueOnce(null);
     expect((await call()).status).toBe("auth_required");
     vi.stubEnv("GEMINI_API_KEY", "");
     expect(await call()).toEqual({ status: "fallback", text: fallback });
@@ -166,7 +169,7 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
 
 it.each(["", "   ", null, 42])("rejects invalid translation input %j before auth or network", async (input) => {
   expect((await translateHarshVoice(input as string)).status).toBe("invalid_input");
-  expect(auth.getAuthenticatedUser).not.toHaveBeenCalled();
+  expect(auth.getAuthenticatedContext).not.toHaveBeenCalled();
   expect(fetchMock).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
