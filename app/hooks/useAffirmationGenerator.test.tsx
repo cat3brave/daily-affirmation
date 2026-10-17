@@ -208,3 +208,17 @@ it("時間切れは案内とフォールバックを保持し、次の操作で�
   expect(result.current.text).toBe("再試行成功");
   expect(result.current.isLoading).toBe(false);
 });
+
+it.each(["usage_limited", "usage_unavailable"] as const)("%sを表示し次の成功で消して再操作できる", async (status) => {
+  const failure: GeminiActionResult = status === "usage_limited"
+    ? { status, reason: "minute_limit", retryAt: "2026-10-18T00:00:00Z", message: "少し待ってください（日本時間）" }
+    : { status, message: "利用状況を確認できませんでした。" };
+  affirmationMocks.generateAffirmation.mockResolvedValueOnce(failure);
+  const { result } = renderHook(() => useAffirmationGenerator());
+  await act(async () => { await result.current.handleGenerateAffirmation(); });
+  expect(result.current.usageError).toBe(failure.message);
+  expect(result.current.isLoading).toBe(false);
+  await act(async () => { await result.current.handleGenerateAffirmation(); });
+  expect(result.current.usageError).toBe("");
+  expect(result.current.text).toBe("今日はここまでで十分ですよ");
+});

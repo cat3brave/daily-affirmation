@@ -303,3 +303,20 @@ it("時間切れではalertと既存フォールバックを表示し入力を�
   expect(getTextbox()).toBeEnabled();
   expect(getTranslateButton()).toBeEnabled();
 });
+
+it.each(["usage_limited", "usage_unavailable"] as const)("%s後も入力を保持し再操作でalertを消す", async (status) => {
+  const failure: GeminiActionResult = status === "usage_limited"
+    ? { status, reason: "daily_limit", retryAt: "2026-10-18T15:00:00Z", message: "本日の利用上限。2026/10/19 00:00:00（日本時間）" }
+    : { status, message: "利用状況を確認できませんでした。" };
+  translatorMocks.translateHarshVoice.mockResolvedValueOnce(failure);
+  render(<GentleTranslatorCard />);
+  fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
+  fireEvent.click(getTranslateButton());
+  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  expect(getTextbox()).toHaveValue("保持する入力");
+  expect(getTextbox()).toBeEnabled();
+  expect(getTranslateButton()).toBeEnabled();
+  fireEvent.click(getTranslateButton());
+  await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  expect(await screen.findByRole("status")).toHaveTextContent("事実と気持ちを分けて見られていますね。");
+});

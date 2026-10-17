@@ -1,10 +1,12 @@
 "use server";
 
 import { generateGeminiText, GeminiTimeoutError } from "./lib/geminiRequest";
+import { reserveAiUsage, type AiUsageFailure } from "./lib/aiUsage";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getAuthenticatedUser } from "./lib/supabaseServer";
+import { getAuthenticatedContext } from "./lib/supabaseServer";
 
 export type GeminiActionResult =
+  | AiUsageFailure
   | { status: "success"; text: string }
   | { status: "fallback"; text: string }
   | { status: "timed_out"; message: string; text: string }
@@ -64,12 +66,16 @@ function isGeminiRateLimitError(error: unknown): boolean {
 // ① アファメーション生成機能
 // -----------------------------------------------------------------
 export async function generateAffirmation(): Promise<GeminiActionResult> {
-  if (!(await getAuthenticatedUser())) {
+  const context = await getAuthenticatedContext();
+  if (!context) {
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 
-  const model = getGeminiModel();
-  if (!model) return { status: "fallback", text: AFFIRMATION_FALLBACK };
+  if (!process.env.GEMINI_API_KEY) return { status: "fallback", text: AFFIRMATION_FALLBACK };
+
+  const usage = await reserveAiUsage(context.supabase);
+  if (usage) return usage;
+  const model = getGeminiModel()!;
 
   const prompt = `
     あなたは、ユーザーを優しく包み込む「心の執事」です。
@@ -120,12 +126,16 @@ export async function translateHarshVoice(
 
   const safeHarshText = harshText.trim().slice(0, 300);
 
-  if (!(await getAuthenticatedUser())) {
+  const context = await getAuthenticatedContext();
+  if (!context) {
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 
-  const model = getGeminiModel();
-  if (!model) return { status: "fallback", text: TRANSLATE_FALLBACK };
+  if (!process.env.GEMINI_API_KEY) return { status: "fallback", text: TRANSLATE_FALLBACK };
+
+  const usage = await reserveAiUsage(context.supabase);
+  if (usage) return usage;
+  const model = getGeminiModel()!;
 
   const prompt = `あなたは心理療法の「ヘルシー・アダルト（健康で思いやりのある大人）」として振る舞う、優しく知的なアシスタントです。
 ユーザーが、自分自身を厳しく責める言葉（クリティカル・ペアレントの声）を入力します。

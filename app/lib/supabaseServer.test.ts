@@ -26,7 +26,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createServerClient }));
 
-import { createSupabaseServerClient, getAuthenticatedUser } from "./supabaseServer";
+import { createSupabaseServerClient, getAuthenticatedUser, getAuthenticatedContext } from "./supabaseServer";
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
@@ -102,4 +102,13 @@ describe("getAuthenticatedUser", () => {
     const adapter = call[2].cookies;
     expect(() => adapter.setAll([{ name: "session", value: "fresh", options: {} }])).not.toThrow();
   });
+});
+
+it("認証済みcontextはgetUserを実行した同じクライアントを保持する", async () => {
+  const client = { auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: "user", email: "test@example.test" } }, error: null }) } };
+  mocks.createServerClient.mockReturnValue(client);
+  const context = await getAuthenticatedContext();
+  expect(context?.supabase).toBe(client);
+  expect(context?.user).toEqual({ id: "user", email: "test@example.test" });
+  expect(client.auth.getUser).toHaveBeenCalledOnce();
 });

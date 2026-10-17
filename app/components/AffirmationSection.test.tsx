@@ -278,3 +278,10 @@ it("時間切れ案内とフォールバックを別々のARIA通知で表示し
   fireEvent.click(screen.getByRole("button", { name: "お気に入りにする 🌷" }));
   expect(favorite).toHaveBeenCalledOnce();
 });
+
+it.each(["短時間の利用上限に達しました。再利用の目安：2026/10/18 09:01:00（日本時間）。", "本日の利用上限に達しました。", "本日の利用上限と短時間の利用上限に達しました。", "利用状況を確認できませんでした。"])("利用枠の案内をalertで表示する: %s", (message) => {
+  render(<AffirmationSection isLoading={false} text="" authError="" rateLimitError="" usageError={message}
+    handleClick={vi.fn()} handleFavoriteAffirmation={vi.fn()} isFavoriteDisabled={false} />);
+  expect(screen.getByRole("alert")).toHaveTextContent(message);
+  expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
+});

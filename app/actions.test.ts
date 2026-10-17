@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => {
     events.push("auth");
     return { data: { user: { id: "user-1" } }, error: null };
   });
+  const retry = vi.fn();
+  const abortSignal = vi.fn(() => ({ retry }));
+  const rpc = vi.fn(() => { events.push("rpc"); return { abortSignal }; });
   const createSupabaseServerClient = vi.fn(() => ({ auth: { getUser } }));
   const generateContent = vi.fn<(prompt: string) => Promise<GenerateContentResult>>();
   const getGenerativeModel = vi.fn<(config: { model: string }) => GenerativeModel>(
@@ -28,6 +31,7 @@ const mocks = vi.hoisted(() => {
   });
   return {
     events,
+    rpc, abortSignal, retry,
     getUser,
     createSupabaseServerClient,
     generateContent,
@@ -68,8 +72,12 @@ beforeEach(() => {
   });
   mocks.createSupabaseServerClient.mockReset();
   mocks.createSupabaseServerClient.mockImplementation(() => ({
-    auth: { getUser: mocks.getUser },
+    auth: { getUser: mocks.getUser }, rpc: mocks.rpc,
   }));
+  mocks.rpc.mockClear();
+  mocks.rpc.mockImplementation(() => { mocks.events.push("rpc"); return { abortSignal: mocks.abortSignal }; });
+  mocks.abortSignal.mockImplementation(() => ({ retry: mocks.retry }));
+  mocks.retry.mockResolvedValue({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
   mocks.generateContent.mockReset();
   mocks.getGenerativeModel.mockClear();
   mocks.getGenerativeModel.mockImplementation(() => {
@@ -97,8 +105,11 @@ describe("generateAffirmation", () => {
       status: "success",
       text: "今日は十分ですよ",
     });
-    expect(mocks.events).toEqual(["auth", "model"]);
+    expect(mocks.events).toEqual(["auth", "rpc", "model"]);
     expect(mocks.generateContent).toHaveBeenCalledOnce();
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+    expect(mocks.createSupabaseServerClient).toHaveBeenCalledOnce();
+    expect(mocks.retry).toHaveBeenCalledWith(false);
   });
 
   it.each([
@@ -223,4 +234,61 @@ describe("translateHarshVoice", () => {
     });
     expect(JSON.stringify(actionResult)).not.toMatch(/internal|token|prompt/);
   });
+});
+
+const calls = [generateAffirmation, () => translateHarshVoice("private-input-secret")];
+describe.each(calls)("usage guard", (call) => {
+  it.each([
+    ["minute_limit", 19, 0], ["daily_limit", 0, 2], ["daily_and_minute_limit", 0, 0],
+  ])("returns %s without creating Gemini", async (reason, daily, minute) => {
+    mocks.retry.mockResolvedValue({ data: [{ allowed: false, reason, daily_remaining: daily, minute_remaining: minute, retry_at: "2026-10-18T15:00:00+00:00" }], error: null });
+    const response = await call();
+    expect(response).toMatchObject({ status: "usage_limited", reason, retryAt: "2026-10-18T15:00:00+00:00" });
+    expect(response).toHaveProperty("message", expect.stringContaining("2026/10/19 00:00:00（日本時間）"));
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+    expectGeminiNotCalled();
+  });
+  it.each(["missing user", "auth error", "auth exception", "no API key"])("skips RPC for %s", async (kind) => {
+    if (kind === "missing user") mocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    if (kind === "auth error") mocks.getUser.mockResolvedValue({ data: { user: { id: "u" } }, error: new Error("secret") });
+    if (kind === "auth exception") mocks.getUser.mockRejectedValue(new Error("secret"));
+    if (kind === "no API key") delete process.env.GEMINI_API_KEY;
+    await call();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expectGeminiNotCalled();
+  });
+  it.each(["error", "exception", "null"])("fails closed on RPC %s", async (kind) => {
+    if (kind === "error") mocks.retry.mockResolvedValue({ data: [], error: new Error("internal cookie JWT api-key-secret") });
+    if (kind === "exception") mocks.rpc.mockImplementation(() => { throw new Error("internal cookie JWT api-key-secret"); });
+    if (kind === "null") mocks.retry.mockResolvedValue({ data: null, error: null });
+    const log = vi.spyOn(console, "error");
+    const response = await call();
+    expect(response).toEqual({ status: "usage_unavailable", message: "利用状況を確認できませんでした。時間をおいて再度お試しください。" });
+    expect(log).not.toHaveBeenCalled();
+    expectGeminiNotCalled();
+  });
+  it.each(["success", "429", "exception"])("never reserves again or refunds after Gemini %s", async (kind) => {
+    if (kind === "success") mocks.generateContent.mockResolvedValue(result("ok"));
+    else mocks.generateContent.mockRejectedValue(kind === "429" ? { status: 429 } : new Error("secret"));
+    await call();
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+  });
+});
+
+it.each(calls)("RPCの5秒期限後の応答ではGeminiを作成しない", async (call) => {
+  vi.useFakeTimers();
+  let resolve!: (value: unknown) => void;
+  mocks.retry.mockReturnValue(new Promise((done) => { resolve = done; }));
+  try {
+    const pending = call();
+    await vi.advanceTimersByTimeAsync(5000);
+    const response = await pending;
+    expect(response).toMatchObject({ status: "usage_unavailable" });
+    expectGeminiNotCalled();
+    resolve({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
+    await vi.advanceTimersByTimeAsync(0);
+    expectGeminiNotCalled();
+    expect(mocks.rpc).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
 });

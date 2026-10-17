@@ -27,7 +27,9 @@ export default function GentleTranslatorCard() {
       if (
         result.status === "auth_required" ||
         result.status === "invalid_input" ||
-        result.status === "rate_limited"
+        result.status === "rate_limited" ||
+        result.status === "usage_limited" ||
+        result.status === "usage_unavailable"
       ) {
         setTranslationError(result.message);
       } else if (result.status === "timed_out") {
