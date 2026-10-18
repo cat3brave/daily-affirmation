@@ -30,6 +30,7 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "e2e-placeholder-anon-key",
       GEMINI_API_KEY: "",
+      NODE_OPTIONS: "--import ./e2e/support/supabaseNetworkGuard.mjs",
       // Fake credentials against the local-only mock; never real Supabase.
       ACCOUNT_DELETION_ENABLED: "true",
       ACCOUNT_DELETION_DB_VERIFIED: "true",

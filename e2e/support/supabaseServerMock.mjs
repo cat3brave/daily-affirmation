@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
 
 // Test-only HTTP service: never forwards requests to Supabase or another host.
 const user = {
@@ -27,6 +28,7 @@ const exportRows = {
 const productionSmoke = process.env.E2E_PROD_MOCK === "true";
 const requests = [];
 const unexpected = [];
+const usedRecoveryCodes = new Set();
 const server = createServer(async (request, response) => {
   response.setHeader("Content-Type", "application/json");
   response.setHeader("Access-Control-Allow-Origin", productionSmoke ? "http://127.0.0.1:3200" : "http://127.0.0.1:3100");
@@ -35,14 +37,14 @@ const server = createServer(async (request, response) => {
   response.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
   const url = new URL(request.url, "http://127.0.0.1:54321");
   const send = (status, data) => { response.writeHead(status); response.end(JSON.stringify(data)); };
-  if (productionSmoke && url.pathname === "/__requests" && request.method === "GET") {
+  if (url.pathname === "/__requests" && request.method === "GET") {
     return send(200, { requests, unexpected });
   }
-  if (productionSmoke && !["/health", "/__requests"].includes(url.pathname) && request.method !== "OPTIONS") {
+  if (!["/health", "/__requests"].includes(url.pathname) && request.method !== "OPTIONS") {
     requests.push({ method: request.method, path: url.pathname, query: url.search, source: request.headers.origin ? "browser" : "server" });
   }
   const rejectUnexpected = () => {
-    if (productionSmoke) unexpected.push(`${request.method} ${url.pathname}${url.search}`);
+    unexpected.push(`${request.method} ${url.pathname}${url.search}`);
     return send(404, { message: "Unexpected mock request" });
   };
   if (request.method === "OPTIONS") {
@@ -98,8 +100,13 @@ const server = createServer(async (request, response) => {
       return send(200, { access_token: "e2e-access-token", refresh_token: "e2e-refresh-token",
         token_type: "bearer", expires_in: 3600, user });
     }
-    if ((grant === "pkce" && input.auth_code === "e2e-oauth-code" && input.code_verifier) ||
+    const recoveryChallenge = typeof input.auth_code === "string" && input.auth_code.startsWith("e2e-recovery-")
+      ? input.auth_code.slice("e2e-recovery-".length) : null;
+    const validRecovery = grant === "pkce" && !usedRecoveryCodes.has(input.auth_code) && typeof input.code_verifier === "string" && recoveryChallenge &&
+      createHash("sha256").update(input.code_verifier).digest("base64url") === recoveryChallenge;
+    if (validRecovery || (grant === "pkce" && input.auth_code === "e2e-oauth-code" && input.code_verifier) ||
         (grant === "refresh_token" && input.refresh_token === "e2e-refresh-token")) {
+      if (validRecovery) usedRecoveryCodes.add(input.auth_code);
       return send(200, { access_token: "e2e-access-token", refresh_token: "e2e-refresh-token",
         token_type: "bearer", expires_in: 3600, user });
     }

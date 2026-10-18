@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+  if (request.nextUrl.pathname === "/forgot-password" || request.nextUrl.pathname.startsWith("/reset-password")) {
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   let authenticated = false;
@@ -52,4 +57,4 @@ export async function proxy(request: NextRequest) {
 }
 
 // 対象を明示し、OAuth callbackと静的アセットには認証処理を適用しない。
-export const config = { matcher: ["/", "/login", "/dashboard/:path*"] };
+export const config = { matcher: ["/", "/login", "/dashboard/:path*", "/forgot-password", "/reset-password/:path*"] };

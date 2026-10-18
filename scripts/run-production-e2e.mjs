@@ -114,7 +114,7 @@ try {
   if (buildCode !== 0) throw new Error(`Production build failed (exit ${buildCode}).`);
   const mock = start(join(root, "e2e/support/supabaseServerMock.mjs"), [], root);
   await ready("http://127.0.0.1:54321/health", mock);
-  const app = start(next, ["start", workspace, "--hostname", "127.0.0.1", "--port", "3200"], workspace);
+  const app = start(next, ["start", workspace, "--hostname", "127.0.0.1", "--port", "3200"], workspace, { ...env, NODE_OPTIONS: "--import ./e2e/support/supabaseNetworkGuard.mjs" });
   await ready("http://127.0.0.1:3200/login", app);
   const tests = start(playwright, ["test", "--config", "playwright.prod.config.ts"], root);
   // An unexpected server exit must fail the run even if tests could otherwise pass.

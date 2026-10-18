@@ -76,7 +76,16 @@ async function change(id: string | null) {
   expect(screen.queryByTestId("owner")).not.toBeInTheDocument();
   await flush();
 }
-async function click(name: string) { await act(async () => { fireEvent.click(screen.getByRole("button", { name })); }); }
+async function click(name: string) {
+  // These controls have literal text labels. Avoid computing every button's
+  // accessible name on every click in this large ownership test fixture.
+  // Keep role, accessible name and visibility checks on the selected control.
+  const button = screen.getByText(name, { selector: "button", exact: true });
+  expect(button).toHaveRole("button");
+  expect(button).toHaveAccessibleName(name);
+  expect(button).toBeVisible();
+  await act(async () => { fireEvent.click(button); });
+}
 const exportData = { schemaVersion: 1, exportedAt: "2026-10-11T00:00:00Z", todos: [], favoriteAffirmations: [], threeGoodThings: [], bloomLogs: [] };
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
