@@ -73,3 +73,11 @@ it("callbackと静的ファイルを除外しdashboard配下は拡張子付き�
     expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url })).toBe(true);
   }
 });
+it.each(["/forgot-password", "/reset-password", "/reset-password/invalid"])("復旧中 %s は既存セッションによらず通し共有キャッシュさせない", async (path) => {
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "user" } }, error: null });
+  expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: path })).toBe(true);
+  const response = await proxy(new NextRequest("https://app.test" + path));
+  expect(response.status).toBe(200); expect(response.headers.get("location")).toBeNull();
+  expect(response.headers.get("cache-control")).toContain("no-store");
+  expect(mocks.getUser).not.toHaveBeenCalled();
+});

@@ -368,6 +368,15 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+        {!isSignUpMode && (
+          <p className="mt-4 text-center text-sm">
+            {isLoading ? (
+              <span aria-disabled="true" className="text-pink-700 opacity-60">パスワードを忘れた方</span>
+            ) : (
+              <Link href="/forgot-password" className="inline-block rounded p-2 text-pink-700 underline underline-offset-2">パスワードを忘れた方</Link>
+            )}
+          </p>
+        )}
         <p className="mt-6 text-center text-sm">
           <Link
             href="/privacy"

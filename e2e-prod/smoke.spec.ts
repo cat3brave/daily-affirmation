@@ -130,3 +130,16 @@ test("real production Server Actions: repeatable AI fallback", async ({ page, re
   const serverRequests = audit.requests.slice(baseline).filter((entry: { source: string }) => entry.source === "server");
   expect(serverRequests.filter((entry: { path: string }) => entry.path === "/auth/v1/user").length).toBeGreaterThanOrEqual(4);
 });
+
+test("password recovery responses prohibit shared caching and use fixed redirects", async ({ request }) => {
+  const callback = await request.get("/auth/recovery?code=invalid-test-code&next=https://example.invalid", { maxRedirects: 0 });
+  expect(callback.status()).toBe(303);
+  expect(callback.headers().location).toBe("/reset-password/invalid");
+  expect(callback.headers()["cache-control"]).toContain("no-store");
+  expect(await callback.text()).not.toContain("invalid-test-code");
+  for (const path of ["/forgot-password", "/reset-password", "/reset-password/invalid"]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toContain("no-store");
+  }
+});

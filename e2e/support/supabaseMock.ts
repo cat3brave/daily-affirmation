@@ -319,3 +319,28 @@ export async function stubAiActionResults(page: Page, results: unknown[]) {
   });
   return () => calls;
 }
+
+// Only recovery-specific browser endpoints; callback exchanges use the real SDK
+// against supabaseServerMock. Existing mock defaults remain unchanged.
+export async function stubPasswordRecoverySupabase(page: Page) {
+  const recoveries: Array<{ email: string; code_challenge: string; code_challenge_method: string }> = [];
+  const passwords: string[] = [];
+  await page.route("http://127.0.0.1:54321/auth/v1/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === "POST" && url.pathname === "/auth/v1/recover") {
+      expect(url.searchParams.get("redirect_to")).toBe("http://127.0.0.1:3100/auth/recovery");
+      recoveries.push(request.postDataJSON());
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      return;
+    }
+    if (request.method() === "PUT" && url.pathname === "/auth/v1/user") {
+      expect(request.headers().authorization).toBe("Bearer e2e-access-token");
+      passwords.push(request.postDataJSON().password);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(e2eUser) });
+      return;
+    }
+    return route.fallback();
+  });
+  return { recoveries, passwords };
+}

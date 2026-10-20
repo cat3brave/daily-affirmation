@@ -536,3 +536,8 @@ describe("LoginPage", () => {
     expect(loginMocks.createSupabaseBrowserClient).toHaveBeenCalledTimes(1);
   });
 });
+
+it("パスワード復旧画面への導線を表示する", () => {
+  render(<LoginPage />);
+  expect(screen.getByRole("link", { name: "パスワードを忘れた方" })).toHaveAttribute("href", "/forgot-password");
+});
