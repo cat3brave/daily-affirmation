@@ -16,9 +16,23 @@ const loadErrorMessage =
 const accountChangedMessage =
   "ログインしている利用者が変わりました。内容を確認してから、もう一度操作してください。";
 
+function getTodayDate() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function ThreeGoodThingsCard() {
   const { capture, auth } = useDashboardOperation();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [inputDate, setInputDate] = useState(getTodayDate);
+  const inputDateRef = useRef(inputDate);
+  const [todayDate, setTodayDate] = useState(getTodayDate);
+  const editorInitializedRef = useRef(false);
+  // Shared synchronous lock: state alone cannot guard same-turn calls.
+  const mutationRef = useRef<symbol | null>(null);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -41,13 +55,13 @@ export default function ThreeGoodThingsCard() {
     null,
   );
 
-  const getTodayDate = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
+  const clearSavedMessage = useCallback(() => {
+    if (savedMessageTimeoutRef.current !== null) {
+      clearTimeout(savedMessageTimeoutRef.current);
+      savedMessageTimeoutRef.current = null;
+    }
+    setIsSaved(false);
+  }, []);
 
   const getPast14Days = () => {
     const dates = [];
@@ -64,7 +78,8 @@ export default function ThreeGoodThingsCard() {
 
   const fetchRecords = useCallback(async () => {
       const current = capture();
-      if (!current()) return;
+      if (!current() || mutationRef.current) return;
+      const targetDate = inputDateRef.current;
       const authGeneration = authGenerationRef.current;
       const requestId = ++loadRequestRef.current;
       setIsLoadingRecords(true);
@@ -102,8 +117,11 @@ export default function ThreeGoodThingsCard() {
         }
         authUserIdRef.current = user.id;
 
-        const today = getTodayDate();
-        const draft = readThreeGoodThingsDraft(user.id, today);
+        const initializeEditor = !editorInitializedRef.current;
+        const draft = initializeEditor
+          ? readThreeGoodThingsDraft(user.id, targetDate)
+          : null;
+        if (draft) editorInitializedRef.current = true;
         userIdRef.current = user.id;
         setUserId(user.id);
         if (draft) {
@@ -145,10 +163,13 @@ export default function ThreeGoodThingsCard() {
 
           setAllRecords(recordsObj);
 
-          const savedThings = recordsObj[today] ?? ["", "", ""];
+          const savedThings = recordsObj[targetDate] ?? ["", "", ""];
           savedThingsRef.current = savedThings;
-          setThings(draft ?? savedThings);
-          setDraftRestored(Boolean(draft));
+          if (initializeEditor) {
+            setThings(draft ?? savedThings);
+            setDraftRestored(Boolean(draft));
+          }
+          editorInitializedRef.current = true;
           setLoadError("");
         }
       } catch (error) {
@@ -181,6 +202,10 @@ export default function ThreeGoodThingsCard() {
         authUserIdRef.current = nextUserId;
         authGenerationRef.current += 1;
         loadRequestRef.current += 1;
+        mutationRef.current = null;
+        editorInitializedRef.current = false;
+        inputDateRef.current = getTodayDate();
+        setInputDate(inputDateRef.current);
         userIdRef.current = null;
         setUserId(null);
         setThings(["", "", ""]);
@@ -211,6 +236,7 @@ export default function ThreeGoodThingsCard() {
 
     return () => {
       isMountedRef.current = false;
+      mutationRef.current = null;
       authGenerationRef.current += 1;
       loadRequestRef.current += 1;
       authListener?.data.subscription.unsubscribe();
@@ -220,8 +246,55 @@ export default function ThreeGoodThingsCard() {
       }
     };
   }, [auth, fetchRecords, supabase.auth]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const checkDate = () => {
+      clearTimeout(timer);
+      setTodayDate(getTodayDate());
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = setTimeout(checkDate, midnight.getTime() - now.getTime());
+    };
+    checkDate();
+    window.addEventListener("focus", checkDate);
+    window.addEventListener("pageshow", checkDate);
+    document.addEventListener("visibilitychange", checkDate);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", checkDate);
+      window.removeEventListener("pageshow", checkDate);
+      document.removeEventListener("visibilitychange", checkDate);
+    };
+  }, []);
+
+  const handleToday = () => {
+    if (!capture()() || mutationRef.current || isLoadingRecords || !userId) return;
+    const today = getTodayDate();
+    if (today === inputDateRef.current) return;
+    const dirty = things.some((thing, index) => thing !== savedThingsRef.current[index]);
+    if (dirty && !window.confirm("未保存の変更を破棄して、今日の入力へ切り替えますか？")) return;
+    if (!capture()() || mutationRef.current) return;
+    clearSavedMessage();
+    const saved = allRecords[today] ?? ["", "", ""];
+    const draft = readThreeGoodThingsDraft(userId, today);
+    savedThingsRef.current = saved;
+    inputDateRef.current = today;
+    setInputDate(today);
+    setTodayDate(today);
+    setThings(draft ?? saved);
+    setDraftRestored(Boolean(draft));
+    setSaveError("");
+    setDeleteError("");
+    setSelectedDate(null);
+    // Refresh today's saved record too: it may have been saved in another tab.
+    editorInitializedRef.current = false;
+    void fetchRecords();
+  };
+
   const handleChange = (index: number, value: string) => {
-    if (!capture()()) return;
+    if (!capture()() || mutationRef.current || isLoadingRecords || !userId) return;
+    editorInitializedRef.current = true;
+    clearSavedMessage();
     const newThings = [...things];
     newThings[index] = value;
     setThings(newThings);
@@ -234,22 +307,24 @@ export default function ThreeGoodThingsCard() {
     ) {
       removeThreeGoodThingsDraft(userId);
     } else {
-      writeThreeGoodThingsDraft(userId, getTodayDate(), newThings);
+      writeThreeGoodThingsDraft(userId, inputDateRef.current, newThings);
     }
   };
 
   const handleSave = async () => {
+    const operation = Symbol();
     const current = capture();
     const displayedUserId = userIdRef.current;
     const authGeneration = authGenerationRef.current;
     const isCurrentOperation = () =>
       current() && isMountedRef.current &&
+      (mutationRef.current === null || mutationRef.current === operation) &&
       authGenerationRef.current === authGeneration &&
       authUserIdRef.current === displayedUserId &&
       userIdRef.current === displayedUserId;
     if (
       !isCurrentOperation() ||
-      isSaving ||
+      mutationRef.current !== null ||
       !displayedUserId ||
       authUserIdRef.current !== displayedUserId ||
       isLoadingRecords
@@ -258,7 +333,9 @@ export default function ThreeGoodThingsCard() {
     const normalizedThings = things.map((thing) => thing.trim());
     if (!normalizedThings.some((thing) => thing !== "")) return;
 
-    const today = getTodayDate();
+    const today = inputDateRef.current;
+    mutationRef.current = operation;
+    clearSavedMessage();
     setSaveError("");
     setIsSaving(true);
 
@@ -281,7 +358,7 @@ export default function ThreeGoodThingsCard() {
         return;
       }
 
-      // user_id と date を使って、今日の記録を追加または更新する
+      // 開始時に確定した対象日と文章で追加または更新する
       const { error: insertError } = await supabase
         .from("three_good_things")
         .upsert(
@@ -305,41 +382,49 @@ export default function ThreeGoodThingsCard() {
         return;
       }
 
-      const updatedRecords = { ...allRecords, [today]: normalizedThings };
       removeThreeGoodThingsDraft(displayedUserId);
       savedThingsRef.current = normalizedThings;
 
       setThings(normalizedThings);
-      setAllRecords(updatedRecords);
+      setAllRecords((records) => ({ ...records, [today]: normalizedThings }));
       setSelectedDate(today);
       setIsSaved(true);
       setSaveError("");
 
-      savedMessageTimeoutRef.current = setTimeout(() => {
-        if (isCurrentOperation()) setIsSaved(false);
+      const timeout = setTimeout(() => {
+        if (savedMessageTimeoutRef.current === timeout && isCurrentOperation()) {
+          savedMessageTimeoutRef.current = null;
+          setIsSaved(false);
+        }
       }, 3000);
+      savedMessageTimeoutRef.current = timeout;
     } catch (error) {
       if (isCurrentOperation()) {
         console.error("記録保存中の想定外のエラー:", error);
         setSaveError("記録を保存できませんでした。もう一度お試しください。");
       }
     } finally {
-      if (isCurrentOperation()) setIsSaving(false);
+      if (mutationRef.current === operation) {
+        if (isCurrentOperation()) setIsSaving(false);
+        mutationRef.current = null;
+      }
     }
   };
 
   const handleDelete = async (dateToDelete: string) => {
+    const operation = Symbol();
     const current = capture();
     const displayedUserId = userIdRef.current;
     const authGeneration = authGenerationRef.current;
     const isCurrentOperation = () =>
       current() && isMountedRef.current &&
+      (mutationRef.current === null || mutationRef.current === operation) &&
       authGenerationRef.current === authGeneration &&
       authUserIdRef.current === displayedUserId &&
       userIdRef.current === displayedUserId;
     if (
       !isCurrentOperation() ||
-      deletingDate !== null ||
+      mutationRef.current !== null ||
       !displayedUserId ||
       authUserIdRef.current !== displayedUserId ||
       isLoadingRecords
@@ -348,7 +433,9 @@ export default function ThreeGoodThingsCard() {
     if (!window.confirm(`${dateToDelete} の記録を削除してもよろしいですか？`))
       return;
 
-    if (!isCurrentOperation()) return;
+    if (!isCurrentOperation() || mutationRef.current) return;
+    mutationRef.current = operation;
+    clearSavedMessage();
     setDeleteError("");
     setDeletingDate(dateToDelete);
 
@@ -392,10 +479,11 @@ export default function ThreeGoodThingsCard() {
         return updatedRecords;
       });
 
-      if (dateToDelete === getTodayDate()) {
+      if (dateToDelete === inputDateRef.current) {
         removeThreeGoodThingsDraft(displayedUserId);
         savedThingsRef.current = ["", "", ""];
         setThings(["", "", ""]);
+        setDraftRestored(false);
       }
 
       setSelectedDate(null);
@@ -406,9 +494,13 @@ export default function ThreeGoodThingsCard() {
         setDeleteError("記録を削除できませんでした。もう一度お試しください。");
       }
     } finally {
-      if (isCurrentOperation()) setDeletingDate(null);
+      if (mutationRef.current === operation) {
+        if (isCurrentOperation()) setDeletingDate(null);
+        mutationRef.current = null;
+      }
     }
   };
+  const isMutating = isSaving || deletingDate !== null;
   const past14Days = getPast14Days();
   const isDeletingSelectedDate =
     selectedDate !== null && deletingDate === selectedDate;
@@ -425,6 +517,17 @@ export default function ThreeGoodThingsCard() {
       <p className="text-[0.65rem] text-pink-400 text-center -mt-3 mb-4">
         入力内容はこの端末に一時保存されます。
       </p>
+      <p className="text-sm font-bold text-pink-700 mb-3">入力対象日：{inputDate}</p>
+      {inputDate !== todayDate && (
+        <div className="w-full mb-4 rounded-xl bg-pink-50 p-3 text-xs text-pink-700">
+          <p role="status">日付が変わりました。入力中の内容は{inputDate}の記録です。</p>
+          <p className="mt-2">ページを再読み込みすると、今日の入力へ戻ります。前日の未保存の文章は復元されません。</p>
+          <button type="button" onClick={handleToday} disabled={isMutating || isLoadingRecords || !userId}
+            className="mt-2 rounded-full border border-pink-300 px-4 py-2 disabled:opacity-50">
+            今日の入力へ
+          </button>
+        </div>
+      )}
       {draftRestored && (
         <p
           role="status"
@@ -442,7 +545,7 @@ export default function ThreeGoodThingsCard() {
               aria-label={`${["1つ目", "2つ目", "3つ目"][index]}のよかったこと`}
               value={things[index]}
               onChange={(e) => handleChange(index, e.target.value)}
-              disabled={isLoadingRecords || isSaving || !userId}
+              disabled={isLoadingRecords || isMutating || !userId}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
               className="w-full min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
             />
@@ -460,7 +563,7 @@ export default function ThreeGoodThingsCard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               onClick={handleSave}
-              disabled={isSaving || isLoadingRecords || !userId || !hasThingToSave}
+              disabled={isMutating || isLoadingRecords || !userId || !hasThingToSave}
               className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
             >
               {isSaving ? "保存中..." : "記録する"}
@@ -502,7 +605,7 @@ export default function ThreeGoodThingsCard() {
         ) : loadError ? (
           <div role="alert" className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500">
             <p>{loadError}</p>
-            <button type="button" onClick={fetchRecords} disabled={isLoadingRecords} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
+            <button type="button" onClick={fetchRecords} disabled={isLoadingRecords || isMutating} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
               {isLoadingRecords ? "再読み込み中..." : "3つのよかったことを再読み込み"}
             </button>
           </div>
@@ -573,7 +676,7 @@ export default function ThreeGoodThingsCard() {
                   type="button"
                   aria-label={`${selectedDate} の記録を削除`}
                   onClick={() => handleDelete(selectedDate)}
-                  disabled={isDeletingSelectedDate}
+                  disabled={isMutating || isLoadingRecords || !userId}
                   className={`p-1 text-pink-300 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:hover:text-pink-300 ${
                     isDeletingSelectedDate ? "opacity-50" : ""
                   }`}

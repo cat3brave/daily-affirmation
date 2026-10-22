@@ -76,3 +76,50 @@ test("別タブのログアウト後は古いタブの入力画面を操作で�
   await expect(page.getByRole("textbox", { name: "1つ目のよかったこと" })).toHaveCount(0);
   expectSafeAuthenticatedRequests(supabaseMock);
 });
+
+test("対象日を表示し保存・削除中は操作を止め、完了後に再入力できる", async ({ page }) => {
+  await loginToDashboard(page);
+  // Only this test allows writes, all fulfilled locally without Supabase access.
+  let releaseWrite: (() => void) | undefined;
+  const writes: Array<{ method: string; date: string | null }> = [];
+  await page.route("http://127.0.0.1:54321/rest/v1/three_good_things**", async (route) => {
+    const request = route.request();
+    if (!["POST", "DELETE"].includes(request.method())) return route.fallback();
+    writes.push({ method: request.method(), date: request.method() === "POST"
+      ? request.postDataJSON().date : new URL(request.url()).searchParams.get("date") });
+    await new Promise<void>((resolve) => { releaseWrite = resolve; });
+    await route.fulfill({ status: 204 });
+  });
+  await page.getByRole("tab", { name: /ワーク/ }).click();
+  const input = page.getByRole("textbox", { name: "1つ目のよかったこと" });
+  await expect(input).toBeEnabled();
+  const date = await page.evaluate(() => {
+    const d = new Date();
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  });
+  await expect(page.getByText(`入力対象日：${date}`)).toBeVisible();
+  await input.fill("花がきれいだった");
+  await page.getByRole("button", { name: "記録する", exact: true }).click();
+  await expect(page.getByRole("button", { name: "保存中..." })).toBeDisabled();
+  await expect(input).toBeDisabled();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0]).toEqual({ method: "POST", date });
+  releaseWrite?.();
+  await expect(page.getByText(/保存しました/)).toBeVisible();
+  await expect(input).toBeEnabled();
+  await input.fill("保存後の新しい入力");
+  const remove = page.getByRole("button", { name: `${date} の記録を削除` });
+  page.once("dialog", (dialog) => dialog.accept());
+  await remove.click();
+  await expect.poll(() => writes.length).toBe(2);
+  await expect(remove).toBeDisabled();
+  await expect(input).toBeDisabled();
+  await expect(page.getByRole("button", { name: "記録する", exact: true })).toBeDisabled();
+  expect(writes[1]).toEqual({ method: "DELETE", date: `eq.${date}` });
+  releaseWrite?.();
+  await expect(input).toBeEnabled();
+  await expect(input).toHaveValue("");
+  await input.fill("削除後の入力");
+  await expect(page.getByRole("button", { name: "記録する", exact: true })).toBeEnabled();
+  expect(writes).toHaveLength(2);
+});
