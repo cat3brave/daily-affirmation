@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,10 @@ const AUTH_MESSAGE_ID = "auth-message";
 type InvalidField = "email" | "password" | null;
 type ErrorFocusTarget = "email" | "password" | "summary";
 
+const subscribeToInitialLocation = () => () => {};
+const clientLocation = () => window.location.search;
+const serverLocation = () => "";
+
 export default function LoginPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const authInFlightRef = useRef(false);
@@ -25,7 +29,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUpMode, setIsSignUpMode] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const initialLocation = useSyncExternalStore(subscribeToInitialLocation, clientLocation, serverLocation);
+  const displayedMessage = message ?? (new URLSearchParams(initialLocation).get("accountDeleted") === "1"
+    ? "アカウントの削除が完了しました。" : "");
   const [invalidField, setInvalidField] = useState<InvalidField>(null);
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success",
@@ -36,13 +43,6 @@ export default function LoginPage() {
     sequence: number;
   } | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("accountDeleted") === "1") {
-      setMessage("アカウントの削除が完了しました。");
-      setMessageType("success");
-    }
-  }, []);
 
   useEffect(() => {
     if (!errorFocusRequest) return;
@@ -243,7 +243,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          {message && (
+          {displayedMessage && (
             <div
               id={AUTH_MESSAGE_ID}
               ref={errorSummaryRef}
@@ -257,7 +257,7 @@ export default function LoginPage() {
                   : "bg-red-50 text-red-700 border border-red-100"
               }`}
             >
-              {message}
+              {displayedMessage}
             </div>
           )}
 

@@ -76,22 +76,17 @@ export default function ThreeGoodThingsCard() {
     return dates;
   };
 
-  const fetchRecords = useCallback(async () => {
+  const fetchRecords = useCallback(() => {
       const current = capture();
       if (!current() || mutationRef.current) return;
       const targetDate = inputDateRef.current;
       const authGeneration = authGenerationRef.current;
       const requestId = ++loadRequestRef.current;
-      setIsLoadingRecords(true);
 
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser().catch((error) => {
-          if (current()) auth?.onOwnerMismatch(null);
-          throw error;
-        });
+      return supabase.auth.getUser().catch((error) => {
+        if (current()) auth?.onOwnerMismatch(null);
+        throw error;
+      }).then(async ({ data: { user }, error: userError }) => {
 
         if (
           !current() ||
@@ -172,7 +167,7 @@ export default function ThreeGoodThingsCard() {
           editorInitializedRef.current = true;
           setLoadError("");
         }
-      } catch (error) {
+      }).catch((error) => {
         console.error("3つのよかったこと取得中に想定外のエラー:", error);
         if (
           current() && requestId === loadRequestRef.current &&
@@ -180,11 +175,11 @@ export default function ThreeGoodThingsCard() {
         ) {
           setLoadError(loadErrorMessage);
         }
-      } finally {
+      }).finally(() => {
         if (current() && requestId === loadRequestRef.current) {
           setIsLoadingRecords(false);
         }
-      }
+      });
   }, [auth, capture, supabase]);
 
   useEffect(() => {
@@ -288,6 +283,7 @@ export default function ThreeGoodThingsCard() {
     setSelectedDate(null);
     // Refresh today's saved record too: it may have been saved in another tab.
     editorInitializedRef.current = false;
+    setIsLoadingRecords(true);
     void fetchRecords();
   };
 
@@ -605,7 +601,7 @@ export default function ThreeGoodThingsCard() {
         ) : loadError ? (
           <div role="alert" className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500">
             <p>{loadError}</p>
-            <button type="button" onClick={fetchRecords} disabled={isLoadingRecords || isMutating} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
+            <button type="button" onClick={() => { setIsLoadingRecords(true); void fetchRecords(); }} disabled={isLoadingRecords || isMutating} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
               {isLoadingRecords ? "再読み込み中..." : "3つのよかったことを再読み込み"}
             </button>
           </div>

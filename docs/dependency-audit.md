@@ -386,3 +386,89 @@ CIは `.github/workflows/ci.yml` の `pull_request` を起点にチェックア�
 管理されたネットワーク設定で公式Playwright配布先 `cdn.playwright.dev` と、公式インストーラーが必要とするリダイレクト先への接続を許可するか、同じPlaywright版・revisionに対応する公式ブラウザーが導入可能な正規環境をこのチャットへ接続する。別の正規環境で実行する場合も、現在の3ファイルの未コミット変更を保持・移送して同一依存で検証する。非公式配布元、別revision、監査・テストの失敗無視を使用しない。
 
 環境復旧後、最終依存でnpm ci、本番監査、全依存JSON監査（非ゼロ終了も記録）、`timeout 600s npm run e2e` を実行する。本番監査とE2Eの成功後にのみ指定3ファイルをstage・commitし、PR以降の処理へ進む。
+
+## PR #65: Next.jsセキュリティ更新（2026-10-24 JST）
+
+この節は今回取得した監査結果。上の過去の監査・環境記録を現在の結果として扱わない。対象ブランチは `feature/good-things-save-consistency`、開始時headは `cc07ae2d13e719f940aa53f598e1ffa72912afa0`。既存の記録機能の修正を保持する。
+
+### 公式情報と更新範囲
+
+| 対象 | 更新前 | 更新後 |
+| --- | --- | --- |
+| next / eslint-config-next | 16.3.8 | 16.4.2（完全固定） |
+| @next/env・@next/eslint-plugin-next・各OS向け@next/swc | 16.3.8 | 16.4.2（対応する内部依存） |
+| eslint-plugin-react-hooks | 7.0.1 | 7.1.1（新しいeslint-config-nextが要求する `^7.1.0` を満たすため） |
+| react / react-dom | 19.2.3 | 19.2.3（変更なし） |
+
+- [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw): Image OptimizationのSVGに関するCritical。
+- [GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r): Server ActionsのDoS、High。
+- [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr): `use cache`のtyped arrayに関するCritical。
+- GitHub公式advisory APIで3件とも16系の影響範囲は `>=16.0.0 <=16.4.0`、最初の修正版は16.4.1と確認した。
+- [公式16.4.2リリース](https://github.com/vercel/next.js/releases/tag/v16.4.2)はdraft / prereleaseともfalse。npmでも16.4.2の公開とintegrityを確認。公式リリースノートの主な変更はTurbopackの修正で、今回必要な追加アプリAPI移行は確認できなかった。
+- Next 16.4.2はNode `>=20.9.0`、React / React DOM `^19.0.0`に対応。ローカルNode 24.19.0、CIのNode 24、既存React 19.2.3を維持できる。ESLint設定のpeerも既存ESLint 9・TypeScript 5で満たす。
+- npmが付随的に再解決したBabel・browser mapping・Zod等は元のlockエントリへ戻し、上記の必要な依存だけを更新した。`timeout 300s npm ci`は成功し、最小lockでの整合性を確認した。force fix、overrides、無関係な一括更新は使っていない。
+- DB・RLS・認証方式・CI監査基準・Gemini SDK・非推奨パッケージは変更しない。
+
+### 本番監査と全依存監査
+
+既存スクリプト名は `audit:prod`。`audit` スクリプトは存在しないため、既存CIと同じ `timeout 300s npm run audit:prod`（`npm audit --omit=dev --audit-level=high`）で検証した。スクリプト名や基準は変更していない。
+
+| 監査 | 結果 | 終了コード |
+| --- | --- | --- |
+| 本番依存 `timeout 300s npm run audit:prod` | 0 vulnerabilities。Critical 0・High 0（その他も0） | 0 |
+| 更新前の全依存 `npm audit --json` | Critical 1・High 2・Moderate 5・Low 1、計9 | 1 |
+| 更新後の全依存 `npm audit --json` | Critical 0・High 2・Moderate 5・Low 1、計8 | 1 |
+
+件数はnpmが集計する影響パッケージ数で、個別advisoryの本数とは異なる。全依存監査は正常に応答したJSONに脆弱性が記録されており、終了1は通信失敗ではない。更新後のNextについて追加のadvisory検出はなかった。全依存監査を成功と報告せず、本番監査とも分ける。
+
+### 残存する開発依存
+
+`npm ls ... --all` とlockfileで以下の経路を確認した。各修正版は今回GitHub公式advisory APIのfirst_patched_versionで確認したもの。全依存監査でも8パッケージすべて `fixAvailable: true`。今回のNext更新とは分けて扱い、解消済みとはしない。
+
+| 影響パッケージ・現在版 | npm severity | 開発依存の経路 | 修正版・根拠 |
+| --- | --- | --- | --- |
+| @babel/core 7.29.0 | Low | eslint-config-next → eslint-plugin-react-hooks → @babel/core | 7.29.6。[GHSA-4x5r-pxfx-6jf8](https://github.com/advisories/GHSA-4x5r-pxfx-6jf8) |
+| @humanfs/node 0.16.7 | Moderate | eslint → @humanfs/node | 0.16.8。[GHSA-p498-v437-472g](https://github.com/advisories/GHSA-p498-v437-472g) |
+| ajv 6.12.6 | Moderate | eslint → ajv、およびeslint → @eslint/eslintrc → ajv | 6.14.0。[GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6) |
+| @vitest/mocker 4.1.10 | Moderate | vitest → @vitest/mocker | 4.1.11でpath traversal修正、4.1.12でmanual mock登録の修正。[GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)、[GHSA-qxg6-89mg-rqv8](https://github.com/advisories/GHSA-qxg6-89mg-rqv8) |
+| vitest 4.1.10 | Moderate | 直接devDependency、および@vitest/coverage-v8 → vitest | 自身の上記path traversalは4.1.11修正。mockerを含めた整合更新が必要 |
+| @vitest/coverage-v8 4.1.10 | Moderate | 直接devDependency → vitest | vitestの影響の伝播。固有の直接advisoryではなく、vitestと対応版へ揃える必要がある |
+| vite 8.1.5 | High | @vitejs/plugin-react → vite、vitest → vite、vitest → @vitest/mocker → vite | 8.1.6で下記5件を修正 |
+| zod 4.3.6 | High | eslint-config-next → eslint-plugin-react-hooks → zod（同plugin → zod-validation-error → zodも共有） | 4.6.6。[GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) |
+
+Viteの直接advisory:
+
+- [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm): Windows上のlaunch-editorチェック回避、High。
+- [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv)、[GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw): launch-editorのエスケープ・引数解釈。
+- [GHSA-9jrq-w75r-8gcw](https://github.com/advisories/GHSA-9jrq-w75r-8gcw): custom middlewareのcross-origin script execution。
+- [GHSA-rq7h-c2jc-7f22](https://github.com/advisories/GHSA-rq7h-c2jc-7f22): `server.fs.allow`外へのアクセス。
+
+本番依存監査ではこれらは検出されないが、開発依存であるだけで安全とは判断しない。ローカル・CIの開発ツールに残るリスクであり、今回PoCや全経路の到達性評価は実施していない。
+
+### 検証経過
+
+- `timeout 300s npm ci`: 成功、終了0。
+- `timeout 300s npm run test:coverage`: 53ファイル・551件成功、終了0。statements 93.44%、branches 87.77%、functions 96.69%、lines 96.52%。通常testは同じ対象のため重複実行を省略。
+- `timeout 300s npm run lint`: 初回は前回E2E生成物にも診断が出たため、gitignore対象のplaywright-report / test-resultsだけを除去して再実行。生成物除去後も既存ソース6ファイル・7箇所の `react-hooks/set-state-in-effect` エラーで終了1。新しいeslint-config-nextが要求するReact Hooks ESLint依存による互換性課題で、ルールは無効化していない。16.4.1も同じ `^7.1.0` を要求する。
+- `npx playwright install chromium`: 公式 `https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip` が403 `Domain forbidden` で終了1。対応Chromiumを導入できず、ローカルE2Eの実動作は未確認。
+- 本節の後続検証結果・CI結果は完了時に追記する。lint失敗中はcommit・pushしない。
+
+### 許可後のESLint互換修正
+
+6ファイル（BloomGraph、ThreeGoodThingsCard、forgot-password、useFavoriteAffirmations、useFlowerGarden、login）への互換修正について追加許可を得た。
+
+- 取得開始時の状態は初期値・入力の変更・再試行イベントで管理し、取得結果の状態更新をPromiseの応答コールバックへ整理した。認証所有者・世代・マウント・リクエスト照合を維持する。
+- 利用者変更に伴う表示状態のリセットは、前の利用者との比較でガードして描画前に行う。
+- hydration可否、初期URL、ユーザー別キャッシュはReactの `useSyncExternalStore` のserver / client snapshotで区別する。キャッシュは利用者ごとの初回復元に限定し、認証方式は変更しない。
+- lintルール・監査基準・coverage閾値を緩和しない。利用者切替中の取得結果・キャッシュ分離・削除完了メッセージの回帰テストを追加した。
+
+### 最終ローカル検証
+
+- 互換修正後の関連Vitest: 7ファイル・144件成功。
+- 最終 `timeout 300s npm run test:coverage`: 53ファイル・554件成功、終了0。通常testと同じ対象。閾値・既存assertionの弱化やskipはなし。
+- 最終 `timeout 300s npm run lint`: 成功、終了0。ルール変更なし。
+- `npx tsc --noEmit`: 追加テストの型指定2箇所を修正後に成功。
+- `timeout 600s npm run e2e`: 74件ともChromium未導入でブラウザー起動前に終了1。ローカル実動作は未検証。
+- `timeout 600s npm run e2e:prod`: Next.js 16.4.2で本番build・TypeScript・静的ページ生成は成功。4件とも同じChromium未導入で終了1。単独buildは重複実行を省略。
+- npm ciと本番監査は成功し、全依存監査の残存開発依存8件は上記のとおり。公式ブラウザー制限の場合にCI検証用commit・通常pushを行う追加許可に従い、同じPR #65でCIを確認する。監査・テスト自体の失敗は無視しない。
+- 最新headのVerify・Vercel・競合状態はPR #65本文へ記載する。auto-merge設定・マージ・ブランチ削除は行わない。

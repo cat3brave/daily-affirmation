@@ -35,6 +35,11 @@ export default function BloomGraph({ refreshKey, userId: owner }: BloomGraphProp
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  const [loadInputs, setLoadInputs] = useState({ refreshKey, retryKey, owner });
+  if (loadInputs.refreshKey !== refreshKey || loadInputs.retryKey !== retryKey || loadInputs.owner !== owner) {
+    setLoadInputs({ refreshKey, retryKey, owner });
+    setLoading(true);
+  }
   const requestRef = useRef(0);
   const inFlightRef = useRef(false);
   const { days, startDate } = useMemo(() => {
@@ -72,43 +77,20 @@ export default function BloomGraph({ refreshKey, userId: owner }: BloomGraphProp
     return { days: daysArray, startDate };
   }, []);
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(() => {
       const current = capture();
       if (!current()) return;
       if (inFlightRef.current) return;
       const requestId = ++requestRef.current;
       inFlightRef.current = true;
-      setLoading(true);
 
-      try {
-        let userId = owner;
-        if (!userId) {
-          const {
-            data: { session },
-            error: sessionError,
-          } = await supabase.auth.getSession();
-
-          if (sessionError) {
-            console.error("セッション取得エラー:", sessionError);
-            if (current() && requestId === requestRef.current) {
-              setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
-            }
-            return;
-          }
-
-          if (!session?.user) {
-            console.error("ログインユーザーが確認できませんでした。");
-            if (current() && requestId === requestRef.current) {
-              setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
-            }
-            return;
-          }
-
-          if (!current()) return;
-          userId = session.user.id;
-        }
+      const user = owner ? Promise.resolve(owner) : supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (error) throw error;
+        if (!session?.user) throw new Error("ログインユーザーが確認できませんでした。");
+        return session.user.id;
+      });
+      return user.then(async (userId) => {
         if (!current()) return;
-
         const { data, error } = await supabase
           .from("bloom_logs")
           .select("created_at")
@@ -138,17 +120,17 @@ export default function BloomGraph({ refreshKey, userId: owner }: BloomGraphProp
           setBloomData(counts);
           setLoadError("");
         }
-      } catch (error) {
+      }).catch((error) => {
         console.error("成長記録取得中に想定外のエラー:", error);
         if (current() && requestId === requestRef.current) {
           setLoadError(BLOOM_LOGS_LOAD_ERROR_MESSAGE);
         }
-      } finally {
+      }).finally(() => {
         if (current() && requestId === requestRef.current) {
           setLoading(false);
           inFlightRef.current = false;
         }
-      }
+      });
   }, [capture, owner, startDate]);
 
   useEffect(() => {

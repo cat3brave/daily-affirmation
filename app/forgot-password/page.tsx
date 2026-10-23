@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import PasswordRecoveryLayout, { recoveryInputClass, recoveryButtonClass, recoveryLinkClass } from "../components/PasswordRecoveryLayout";
@@ -8,6 +8,10 @@ import PasswordRecoveryLayout, { recoveryInputClass, recoveryButtonClass, recove
 const sentMessage = "登録されているメールアドレスの場合、再設定用のメールが届きます。依頼したブラウザーでメール内のリンクを開いてください。";
 const failedMessage = "復旧メールを依頼できませんでした。通信状況を確認し、時間をおいてもう一度お試しください。";
 const limitedMessage = "依頼が制限されています。時間をおいてもう一度お試しください。";
+
+const subscribeToHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 
 export default function ForgotPasswordPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -17,11 +21,11 @@ export default function ForgotPasswordPage() {
   const notice = useRef<HTMLParagraphElement>(null);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
+  const ready = useSyncExternalStore(subscribeToHydration, clientReady, serverReady);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [invalid, setInvalid] = useState(false);
-  useEffect(() => { mounted.current = true; setReady(true); return () => { mounted.current = false; }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { if (message && !busy) (invalid ? emailInput.current : notice.current)?.focus(); }, [message, invalid, busy]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
