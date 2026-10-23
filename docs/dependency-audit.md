@@ -1,8 +1,104 @@
 # npm依存関係監査・引き継ぎ記録
 
-## 最新: CI #90の本番High対応（2026-10-09 JST）
+## 最新: 開発依存の再監査・修正（2026-10-24 JST）
 
-以下を現在の結果とする。後半の「履歴」は過去の記録であり、現在の監査・commit・検証状態とは区別する。本対応は部分対応であり、全依存の脆弱性を解消したものではない。
+この節だけを今回の結果とし、以降のPR #65・CI #90等は履歴として保持する。
+基準は取得した最新main `54c6d7077f9a569fea595de5a872b8aad5d5bf2a`（PR #65）。
+作業ブランチは `feature/fix-development-dependency-audit`。開始時の
+`git status -sb` / `git status --short` は変更なし。PR #65の日付・保存削除排他・認証境界のコードを維持し、旧PR #52とそのブランチは操作しない。
+実行環境はLinux、Node 24.19.0、npm 11.9.0。npmキャッシュは書込み可能な
+`/tmp/daily-affirmation-npm-cache` を指定する。
+
+### 今回実測した監査
+
+| 対象 | 更新前 | 更新後 | JSON終了コード（前→後） |
+| --- | --- | --- | --- |
+| 本番依存 | 全severity 0 | 全severity 0 | 0 → 0 |
+| 全依存 | High 2・Moderate 5・Low 1、計8 | 全severity 0 | 1 → 0 |
+
+更新前 `timeout 300s npm ci --cache /tmp/daily-affirmation-npm-cache` は終了0。
+更新前JSON取得は2026-10-23 21:40:29 UTC（2026-10-24 06:40:29 JST）、
+最終依存の監査は21:42:48 UTC（06:42:48 JST）から実行。
+前後とも `npm audit --omit=dev --json` と `npm audit --json` の
+`metadata.vulnerabilities` を確認した。更新前の全依存の終了1は脆弱性検出であり、通信失敗ではない。
+更新後は両JSONとも終了0、`vulnerabilities` は空。通常の `npm audit` も
+`found 0 vulnerabilities`、終了0。
+件数はnpmの影響パッケージ集計であり、独立advisory本数ではない。
+
+リポジトリに `audit` スクリプトは存在しないため、指定の `npm run audit` に対応する検証は
+既存CIと同じ `timeout 300s npm run audit:prod`（`npm audit --omit=dev --audit-level=high`）で実施し、終了0・0件だった。
+スクリプト名・監査基準・workflowは変更しない。
+
+### 更新版・依存経路・公式根拠
+
+2026-10-24 JSTにGitHub公式advisory APIとnpm registryの公開メタデータ（版、integrity、dependencies、engines、peerDependencies）を取得し直した。
+以下は安定版で、既存の依存範囲内かつ同じmajor。メジャー更新・overrides・不要な直接依存追加はない。
+
+| 対象 | 更新前 → 更新後 | 実際の依存経路・advisory |
+| --- | --- | --- |
+| vite | 8.1.5 → 8.1.6 | @vitejs/plugin-react / vitest / vitest → @vitest/mocker → vite。下記5件の8.1系最小修正版 |
+| zod | 4.3.6 → 4.6.6 | eslint-config-next → eslint-plugin-react-hooks → zod（zod-validation-error経由も共有）。[GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)、巨大な制約付きcollectionでのメモリ枯渇 |
+| vitest / @vitest/coverage-v8 / @vitest/mocker | 4.1.10 → 4.1.12 | 直接devDependencyのvitest / coverage-v8 → vitest → mocker。[GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)（path traversal、4.1.11修正）と[GHSA-qxg6-89mg-rqv8](https://github.com/advisories/GHSA-qxg6-89mg-rqv8)（manual mock登録によるcode injection、4.1.12修正）を両方解消。expect / pretty-format / runner / snapshot / spy / utilsも要求される4.1.12に整合 |
+| @babel/core | 7.29.0 → 7.29.6 | eslint-config-next → eslint-plugin-react-hooks → @babel/core。[GHSA-4x5r-pxfx-6jf8](https://github.com/advisories/GHSA-4x5r-pxfx-6jf8)、sourceMappingURLを通じた任意ファイル読取り |
+| @humanfs/node | 0.16.7 → 0.16.8 | eslint → @humanfs/node。[GHSA-p498-v437-472g](https://github.com/advisories/GHSA-p498-v437-472g)、再帰copyがsymlink先を追ってsource外をコピー |
+| ajv | 6.12.6 → 6.14.0 | eslint → ajv、およびeslint → @eslint/eslintrc → ajv。[GHSA-2g4f-4pwh-qvx6](https://github.com/advisories/GHSA-2g4f-4pwh-qvx6)、$data利用時のReDoS |
+
+Viteの公式advisoryは以下5件。今回取得した8.1系のfirst_patched_versionはいずれも8.1.6。
+
+- [GHSA-698v-4r3x-3vcv](https://github.com/advisories/GHSA-698v-4r3x-3vcv): Windowsの% escaping。
+- [GHSA-r825-w8mm-5pxw](https://github.com/advisories/GHSA-r825-w8mm-5pxw): editor CLI引数解釈。
+- [GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm): Windowsの存在確認回避。
+- [GHSA-9jrq-w75r-8gcw](https://github.com/advisories/GHSA-9jrq-w75r-8gcw): custom middlewareのcross-origin script実行。
+- [GHSA-rq7h-c2jc-7f22](https://github.com/advisories/GHSA-rq7h-c2jc-7f22): server.fs.allow外のファイル参照。
+
+Babel coreの最低要求に伴いgenerator 7.29.1 → 7.29.6、parser 7.29.0 → 7.29.3、helpers 7.28.6 → 7.29.2も更新。
+humanfs nodeの要求に伴いcore 0.19.1 → 0.19.2、types 0.15.0（推移依存）も追加。
+Vitest / coverage-v8のNode・peer要求はNode 24と既存Vite / jsdomで満たされる。
+Next / eslint-config-next 16.4.2、React / React DOM 19.2.3、すべての本番依存lockエントリを維持した。
+
+更新には `npm install --package-lock-only --save-dev --save-prefix='^' vitest@4.1.12 @vitest/coverage-v8@4.1.12 --cache /tmp/daily-affirmation-npm-cache` と
+`npm update vite zod @babel/core @humanfs/node ajv --package-lock-only --cache /tmp/daily-affirmation-npm-cache` を使用。
+その際の周辺依存の再解決は採用せず、既存lockエントリを保持し、対象は公式npmメタデータの上記最小修正版・tarball・integrity・依存要求へ限定した。
+`npm install --package-lock-only --ignore-scripts --cache /tmp/daily-affirmation-npm-cache` でlockを確認し、最終 `npm ci` で導入を検証。
+lockfile全削除・全面再生成、force fix、一括更新は行っていない。
+
+### 最終依存の検証
+
+検証は2026-10-24 06:42–06:47 JSTに実施。以下のコマンドの前後で依存・テスト設定・アプリコードは変更していない。
+
+| 実行コマンド | 結果 / 終了コード |
+| --- | --- |
+| `timeout 300s npm ci --cache /tmp/daily-affirmation-npm-cache` | 成功、0。最終lockで502パッケージ導入 |
+| `NPM_CONFIG_CACHE=/tmp/daily-affirmation-npm-cache timeout 300s npm run audit:prod` | 成功、0、脆弱性0 |
+| `npm audit --omit=dev --json` / `npm audit --json` / `npm audit`（各 `NPM_CONFIG_CACHE=/tmp/daily-affirmation-npm-cache`） | 全て終了0、脆弱性0、有効なJSON応答 |
+| `npm ls vite zod vitest @vitest/mocker @vitest/coverage-v8 @babel/core @babel/generator @babel/parser @babel/helpers @humanfs/node @humanfs/core @humanfs/types ajv --all` | 成功、0。更新対象・対応peerの版整合を確認 |
+| `npm ls --all` | 成功、0。invalid / missing peerなし（未導入optional peerは任意） |
+| `timeout 300s npm run test:coverage` | 成功、0。53ファイル・554件。Statements 93.49%、Branches 88.05%、Functions 95.81%、Lines 96.65% |
+| `timeout 300s npm run test` | 省略。coverageと同じ対象554件を実行済み |
+| `timeout 300s npm run lint` | 成功、0 |
+| `PLAYWRIGHT_BROWSERS_PATH=/tmp/daily-affirmation-playwright NPM_CONFIG_CACHE=/tmp/daily-affirmation-npm-cache timeout 300s npx playwright install chromium` | 終了1、timeoutなし。公式配布URLへの403 `Domain forbidden` |
+| `PLAYWRIGHT_BROWSERS_PATH=/tmp/daily-affirmation-playwright timeout 600s npm run e2e` | 終了1、timeoutなし。74件全てChromium起動前の未導入エラー。ローカル動作未検証 |
+| `PLAYWRIGHT_BROWSERS_PATH=/tmp/daily-affirmation-playwright timeout 600s npm run e2e:prod` | 終了1、timeoutなし。本番build・TypeScript・静的生成成功後、4件全て同じ未導入エラー。ローカル動作未検証 |
+| `timeout 300s npm run build` | 省略。本番E2E内のfresh buildが成功済み |
+| `git diff --check` | 成功、0 |
+| `git diff --stat` / `git diff --name-only` / `git status -sb` / `git status --short` | 指定3ファイルのみの差分を確認 |
+
+公式URLは `https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip`。
+Playwright 1.62.1、Chromium / headless shell 151.0.7922.34、revision 1234は維持した。
+現在の管理ネットワーク許可一覧にはcdn.playwright.devがあるが、実際のダウンロードは403だった。
+非公式配布元・別ブラウザーへの置換やネットワーク制限の迂回は行っていない。
+検証指定の通常E2Eコマンドは2回記載されていたが、ブラウザー未導入の同一失敗を無変更で繰り返さず、通常E2E1回と本番E2E1回を実行した。
+
+既存554件・74件・4件の対象件数を維持。互換性のためのテスト設定・テストコード修正は不要だった。
+assertion、coverage閾値、lintルール、timeout上限、skip指定は変更していない。
+`next dev` のAGENTS.md自動追記は生成元を確認して除去し、元の内容を保持した。
+ユーザーが明示したChromium環境制限の例外に従い、CI確認用commit・通常push・通常PR作成へ進む。
+CIの公式Chromium導入と両E2Eの成功、最新headのVerify・Vercel・競合状態はPRで確認・記録する。
+ローカルE2E成功とは扱わない。auto-merge設定・merge・ブランチ削除は行わずレビュー待ちで停止する。
+
+## 履歴: CI #90の本番High対応（2026-10-09 JST）
+
+以下は2026-10-09時点の記録。現在の監査・commit・検証状態とは区別する。本対応は部分対応であり、全依存の脆弱性を解消したものではない。
 
 作業ブランチは `codex/address-development-dependency-vulnerabilities`。保存済みcommit `c56600de676f437f29f4f658cde63fb1ee2edf96` を保持し、その後に追加する更新。mainへの直接反映、履歴改変、旧PR #52の取込み・操作は行わない。ユーザーの指示により、ローカルE2Eが環境制限で実行できなくても、利用可能な検証と本番監査の成功後に同じ作業ブランチへcommit・通常pushし、GitHub CIでの検証用に保存する。完成・E2E検証済みとは扱わず、PR作成・CI手動実行は行わない。
 
