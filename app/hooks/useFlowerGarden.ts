@@ -20,24 +20,35 @@ export function useFlowerGarden(
   const [isBloomSaving, setIsBloomSaving] = useState<boolean>(false);
   const [flowerError, setFlowerError] = useState<string>("");
   const [flowerLoadError, setFlowerLoadError] = useState<string>("");
-  const [isReloadingBlooms, setIsReloadingBlooms] = useState(false);
+  const [isReloadingBlooms, setIsReloadingBlooms] = useState(Boolean(userId));
   const loadRequestRef = useRef(0);
   const loadInFlightRef = useRef(false);
   const [bloomRefreshKey, setBloomRefreshKey] = useState<number>(0);
 
+  const [stateOwner, setStateOwner] = useState(userId);
+  if (stateOwner !== userId) {
+    setStateOwner(userId);
+    setGrowth(0);
+    setCurrentFlower("🌸");
+    setIsBloomSaving(false);
+    setBloomRefreshKey(0);
+    setTotalBlooms(0);
+    setFlowerError("");
+    setFlowerLoadError("");
+    setIsReloadingBlooms(Boolean(userId));
+  }
+
   // ☁️ ログイン済みユーザーが確定したら「お花の数」を取ってくる
-  const fetchBlooms = useCallback(async () => {
+  const loadBlooms = useCallback(() => {
       if (!userId || loadInFlightRef.current) return;
       const current = capture();
       if (!current()) return;
       const requestId = ++loadRequestRef.current;
       loadInFlightRef.current = true;
-      setIsReloadingBlooms(true);
-      try {
-        const { count, error } = await supabase
+      return Promise.resolve(supabase
           .from("bloom_logs")
           .select("*", { count: "exact", head: true })
-          .eq("user_id", userId);
+          .eq("user_id", userId)).then(({ count, error }) => {
 
         if (!current() || requestId !== loadRequestRef.current) {
           return;
@@ -55,40 +66,39 @@ export function useFlowerGarden(
           setTotalBlooms(count);
         }
         setFlowerLoadError("");
-      } catch (error) {
+      }).catch((error) => {
         console.error("bloom_logs count fetch unexpected error:", error);
         if (current() && requestId === loadRequestRef.current) {
           setFlowerLoadError(
             "お花の記録を読み込めませんでした。時間をおいて、もう一度お試しください。",
           );
         }
-      } finally {
+      }).finally(() => {
         if (current() && requestId === loadRequestRef.current) {
           loadInFlightRef.current = false;
           setIsReloadingBlooms(false);
         }
-      }
+      });
   }, [capture, supabase, userId]);
 
   useEffect(() => {
-    setGrowth(0);
-    setCurrentFlower("🌸");
-    setIsBloomSaving(false);
     saveInFlightRef.current = false;
-    setBloomRefreshKey(0);
-    setTotalBlooms(0);
-    setFlowerError("");
-    setFlowerLoadError("");
     loadRequestRef.current += 1;
     loadInFlightRef.current = false;
     if (!userId) return;
-    fetchBlooms();
+    void loadBlooms();
 
     return () => {
       loadRequestRef.current += 1;
       loadInFlightRef.current = false;
     };
-  }, [fetchBlooms, userId]);
+  }, [loadBlooms, userId]);
+
+  const fetchBlooms = useCallback(() => {
+    if (!userId || !capture()() || loadInFlightRef.current) return;
+    setIsReloadingBlooms(true);
+    return loadBlooms();
+  }, [capture, loadBlooms, userId]);
 
   // 🌱 お散歩ボタンを押した時の処理
   const handleWalk = useCallback(async () => {

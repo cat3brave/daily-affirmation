@@ -1,8 +1,11 @@
 import { useDashboardOperation, verifyDashboardOwner } from "./dashboardAuth";
 import { isAccountDeleted } from "../lib/deletedAccount";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { createSupabaseBrowserClient } from "../lib/supabaseClient";
 import { getFavoriteAffirmationsStorageKey } from "../lib/userLocalStorage";
+
+const subscribeToInitialCache = () => () => {};
+const serverCache = () => undefined;
 
 type SupabaseBrowserClient = ReturnType<typeof createSupabaseBrowserClient>;
 
@@ -17,7 +20,7 @@ export function useFavoriteAffirmations(
   );
   const [favoriteError, setFavoriteError] = useState("");
   const [favoriteLoadError, setFavoriteLoadError] = useState("");
-  const [isReloadingFavorites, setIsReloadingFavorites] = useState(false);
+  const [isReloadingFavorites, setIsReloadingFavorites] = useState(Boolean(userId));
   const [hasLoadedFavorites, setHasLoadedFavorites] = useState(false);
   const favoriteAffirmationsRef = useRef<string[]>([]);
   const pendingFavoriteAffirmationsRef = useRef(new Set<string>());
@@ -33,41 +36,45 @@ export function useFavoriteAffirmations(
     [],
   );
 
-  useEffect(() => {
-    setLoadedOwner(null);
-    setHasLoadedFavorites(false);
-    setFavoriteAffirmations([]);
-    favoriteAffirmationsRef.current = [];
-    pendingFavoriteAffirmationsRef.current.clear();
-    setFavoriteError("");
-    setFavoriteLoadError("");
-    loadRequestRef.current += 1;
-    loadInFlightRef.current = false;
-
-    if (!userId) return;
-
+  const readInitialCache = useCallback(() => {
     try {
-      const savedFavorites = localStorage.getItem(
-        getFavoriteAffirmationsStorageKey(userId),
-      );
-
-      if (savedFavorites) {
-        const parsedFavorites = JSON.parse(savedFavorites);
-
-        if (Array.isArray(parsedFavorites)) {
-          const favorites = parsedFavorites.filter(
-            (favorite): favorite is string => typeof favorite === "string",
-          );
-          favoriteAffirmationsRef.current = favorites;
-          setFavoriteAffirmations(favorites);
-        }
-      }
+      return userId ? localStorage.getItem(getFavoriteAffirmationsStorageKey(userId)) : null;
+    } catch {
+      return null;
+    }
+  }, [userId]);
+  const initialCache = useSyncExternalStore<string | null | undefined>(
+    subscribeToInitialCache, readInitialCache, serverCache,
+  );
+  const [cacheOwner, setCacheOwner] = useState<{ id: string | null; ready: boolean }>({ id: userId, ready: false });
+  // Reset owner-specific state before rendering a different user's data.
+  // The server snapshot defers browser storage restoration until hydration.
+  if (cacheOwner.id !== userId || (!cacheOwner.ready && initialCache !== undefined)) {
+    const ready = initialCache !== undefined;
+    let favorites: string[] = [];
+    try {
+      const parsed: unknown = initialCache ? JSON.parse(initialCache) : null;
+      if (Array.isArray(parsed)) favorites = parsed.filter((value): value is string => typeof value === "string");
     } catch {
       console.error("お気に入りアファメーションの読み込みに失敗しました。");
-    } finally {
-      setLoadedOwner(userId);
-      setHasLoadedFavorites(true);
     }
+    setCacheOwner({ id: userId, ready });
+    setFavoriteAffirmations(favorites);
+    setLoadedOwner(ready ? userId : null);
+    setHasLoadedFavorites(ready && Boolean(userId));
+    setFavoriteError("");
+    setFavoriteLoadError("");
+    setIsReloadingFavorites(Boolean(userId));
+  }
+
+  useEffect(() => {
+    favoriteAffirmationsRef.current = favoriteAffirmations;
+  }, [favoriteAffirmations]);
+
+  useEffect(() => {
+    pendingFavoriteAffirmationsRef.current.clear();
+    loadRequestRef.current += 1;
+    loadInFlightRef.current = false;
   }, [userId]);
 
   useEffect(() => {
@@ -83,19 +90,17 @@ export function useFavoriteAffirmations(
     }
   }, [favoriteAffirmations, hasLoadedFavorites, loadedOwner, userId, capture]);
 
-  const fetchFavoriteAffirmations = useCallback(async () => {
+  const loadFavoriteAffirmations = useCallback(() => {
       if (!userId || !hasLoadedFavorites || loadInFlightRef.current) return;
       const current = capture();
       if (!current()) return;
       const requestId = ++loadRequestRef.current;
       loadInFlightRef.current = true;
-      setIsReloadingFavorites(true);
-      try {
-        const { data, error } = await supabase
+      return Promise.resolve(supabase
           .from("favorite_affirmations")
           .select("text")
           .eq("user_id", userId)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false })).then(({ data, error }) => {
 
         if (!current() || requestId !== loadRequestRef.current) return;
 
@@ -117,7 +122,7 @@ export function useFavoriteAffirmations(
           favoriteAffirmationsRef.current = fetchedFavorites;
           setFavoriteAffirmations(fetchedFavorites);
         }
-      } catch (error) {
+      }).catch((error) => {
         if (!current()) return;
         console.error("お気に入り読み込み中の想定外エラー:", error);
         if (current() && requestId === loadRequestRef.current) {
@@ -125,23 +130,29 @@ export function useFavoriteAffirmations(
             "お気に入りの読み込みに失敗しました。時間をおいて、もう一度お試しください。",
           );
         }
-      } finally {
+      }).finally(() => {
         if (current() && requestId === loadRequestRef.current) {
           loadInFlightRef.current = false;
           setIsReloadingFavorites(false);
         }
-      }
+      });
   }, [capture, hasLoadedFavorites, supabase, userId]);
 
   useEffect(() => {
     if (!userId || loadedOwner !== userId || !hasLoadedFavorites || isAccountDeleted(userId) || !capture()()) return;
-    fetchFavoriteAffirmations();
+    void loadFavoriteAffirmations();
 
     return () => {
       loadRequestRef.current += 1;
       loadInFlightRef.current = false;
     };
-  }, [capture, fetchFavoriteAffirmations, hasLoadedFavorites, loadedOwner, userId]);
+  }, [capture, loadFavoriteAffirmations, hasLoadedFavorites, loadedOwner, userId]);
+
+  const fetchFavoriteAffirmations = useCallback(() => {
+    if (!userId || !hasLoadedFavorites || !capture()() || loadInFlightRef.current) return;
+    setIsReloadingFavorites(true);
+    return loadFavoriteAffirmations();
+  }, [capture, hasLoadedFavorites, loadFavoriteAffirmations, userId]);
 
   const handleFavoriteAffirmation = useCallback(
     async (affirmationText: string) => {

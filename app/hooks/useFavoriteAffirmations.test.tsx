@@ -278,3 +278,19 @@ it("古い削除失敗をBの一覧へ戻さずBのキャッシュを汚さな�
   expect(result.current.favoriteError).toBe("");
   expect(localStorage.getItem("favoriteAffirmations:B")).toBe('["Bの言葉"]');
 });
+
+it("利用者切替時は新しい利用者のキャッシュだけを復元しログアウトで表示を消す", () => {
+  localStorage.setItem("favoriteAffirmations:A", JSON.stringify(["Aのキャッシュ"]));
+  localStorage.setItem("favoriteAffirmations:B", JSON.stringify(["Bのキャッシュ"]));
+  const mock = createSupabaseMock();
+  mock.order.mockReturnValue(new Promise(() => {}));
+  const { result, rerender } = renderHook(({ id }: { id: string | null }) => useFavoriteAffirmations(id, mock.supabase), { initialProps: { id: "A" as string | null } });
+  expect(result.current.favoriteAffirmations).toEqual(["Aのキャッシュ"]);
+  rerender({ id: "B" });
+  expect(result.current.favoriteAffirmations).toEqual(["Bのキャッシュ"]);
+  expect(localStorage.getItem("favoriteAffirmations:B")).toBe('["Bのキャッシュ"]');
+  rerender({ id: null });
+  expect(result.current.favoriteAffirmations).toEqual([]);
+  expect(localStorage.getItem("favoriteAffirmations:A")).toBe('["Aのキャッシュ"]');
+  expect(localStorage.getItem("favoriteAffirmations:B")).toBe('["Bのキャッシュ"]');
+});

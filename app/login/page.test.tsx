@@ -541,3 +541,17 @@ it("パスワード復旧画面への導線を表示する", () => {
   render(<LoginPage />);
   expect(screen.getByRole("link", { name: "パスワードを忘れた方" })).toHaveAttribute("href", "/forgot-password");
 });
+
+it("削除完了の案内を復元し、次の操作のエラー表示へ切り替えられる", () => {
+  const previousUrl = window.location.href;
+  window.history.replaceState(null, "", "/login?accountDeleted=1");
+  try {
+    render(<LoginPage />);
+    expect(screen.getByRole("status")).toHaveTextContent("アカウントの削除が完了しました。");
+    fireEvent.click(screen.getByRole("button", { name: "ログイン" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("メールアドレスを入力してください。");
+    expect(screen.queryByText("アカウントの削除が完了しました。")).not.toBeInTheDocument();
+  } finally {
+    window.history.replaceState(null, "", previousUrl);
+  }
+});

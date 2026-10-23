@@ -221,3 +221,27 @@ describe("useFlowerGarden", () => {
     expect(consoleError).toHaveBeenCalled();
   });
 });
+
+it("利用者変更時は成長と合計をリセットし、古い再取得結果を反映しない", async () => {
+  const mock = createSupabaseMock({ count: 7 });
+  const { result, rerender } = renderHook(({ id }) => useFlowerGarden(id, mock.supabase), { initialProps: { id: USER_ID } });
+  await waitFor(() => expect(result.current.totalBlooms).toBe(7));
+  await act(async () => { await result.current.handleWalk(); });
+  expect(result.current.growth).toBe(1);
+  let finishOld!: (value: CountResult) => void;
+  mock.eq.mockReturnValueOnce(new Promise(resolve => { finishOld = resolve; }));
+  let oldRequest!: Promise<void> | undefined;
+  act(() => { oldRequest = result.current.reloadBlooms(); });
+  let finishNew!: (value: CountResult) => void;
+  mock.eq.mockReturnValueOnce(new Promise(resolve => { finishNew = resolve; }));
+  rerender({ id: "user-B" });
+  expect(result.current.growth).toBe(0);
+  expect(result.current.totalBlooms).toBe(0);
+  expect(result.current.isReloadingBlooms).toBe(true);
+  await act(async () => { finishOld({ count: 99, error: null }); await oldRequest; });
+  expect(result.current.totalBlooms).toBe(0);
+  expect(result.current.isReloadingBlooms).toBe(true);
+  await act(async () => finishNew({ count: 2, error: null }));
+  expect(result.current.totalBlooms).toBe(2);
+  expect(result.current.isReloadingBlooms).toBe(false);
+});
