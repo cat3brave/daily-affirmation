@@ -1,8 +1,39 @@
 # npm依存関係監査・引き継ぎ記録
 
-## 最新: 開発依存の再監査・修正（2026-10-24 JST）
+## 最新: SDK移行と許可されたundici最小更新（2026-10-25 JST）
 
-この節だけを今回の結果とし、以降のPR #65・CI #90等は履歴として保持する。
+`feature/migrate-google-genai`、基準main `4037e062116fece11f4f2dd1312cad14330fc03d`。
+undici更新前：SDKを`@google/genai` 2.31.0へ変更したlockで、`timeout 300s npm ci --cache /tmp/daily-npm`は成功。
+`timeout 300s npm run audit:prod`は終了0・本番脆弱性0件でした。
+`npm audit --json`と`npm audit`は終了1、全依存でHigh 1件（undici）です。
+有効な監査応答であり、通信失敗ではありません。以下に更新後の結果を分けて記録します。
+
+経路は既存の`jsdom@28.1.0 → undici@7.30.0`（dev）。基準mainでも同じ版であり、
+今回追加したSDKの依存経路ではありません。更新前の以下3 advisoryが同一パッケージへ集約されています。
+
+- [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685): EventSource parserのメモリ消費
+- [GHSA-f72v-6w45-q472](https://github.com/advisories/GHSA-f72v-6w45-q472): integrityアルゴリズムの検証
+- [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c): content-encodings処理の未捕捉例外
+
+監査の修正境界は7.30.1。npmで同版の公開とNode >=20.18.1を確認しました。
+初回は無関係な依存更新禁止に従い停止しました。その後ユーザーが今回に限り明示的に許可したため、
+jsdomの要求`^7.21.0`内で7.30.0 → 7.30.1へ更新しました。
+公式npm metadataのtarball・integrityを使用してlockの該当エントリだけを更新し、`npm ci`で検証。
+SDK移行差分に加わった変更が`node_modules/undici`の1エントリだけであることを比較確認しました。
+既存lockとの版比較でも変更はundiciだけ。直接依存追加・overrides・force fix・無関係な版更新はありません。
+
+更新後監査は2026-10-24 22:18:44 UTC（2026-10-25 07:18:44 JST）から実行しました。
+`timeout 300s npm ci --cache /tmp/daily-npm`、`timeout 300s npm run audit:prod`、
+`npm audit --json`、`npm audit`は全て終了0。本番・全依存とも全severity 0件です。
+JSONの`vulnerabilities`は空で、正常な監査応答を確認しています。
+`npm ls undici --all`は`jsdom@28.1.0 → undici@7.30.1`、
+`npm ls --all`も終了0でinvalid / missing peerはありません。
+強制audit fixや監査基準の緩和は行っていません。
+
+
+## 履歴: 開発依存の再監査・修正（2026-10-24 JST）
+
+この節は2026-10-24時点の結果であり、現在の結果は冒頭のSDK移行節を参照する。以降のPR #65・CI #90等も履歴として保持する。
 基準は取得した最新main `54c6d7077f9a569fea595de5a872b8aad5d5bf2a`（PR #65）。
 作業ブランチは `feature/fix-development-dependency-audit`。開始時の
 `git status -sb` / `git status --short` は変更なし。PR #65の日付・保存削除排他・認証境界のコードを維持し、旧PR #52とそのブランチは操作しない。

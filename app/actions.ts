@@ -2,7 +2,6 @@
 
 import { generateGeminiText, GeminiTimeoutError } from "./lib/geminiRequest";
 import { reserveAiUsage, type AiUsageFailure } from "./lib/aiUsage";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getAuthenticatedContext } from "./lib/supabaseServer";
 
 export type GeminiActionResult =
@@ -24,15 +23,6 @@ const RATE_LIMITED_MESSAGE =
 const AFFIRMATION_FALLBACK = "あなたは、そのままで素晴らしい存在です。";
 const TRANSLATE_FALLBACK =
   "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。";
-
-function getGeminiModel() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  return new GoogleGenerativeAI(apiKey).getGenerativeModel({
-    model: "gemini-2.5-flash",
-  });
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -75,7 +65,6 @@ export async function generateAffirmation(): Promise<GeminiActionResult> {
 
   const usage = await reserveAiUsage(context.supabase);
   if (usage) return usage;
-  const model = getGeminiModel()!;
 
   const prompt = `
     あなたは、ユーザーを優しく包み込む「心の執事」です。
@@ -98,7 +87,7 @@ export async function generateAffirmation(): Promise<GeminiActionResult> {
   `;
 
   try {
-    return { status: "success", text: await generateGeminiText(model, prompt) };
+    return { status: "success", text: await generateGeminiText(process.env.GEMINI_API_KEY!, prompt) };
   } catch (error) {
     if (error instanceof GeminiTimeoutError) {
       return {
@@ -135,7 +124,6 @@ export async function translateHarshVoice(
 
   const usage = await reserveAiUsage(context.supabase);
   if (usage) return usage;
-  const model = getGeminiModel()!;
 
   const prompt = `あなたは心理療法の「ヘルシー・アダルト（健康で思いやりのある大人）」として振る舞う、優しく知的なアシスタントです。
 ユーザーが、自分自身を厳しく責める言葉（クリティカル・ペアレントの声）を入力します。
@@ -150,7 +138,7 @@ export async function translateHarshVoice(
 「${safeHarshText}」`;
 
   try {
-    return { status: "success", text: await generateGeminiText(model, prompt) };
+    return { status: "success", text: await generateGeminiText(process.env.GEMINI_API_KEY!, prompt) };
   } catch (error) {
     if (error instanceof GeminiTimeoutError) {
       return {
