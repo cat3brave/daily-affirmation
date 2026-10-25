@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-type GenerateContentResult = { response: { text: () => string } };
-type GenerativeModel = {
-  generateContent: (prompt: string) => Promise<GenerateContentResult>;
-};
+type GenerateContentResult = { candidates: { content: { parts: { text: string }[] } }[] };
+type GenerateParams = { model: string; contents: string };
 type AuthResult = {
   data: { user: { id: string } | null };
   error: Error | null;
@@ -19,15 +17,10 @@ const mocks = vi.hoisted(() => {
   const abortSignal = vi.fn(() => ({ retry }));
   const rpc = vi.fn(() => { events.push("rpc"); return { abortSignal }; });
   const createSupabaseServerClient = vi.fn(() => ({ auth: { getUser } }));
-  const generateContent = vi.fn<(prompt: string) => Promise<GenerateContentResult>>();
-  const getGenerativeModel = vi.fn<(config: { model: string }) => GenerativeModel>(
-    () => {
-      events.push("model");
-      return { generateContent };
-    },
-  );
-  const GoogleGenerativeAI = vi.fn(function GoogleGenerativeAI() {
-    return { getGenerativeModel };
+  const generateContent = vi.fn<(params: GenerateParams) => Promise<GenerateContentResult>>();
+  const GoogleGenAI = vi.fn(function GoogleGenAI() {
+    events.push("model");
+    return { models: { generateContent } };
   });
   return {
     events,
@@ -35,15 +28,14 @@ const mocks = vi.hoisted(() => {
     getUser,
     createSupabaseServerClient,
     generateContent,
-    getGenerativeModel,
-    GoogleGenerativeAI,
+    GoogleGenAI,
   };
 });
 
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ getAll: () => [], set: vi.fn() })) }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: mocks.createSupabaseServerClient }));
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: mocks.GoogleGenerativeAI,
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: mocks.GoogleGenAI,
 }));
 
 import { generateAffirmation, translateHarshVoice } from "./actions";
@@ -57,7 +49,7 @@ const RATE_LIMIT_MESSAGE =
   "利用が集中しています。少し時間をおいてから、もう一度お試しください。";
 
 function result(text: string): GenerateContentResult {
-  return { response: { text: () => text } };
+  return { candidates: [{ content: { parts: [{ text }] } }] };
 }
 
 beforeEach(() => {
@@ -79,12 +71,11 @@ beforeEach(() => {
   mocks.abortSignal.mockImplementation(() => ({ retry: mocks.retry }));
   mocks.retry.mockResolvedValue({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
   mocks.generateContent.mockReset();
-  mocks.getGenerativeModel.mockClear();
-  mocks.getGenerativeModel.mockImplementation(() => {
+  mocks.GoogleGenAI.mockReset();
+  mocks.GoogleGenAI.mockImplementation(function () {
     mocks.events.push("model");
-    return { generateContent: mocks.generateContent };
+    return { models: { generateContent: mocks.generateContent } };
   });
-  mocks.GoogleGenerativeAI.mockClear();
 });
 
 afterEach(() => {
@@ -92,8 +83,7 @@ afterEach(() => {
 });
 
 function expectGeminiNotCalled() {
-  expect(mocks.GoogleGenerativeAI).not.toHaveBeenCalled();
-  expect(mocks.getGenerativeModel).not.toHaveBeenCalled();
+  expect(mocks.GoogleGenAI).not.toHaveBeenCalled();
   expect(mocks.generateContent).not.toHaveBeenCalled();
 }
 
@@ -187,7 +177,7 @@ describe("translateHarshVoice", () => {
       status: "success",
       text: "優しい言葉です",
     });
-    const prompt = mocks.generateContent.mock.calls[0][0];
+    const prompt = mocks.generateContent.mock.calls[0][0].contents;
     expect(prompt).toContain(`「${limited}」`);
     expect(prompt).not.toContain("超過");
   });
@@ -291,4 +281,21 @@ it.each(calls)("RPCの5秒期限後の応答ではGeminiを作成しない", asy
     expect(mocks.rpc).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   } finally { vi.useRealTimers(); }
+});
+
+// Client construction and response processing are inside the safe action boundary.
+describe.each(calls)("SDK boundary exceptions", call => {
+  it("converts construction failures to the existing fallback", async () => {
+    mocks.GoogleGenAI.mockImplementation(() => { throw new Error("private-key-secret"); });
+    const response = await call();
+    expect(response.status).toBe("fallback");
+    expect(JSON.stringify(response)).not.toContain("secret");
+    expect(mocks.rpc).toHaveBeenCalledOnce();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+  });
+  it("converts response access failures to the existing fallback", async () => {
+    mocks.generateContent.mockResolvedValue({ get candidates(): never { throw new Error("private-input-secret"); } });
+    expect((await call()).status).toBe("fallback");
+    expect(mocks.rpc).toHaveBeenCalledOnce();
+  });
 });

@@ -39,6 +39,11 @@ async function start(call: () => Promise<GeminiActionResult>) {
   expect(fetchMock).toHaveBeenCalledOnce();
   return { pending };
 }
+function responseBody(json: () => Promise<unknown>) {
+  const response = new Response();
+  response.json = json;
+  return response;
+}
 function trackListeners() {
   const add = vi.spyOn(AbortSignal.prototype, "addEventListener");
   const remove = vi.spyOn(AbortSignal.prototype, "removeEventListener");
@@ -56,7 +61,7 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
   it("succeeds before the deadline and removes the timer/listener", async () => {
     const checkCleanup = trackListeners();
     const body = deferred<typeof payload>();
-    fetchMock.mockResolvedValue({ ok: true, json: () => body.promise } as Response);
+    fetchMock.mockResolvedValue(responseBody(() => body.promise));
     const { pending } = await start(call);
     await vi.advanceTimersByTimeAsync(GEMINI_TIMEOUT_MS - 1);
     body.resolve(payload);
@@ -107,7 +112,7 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
       const once = { once: true, capture: false };
       const abort = () => { observedAbort = true; body.reject(new DOMException("body-secret", "AbortError")); };
       signal.addEventListener("abort", abort, once);
-      return { ok: true, json: () => body.promise.finally(() => signal.removeEventListener("abort", abort, once)) } as Response;
+      return responseBody(() => body.promise.finally(() => signal.removeEventListener("abort", abort, once)));
     });
     const { pending } = await start(call);
     await vi.advanceTimersByTimeAsync(GEMINI_TIMEOUT_MS);
@@ -120,13 +125,13 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
     const checkCleanup = trackListeners();
     const late = deferred<Response>();
     const body = deferred<typeof payload>();
-    fetchMock.mockImplementation(() => phase === "headers" ? late.promise : Promise.resolve({ ok: true, json: () => body.promise } as Response));
+    fetchMock.mockImplementation(() => phase === "headers" ? late.promise : Promise.resolve(responseBody(() => body.promise)));
     const { pending } = await start(call);
     await vi.advanceTimersByTimeAsync(GEMINI_TIMEOUT_MS);
     const result = await pending;
     expect(result).toEqual({ status: "timed_out", message: timeoutMessage, text: fallback });
     checkCleanup();
-    late.resolve({ ok: true, json: async () => payload } as Response);
+    late.resolve(responseBody(async () => payload));
     body.resolve(payload);
     await vi.advanceTimersByTimeAsync(0);
     expect(await pending).toBe(result);
@@ -135,7 +140,7 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
     fetchMock.mockClear();
     const lateFailure = deferred<Response>();
     const failedBody = deferred<typeof payload>();
-    fetchMock.mockImplementation(() => phase === "headers" ? lateFailure.promise : Promise.resolve({ ok: true, json: () => failedBody.promise } as Response));
+    fetchMock.mockImplementation(() => phase === "headers" ? lateFailure.promise : Promise.resolve(responseBody(() => failedBody.promise)));
     const next = (await start(call)).pending;
     await vi.advanceTimersByTimeAsync(GEMINI_TIMEOUT_MS);
     const nextResult = await next;
@@ -155,6 +160,64 @@ describe.each(actions)("$name with real SDK and mock fetch", ({ call, fallback }
     expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
     expect(JSON.stringify(result)).not.toMatch(/secret/);
     checkCleanup();
+  });
+
+  it.each([429, 500, 503, 400, 404])("sends one HTTP request for API status %s", async (status) => {
+    const cleanup = trackListeners();
+    const logs = [vi.spyOn(console, "error"), vi.spyOn(console, "warn"), vi.spyOn(console, "log")];
+    fetchMock.mockResolvedValue(Response.json({ error: { code: status, message: "private-api-key-secret private-input-secret" } }, { status }));
+    const result = await call();
+    expect(result.status).toBe(status === 429 ? "rate_limited" : "fallback");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+    expect(JSON.stringify(result)).not.toMatch(/secret/);
+    logs.forEach(log => expect(log).not.toHaveBeenCalled());
+    cleanup();
+  });
+
+  it.each([
+    {}, { candidates: [] },
+    { candidates: [{ content: { parts: [] } }] },
+    { candidates: [{ content: { parts: [{ text: "   " }] } }] },
+    { candidates: [{ content: { parts: [{ text: 42 }] } }] },
+    { candidates: [{ content: { parts: [{ text: "private-input-secret", thought: true }] } }] },
+    { candidates: [{ content: { parts: [{ functionCall: { name: "private-input-secret" } }] } }] },
+    { candidates: [{ finishReason: "SAFETY", content: { parts: [{ text: "partial" }] } }] },
+    { candidates: [{ finishReason: "CONTINUATION", continuationToken: "private-api-key-secret", content: { parts: [{ text: "partial" }] } }] },
+  ])("rejects unusable text safely without continuation %#", async (body) => {
+    const cleanup = trackListeners();
+    const logs = [vi.spyOn(console, "error"), vi.spyOn(console, "warn"), vi.spyOn(console, "log")];
+    fetchMock.mockResolvedValue(Response.json(body));
+    expect(await call()).toEqual({ status: "fallback", text: fallback });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    logs.forEach(log => expect(log).not.toHaveBeenCalled());
+    cleanup();
+  });
+
+  it.each(["denied", "error", "exception", "malformed"])("makes no generation request when quota is %s", async (kind) => {
+    if (kind === "denied") auth.retry.mockResolvedValue({ data: [{ allowed: false, reason: "daily_limit", daily_remaining: 0, minute_remaining: 2, retry_at: "2026-10-18T15:00:00Z" }], error: null });
+    if (kind === "error") auth.retry.mockResolvedValue({ data: null, error: new Error("secret") });
+    if (kind === "exception") auth.retry.mockRejectedValue(new Error("secret"));
+    if (kind === "malformed") auth.retry.mockResolvedValue({ data: [], error: null });
+    expect((await call()).status).toBe(kind === "denied" ? "usage_limited" : "usage_unavailable");
+    expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("reserves quota before sending the unchanged model and prompt", async () => {
+    fetchMock.mockImplementation(async (url, init) => {
+      expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+      expect(auth.retry).toHaveBeenCalledOnce();
+      expect(String(url)).toContain("gemini-2.5-flash:generateContent");
+      const body = JSON.parse(init!.body as string);
+      expect(body.contents[0].parts[0].text).toBeTypeOf("string");
+      return Response.json(payload);
+    });
+    expect(await call()).toEqual({ status: "success", text: "優しい言葉" });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("does not invoke fetch without authentication or API key", async () => {
