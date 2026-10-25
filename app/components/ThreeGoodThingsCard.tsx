@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import GoodThingsMonthlyHistory from "./GoodThingsMonthlyHistory";
 import { motion, AnimatePresence } from "framer-motion";
 // 👇 新しく作った「通信パイプ」を呼び出します！
 import { useDashboardOperation } from "../hooks/dashboardAuth";
@@ -33,6 +34,7 @@ export default function ThreeGoodThingsCard() {
   const editorInitializedRef = useRef(false);
   // Shared synchronous lock: state alone cannot guard same-turn calls.
   const mutationRef = useRef<symbol | null>(null);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -381,6 +383,7 @@ export default function ThreeGoodThingsCard() {
       removeThreeGoodThingsDraft(displayedUserId);
       savedThingsRef.current = normalizedThings;
 
+      setHistoryRevision((value) => value + 1);
       setThings(normalizedThings);
       setAllRecords((records) => ({ ...records, [today]: normalizedThings }));
       setSelectedDate(today);
@@ -469,6 +472,7 @@ export default function ThreeGoodThingsCard() {
         return;
       }
 
+      setHistoryRevision((value) => value + 1);
       setAllRecords((currentRecords) => {
         const updatedRecords = { ...currentRecords };
         delete updatedRecords[dateToDelete];
@@ -712,6 +716,7 @@ export default function ThreeGoodThingsCard() {
           )}
         </AnimatePresence>
       </div>
+      {userId && <GoodThingsMonthlyHistory key={userId} userId={userId} today={todayDate} busy={isMutating} revision={historyRevision} />}
     </div>
   );
 }
