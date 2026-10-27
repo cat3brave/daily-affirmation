@@ -243,17 +243,35 @@ export async function stubAuthenticatedSupabase(
       return;
     }
 
+    let rows = currentData[table as keyof DashboardMockData] ?? [];
+    // Evaluate monthly history filters locally; never forward mock requests.
+    if (table === "three_good_things" && url.searchParams.has("date")) {
+      const filters = url.searchParams.getAll("date");
+      expect(url.searchParams.get("user_id")).toBe(`eq.${currentUser?.id}`);
+      expect(url.searchParams.get("select")).toBe("date,things1,things2,things3");
+      expect(url.searchParams.get("order")).toBe("date.desc");
+      expect(filters.some((filter) => filter.startsWith("gte."))).toBe(true);
+      expect(filters.some((filter) => filter.startsWith("lt."))).toBe(true);
+      rows = rows.filter((value) => {
+        const row = value as { date: string; user_id?: string };
+        return (!row.user_id || row.user_id === currentUser?.id) && filters.every((filter) => {
+          const [op, date] = filter.split(".");
+          return op === "gte" ? row.date >= date : op === "lt" ? row.date < date : op === "lte" && row.date <= date;
+        });
+      }).sort((a, b) => (b as { date: string }).date.localeCompare((a as { date: string }).date));
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       headers: {
-        "content-range": `0-0/${currentData[table as keyof DashboardMockData]?.length ?? 0}`,
+        "content-range": `0-0/${rows.length}`,
       },
       body:
         method === "HEAD"
           ? ""
           : JSON.stringify(
-              currentData[table as keyof DashboardMockData] ?? [],
+              rows,
             ),
     });
   });
