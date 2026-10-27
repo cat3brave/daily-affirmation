@@ -123,3 +123,42 @@ test("対象日を表示し保存・削除中は操作を止め、完了後に�
   await expect(page.getByRole("button", { name: "記録する", exact: true })).toBeEnabled();
   expect(writes).toHaveLength(2);
 });
+
+test("保存状態を継続表示し、同じ保存値への追加通信を送らない", async ({ page }) => {
+  await page.clock.install({ time: new Date(2026, 9, 25, 12) });
+  const mock = await loginToDashboard(page, { three_good_things: [
+    { user_id: "e2e-user-id", date: "2026-10-25", things1: "保存した文章", things2: "", things3: "" },
+  ] });
+  const writes: unknown[] = [];
+  await page.route("http://127.0.0.1:54321/rest/v1/three_good_things**", async route => {
+    if (route.request().method() !== "POST") return route.fallback();
+    writes.push(route.request().postDataJSON());
+    await route.fulfill({ status: 204 });
+  });
+  await page.getByRole("tab", { name: /ワーク/ }).click();
+  const input = page.getByRole("textbox", { name: "1つ目のよかったこと" });
+  const status = page.getByRole("status", { name: "保存状態" });
+  const save = page.getByRole("button", { name: "記録する", exact: true });
+  await expect(status).toHaveText("保存済み");
+  await expect(save).toBeDisabled();
+  await input.fill("  保存した文章  ");
+  await expect(status).toHaveText("保存済み");
+  await save.evaluate(button => (button as HTMLButtonElement).click());
+  expect(writes).toHaveLength(0);
+  await input.fill("編集した文章");
+  await expect(status).toHaveText("未保存の変更があります");
+  await save.click();
+  await expect(status).toHaveText("保存済み");
+  await expect(save).toBeDisabled();
+  await page.clock.fastForward(4000);
+  await expect(status).toHaveText("保存済み");
+  await input.fill(" 編集した文章 ");
+  await expect(status).toHaveText("保存済み");
+  await save.evaluate(button => (button as HTMLButtonElement).click());
+  expect(writes).toHaveLength(1);
+  await input.fill("もう一度編集");
+  await expect(status).toHaveText("未保存の変更があります");
+  await expect(save).toBeEnabled();
+  expect(writes).toEqual([expect.objectContaining({ date: "2026-10-25", things1: "編集した文章" })]);
+  expectSafeAuthenticatedRequests(mock);
+});

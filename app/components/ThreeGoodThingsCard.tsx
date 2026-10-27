@@ -17,6 +17,10 @@ const loadErrorMessage =
 const accountChangedMessage =
   "ログインしている利用者が変わりました。内容を確認してから、もう一度操作してください。";
 
+function sameSavedValues(things: string[], saved: string[]) {
+  return things.every((thing, index) => thing.trim() === saved[index].trim());
+}
+
 function getTodayDate() {
   const d = new Date();
   const year = d.getFullYear();
@@ -36,6 +40,7 @@ export default function ThreeGoodThingsCard() {
   const mutationRef = useRef<symbol | null>(null);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [things, setThings] = useState<string[]>(["", "", ""]);
+  const [savedRecordKnown, setSavedRecordKnown] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -162,6 +167,11 @@ export default function ThreeGoodThingsCard() {
 
           const savedThings = recordsObj[targetDate] ?? ["", "", ""];
           savedThingsRef.current = savedThings;
+          setSavedRecordKnown(true);
+          const currentDraft = readThreeGoodThingsDraft(user.id, targetDate);
+          if (currentDraft && sameSavedValues(currentDraft, savedThings)) {
+            removeThreeGoodThingsDraft(user.id);
+          }
           if (initializeEditor) {
             setThings(draft ?? savedThings);
             setDraftRestored(Boolean(draft));
@@ -207,6 +217,7 @@ export default function ThreeGoodThingsCard() {
         setUserId(null);
         setThings(["", "", ""]);
         savedThingsRef.current = ["", "", ""];
+        setSavedRecordKnown(false);
         setAllRecords({});
         setSelectedDate(null);
         setDraftRestored(false);
@@ -268,13 +279,16 @@ export default function ThreeGoodThingsCard() {
     if (!capture()() || mutationRef.current || isLoadingRecords || !userId) return;
     const today = getTodayDate();
     if (today === inputDateRef.current) return;
-    const dirty = things.some((thing, index) => thing !== savedThingsRef.current[index]);
+    const dirty = savedRecordKnown
+      ? !sameSavedValues(things, savedThingsRef.current)
+      : things.some((thing) => thing.trim() !== "");
     if (dirty && !window.confirm("未保存の変更を破棄して、今日の入力へ切り替えますか？")) return;
     if (!capture()() || mutationRef.current) return;
     clearSavedMessage();
     const saved = allRecords[today] ?? ["", "", ""];
     const draft = readThreeGoodThingsDraft(userId, today);
     savedThingsRef.current = saved;
+    setSavedRecordKnown(false);
     inputDateRef.current = today;
     setInputDate(today);
     setTodayDate(today);
@@ -297,11 +311,12 @@ export default function ThreeGoodThingsCard() {
     newThings[index] = value;
     setThings(newThings);
     setDraftRestored(false);
+    setSaveError("");
 
     if (!userId) return;
     if (
       !newThings.some((thing) => thing.trim() !== "") ||
-      newThings.every((thing, thingIndex) => thing === savedThingsRef.current[thingIndex])
+      (savedRecordKnown && sameSavedValues(newThings, savedThingsRef.current))
     ) {
       removeThreeGoodThingsDraft(userId);
     } else {
@@ -330,6 +345,8 @@ export default function ThreeGoodThingsCard() {
 
     const normalizedThings = things.map((thing) => thing.trim());
     if (!normalizedThings.some((thing) => thing !== "")) return;
+    if (savedRecordKnown && allRecords[inputDateRef.current] &&
+      sameSavedValues(normalizedThings, savedThingsRef.current)) return;
 
     const today = inputDateRef.current;
     mutationRef.current = operation;
@@ -382,6 +399,7 @@ export default function ThreeGoodThingsCard() {
 
       removeThreeGoodThingsDraft(displayedUserId);
       savedThingsRef.current = normalizedThings;
+      setSavedRecordKnown(true);
 
       setHistoryRevision((value) => value + 1);
       setThings(normalizedThings);
@@ -482,6 +500,8 @@ export default function ThreeGoodThingsCard() {
       if (dateToDelete === inputDateRef.current) {
         removeThreeGoodThingsDraft(displayedUserId);
         savedThingsRef.current = ["", "", ""];
+        setSavedRecordKnown(true);
+        setSaveError("");
         setThings(["", "", ""]);
         setDraftRestored(false);
       }
@@ -505,6 +525,16 @@ export default function ThreeGoodThingsCard() {
   const isDeletingSelectedDate =
     selectedDate !== null && deletingDate === selectedDate;
   const hasThingToSave = things.some((thing) => thing.trim() !== "");
+
+  const matchesSaved = savedRecordKnown && sameSavedValues(things, allRecords[inputDate] ?? ["", "", ""]);
+  const unchangedRecord = matchesSaved && Boolean(allRecords[inputDate]);
+  const saveStatus = isLoadingRecords ? "保存済み内容を読み込んでいます..."
+    : isSaving ? "保存中..."
+    : saveError ? "保存に失敗しました。もう一度お試しください。"
+    : !savedRecordKnown ? "読み込みに失敗したため、保存状態を確認できません。"
+    : unchangedRecord ? "保存済み"
+    : !matchesSaved ? "未保存の変更があります"
+    : "対象日の記録はまだありません";
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
@@ -554,34 +584,21 @@ export default function ThreeGoodThingsCard() {
       </div>
 
       <div className="relative w-full flex justify-center h-10 mb-4">
-        <AnimatePresence mode="wait">
-          {!isSaved ? (
-            <motion.button
-              type="button"
-              key="save-button"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              onClick={handleSave}
-              disabled={isMutating || isLoadingRecords || !userId || !hasThingToSave}
-              className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
-            >
-              {isSaving ? "保存中..." : "記録する"}
-            </motion.button>
-          ) : (
-            <motion.p
-              role="status"
-              key="saved-message"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="text-pink-600 font-bold flex items-center h-full"
-            >
-              ✨ 保存しました！今日もお疲れ様です ✨
-            </motion.p>
-          )}
-        </AnimatePresence>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isMutating || isLoadingRecords || !userId || !hasThingToSave || unchangedRecord}
+          className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
+        >
+          {isSaving ? "保存中..." : "記録する"}
+        </button>
       </div>
+      <p role="status" aria-label="保存状態" aria-live="polite" aria-atomic="true"
+        className="mb-4 text-center text-xs text-pink-700">{saveStatus}</p>
+      {savedRecordKnown && !matchesSaved && !hasThingToSave && (
+        <p className="mb-4 text-center text-xs text-pink-700">空欄では更新できません。記録を消す場合は削除ボタンを使ってください。</p>
+      )}
+      {isSaved && <p className="mb-4 text-center text-xs text-pink-600">✨ 保存しました！今日もお疲れ様です ✨</p>}
       {saveError && (
         <p
           role="alert"
