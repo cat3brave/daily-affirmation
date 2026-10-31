@@ -3,6 +3,7 @@ import {
   expectSafeAuthenticatedRequests,
   loginToDashboard,
   stubExternalServices,
+  stubRejectedAuthSupabase,
   trackSupabaseAuthRequests,
 } from "./support/supabaseMock";
 
@@ -70,8 +71,9 @@ for (const viewport of viewports) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {
     test.use({ viewport });
 
-    test("ログインと新規登録の状態を識別して操作できる", async ({ page }) => {
+    test("ログインの入力エラーと削除完了の状態を識別して操作できる", async ({ page }) => {
       const authRequests = trackSupabaseAuthRequests(page);
+      await stubRejectedAuthSupabase(page);
       await page.goto("/login");
       await expectForcedColors(page);
       await expectNoPageHorizontalScroll(page);
@@ -82,6 +84,7 @@ for (const viewport of viewports) {
       await expectBordered(email);
       await expectBordered(password);
       await expectBordered(login);
+      await expectBordered(page.getByRole("button", { name: "Googleでログイン" }));
 
       await page.keyboard.press("Tab");
       const skipLink = page.getByRole("link", { name: "メインコンテンツへ移動" });
@@ -97,14 +100,19 @@ for (const viewport of viewports) {
       await expect(email).toHaveAttribute("aria-invalid", "true");
       await expectBordered(validationError);
 
-      await page.getByRole("button", { name: "はじめての方はこちら（新規登録）" }).click();
-      await expect(page.getByRole("heading", { name: "はじめての登録🌱" })).toBeVisible();
-      await email.fill("new-user@example.com");
+      await email.fill("existing-user@example.com");
       await password.fill("safe-e2e-password");
-      await page.getByRole("button", { name: "確認メールを送る" }).click();
+      await login.click();
+      const failure = page.getByRole("alert");
+      await expect(failure).toHaveText("ログインに失敗しました。メールアドレスとパスワードを確認してください。");
+      await expectBordered(failure);
+      await expect(failure).toBeFocused();
+      await page.goto("/login?accountDeleted=1");
       const success = page.getByRole("status");
-      await expect(success).toContainText("確認メールを送信しました");
+      await expect(success).toHaveText("アカウントの削除が完了しました。");
       await expectBordered(success);
+      await expect(page.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+      await expect(page.getByRole("button", { name: /新規登録|確認メール/ })).toHaveCount(0);
       await expectNoPageHorizontalScroll(page);
 
       expect(authRequests).toHaveLength(1);

@@ -55,7 +55,7 @@ test.beforeEach(async ({ page }) => {
   await stubExternalServices(page);
 });
 
-test("公開ログイン画面と新規登録モードにWCAG A・AA違反がない", async ({
+test("既存ユーザー向けログイン画面にWCAG A・AA違反がない", async ({
   page,
 }) => {
   await page.goto("/login");
@@ -69,17 +69,8 @@ test("公開ログイン画面と新規登録モードにWCAG A・AA違反がな
   ).toBeVisible();
   await expectNoAccessibilityViolations(page, "公開ログイン画面");
 
-  await page
-    .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "はじめての登録🌱" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "確認メールを送る" }),
-  ).toBeVisible();
-  await expect(page.getByText("確認メールが届きます。")).toBeVisible();
-  await expectNoAccessibilityViolations(page, "新規登録モード");
+  await expect(page.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /新規登録|確認メール/ })).toHaveCount(0);
 });
 
 test("キーボードだけでログインしダッシュボードのタブを切り替えられる", async ({
@@ -104,14 +95,21 @@ test("キーボードだけでログインしダッシュボードのタブを�
     page.getByRole("link", { name: "メインコンテンツへ移動" }),
   ).toBeFocused();
   await page.keyboard.press("Tab");
+  await expect(googleButton).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(emailInput).toBeFocused();
   await page.keyboard.type("e2e-user@example.com");
   await page.keyboard.press("Tab");
   await expect(passwordInput).toBeFocused();
   await page.keyboard.type("e2e-password");
   await page.keyboard.press("Tab");
-  await expect(googleButton).toBeFocused();
+  await expect(loginButton).toBeFocused();
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "パスワードを忘れた方" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "プライバシーとデータについて" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
   await expect(loginButton).toBeFocused();
   const appOrigin = new URL(page.url()).origin;
   const loginResponsePromise = page.waitForResponse((response) => {
