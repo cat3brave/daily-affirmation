@@ -103,7 +103,9 @@ for (const viewport of viewports) {
       await email.fill("existing-user@example.com");
       await password.fill("safe-e2e-password");
       await login.click();
-      const failure = page.getByRole("alert");
+      const failure = page.getByRole("alert").filter({
+        hasText: "ログインに失敗しました。メールアドレスとパスワードを確認してください。",
+      });
       await expect(failure).toHaveText("ログインに失敗しました。メールアドレスとパスワードを確認してください。");
       await expectBordered(failure);
       await expect(failure).toBeFocused();

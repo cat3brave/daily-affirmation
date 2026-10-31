@@ -67,6 +67,8 @@ test("ログイン画面でメインコンテンツをスキップ後も入力�
 
   await useSkipLink(page, page.locator("#main-content"));
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Googleでログイン", exact: true })).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(page.getByLabel("メールアドレス")).toBeFocused();
   await page.keyboard.type("e2e-user@example.com");
   await page.keyboard.press("Tab");
