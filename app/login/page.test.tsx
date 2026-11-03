@@ -67,19 +67,12 @@ const EMAIL_REQUIRED_MESSAGE = "メールアドレスを入力してください
 const PASSWORD_REQUIRED_MESSAGE = "パスワードを入力してください。";
 const LOGIN_FAILURE_MESSAGE =
   "ログインに失敗しました。メールアドレスとパスワードを確認してください。";
-const SIGN_UP_FAILURE_MESSAGE =
-  "登録に失敗しました。メールアドレスやパスワードを確認してください。";
-const SIGN_UP_SUCCESS_MESSAGE =
-  "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。";
 const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
 const AUTH_MESSAGE_ID = "auth-message";
 const AUTH_LOADING_MESSAGE = "認証処理中です。";
 const LOGIN_BUTTON_LABEL = "ログイン";
 const GOOGLE_LOGIN_BUTTON_LABEL = "Googleでログイン";
-const SIGN_UP_TOGGLE_LABEL = "はじめての方はこちら（新規登録）";
-const LOGIN_MODE_TOGGLE_LABEL = "すでに登録済みの方はこちら";
-const SIGN_UP_SUBMIT_LABEL = "確認メールを送る";
 
 function createDeferred<T>(): Deferred<T> {
   let resolve: Deferred<T>["resolve"] | undefined;
@@ -124,22 +117,6 @@ function fillEmailAndPassword(email = " user@example.com ", password = "secret")
   });
 }
 
-function switchToSignUpMode() {
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: SIGN_UP_TOGGLE_LABEL,
-    }),
-  );
-}
-
-function switchToLoginMode() {
-  fireEvent.click(
-    screen.getByRole("button", {
-      name: LOGIN_MODE_TOGGLE_LABEL,
-    }),
-  );
-}
-
 beforeEach(() => {
   configureLoginMock();
 });
@@ -150,6 +127,21 @@ afterEach(() => {
 });
 
 describe("LoginPage", () => {
+  it("既存ユーザー向けの入口だけを表示し、操作しても新規登録しない", async () => {
+    const { container } = render(<LoginPage />);
+    expect(screen.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /新規登録|確認メール|登録済みの方/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "はじめての登録🌱" })).not.toBeInTheDocument();
+    expect(container.querySelector('[autocomplete="new-password"]')).toBeNull();
+    expect(screen.getByRole("link", { name: "プライバシーとデータについて" })).toHaveAttribute("href", "/privacy");
+    fillEmailAndPassword();
+    fireEvent.submit(container.querySelector("form")!);
+    await waitFor(() => expect(loginMocks.push).toHaveBeenCalledWith("/dashboard"));
+    fireEvent.click(screen.getByRole("button", { name: GOOGLE_LOGIN_BUTTON_LABEL }));
+    expect(loginMocks.signInWithOAuth).toHaveBeenCalledTimes(1);
+    expect(loginMocks.signUp).not.toHaveBeenCalled();
+  });
+
   it("主要なログイン要素に高コントラストの色を使用する", () => {
     render(<LoginPage />);
 
@@ -188,18 +180,6 @@ describe("LoginPage", () => {
     expect(passwordInput).toHaveAttribute("type", "password");
     expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
     expect(passwordInput).not.toBeRequired();
-
-    switchToSignUpMode();
-    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
-      "autocomplete",
-      "new-password",
-    );
-
-    switchToLoginMode();
-    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
-      "autocomplete",
-      "current-password",
-    );
   });
 
   it("Googleボタンのアクセシブルネームを正確に保つ", () => {
@@ -278,24 +258,6 @@ describe("LoginPage", () => {
     expect(passwordInput).not.toHaveAttribute("aria-describedby");
   });
 
-  it("モード切り替え時に入力エラーと入力欄の参照を消す", async () => {
-    render(<LoginPage />);
-    const emailInput = screen.getByLabelText(EMAIL_PLACEHOLDER);
-
-    fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }));
-    await screen.findByText(EMAIL_REQUIRED_MESSAGE);
-    switchToSignUpMode();
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(emailInput).not.toHaveAttribute("aria-invalid");
-    expect(emailInput).not.toHaveAttribute("aria-describedby");
-    expect(emailInput).toHaveAttribute("autocomplete", "email");
-    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toHaveAttribute(
-      "autocomplete",
-      "new-password",
-    );
-  });
-
   it("ログイン成功時にtrimしたメールとパスワードを渡しdashboardへ遷移する", async () => {
     render(<LoginPage />);
     fillEmailAndPassword();
@@ -360,68 +322,6 @@ describe("LoginPage", () => {
       "ログイン中に想定外のエラー:",
       error,
     );
-  });
-
-  it("新規登録成功時に確認メール送信メッセージを表示しログインモードへ戻る", async () => {
-    render(<LoginPage />);
-    switchToSignUpMode();
-    fillEmailAndPassword();
-
-    fireEvent.click(screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }));
-
-    expect(await screen.findByText(SIGN_UP_SUCCESS_MESSAGE)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: LOGIN_BUTTON_LABEL }),
-    ).toBeInTheDocument();
-  });
-
-  it("新規登録がerrorを返した場合にエラー表示する", async () => {
-    loginMocks.signUp.mockResolvedValue({
-      error: { message: "sign up failed" },
-    });
-    render(<LoginPage />);
-    switchToSignUpMode();
-    fillEmailAndPassword();
-
-    fireEvent.click(screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }));
-
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(
-      SIGN_UP_FAILURE_MESSAGE,
-    );
-    await waitFor(() => {
-      expect(alert).toHaveFocus();
-    });
-    expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toHaveValue(
-      "user@example.com",
-    );
-  });
-
-  it("新規登録がthrowした場合に例外を伝播させずエラー表示して再操作可能に戻る", async () => {
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    const error = new Error("sign up exploded");
-    loginMocks.signUp.mockRejectedValue(error);
-    render(<LoginPage />);
-    switchToSignUpMode();
-    fillEmailAndPassword();
-
-    let clickError: unknown;
-    try {
-      fireEvent.click(screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }));
-    } catch (caughtError) {
-      clickError = caughtError;
-    }
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      SIGN_UP_FAILURE_MESSAGE,
-    );
-    expect(clickError).toBeUndefined();
-    expect(
-      screen.getByRole("button", { name: SIGN_UP_SUBMIT_LABEL }),
-    ).toBeEnabled();
-    expect(consoleError).toHaveBeenCalledWith("登録中に想定外のエラー:", error);
   });
 
   it("Googleログイン時にproviderと正しいredirectToを渡す", async () => {
@@ -521,6 +421,31 @@ describe("LoginPage", () => {
     expect(loginMocks.push).toHaveBeenCalledWith("/dashboard");
     expect(form).toHaveAttribute("aria-busy", "false");
     expect(screen.queryByText(AUTH_LOADING_MESSAGE)).not.toBeInTheDocument();
+  });
+
+  it("Google認証中とリダイレクト待機中はメール送信や連打を受け付けない", async () => {
+    const oauthDeferred = createDeferred<AuthResult>();
+    loginMocks.signInWithOAuth.mockReturnValue(oauthDeferred.promise);
+    const { container } = render(<LoginPage />);
+    fillEmailAndPassword();
+    const googleButton = screen.getByRole("button", { name: GOOGLE_LOGIN_BUTTON_LABEL });
+    fireEvent.click(googleButton);
+    fireEvent.click(googleButton);
+    fireEvent.submit(container.querySelector("form")!);
+    expect(loginMocks.signInWithOAuth).toHaveBeenCalledTimes(1);
+    expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(EMAIL_PLACEHOLDER)).toBeDisabled();
+    expect(screen.getByLabelText(PASSWORD_PLACEHOLDER)).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "パスワードを忘れた方" })).not.toBeInTheDocument();
+    await act(async () => {
+      oauthDeferred.resolve({ error: null });
+      await oauthDeferred.promise;
+    });
+    expect(container.querySelector("form")).toHaveAttribute("aria-busy", "true");
+    expect(googleButton).toBeDisabled();
+    fireEvent.submit(container.querySelector("form")!);
+    expect(loginMocks.signInWithPassword).not.toHaveBeenCalled();
+    expect(loginMocks.signUp).not.toHaveBeenCalled();
   });
 
   it("再レンダーしてもSupabaseクライアントを再作成しない", () => {

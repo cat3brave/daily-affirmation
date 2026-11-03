@@ -53,7 +53,7 @@ test.beforeEach(async ({ page }) => {
   await stubExternalServices(page);
 });
 
-test("320 CSS pxでログインと新規登録がページ内にリフローする", async ({
+test("320 CSS pxでログインと受付停止の案内がページ内にリフローする", async ({
   page,
 }) => {
   await page.goto("/login");
@@ -70,15 +70,12 @@ test("320 CSS pxでログインと新規登録がページ内にリフローす�
   await expectVisibleFocus(skipLink);
   await expectInsideViewport(skipLink);
 
-  await page
-    .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-    .click();
-  await expectInsideViewport(
-    page.getByRole("heading", { name: "はじめての登録🌱" }),
-  );
-  await expectInsideViewport(
-    page.getByRole("button", { name: "確認メールを送る" }),
-  );
+  await expectInsideViewport(page.getByText(/新規登録は受け付けていません。/));
+  await expectInsideViewport(page.getByRole("button", { name: "Googleでログイン" }));
+  await expectInsideViewport(page.getByRole("button", { name: "ログイン", exact: true }));
+  await expectInsideViewport(page.getByRole("link", { name: "パスワードを忘れた方" }));
+  await expectInsideViewport(page.getByRole("link", { name: "プライバシーとデータについて" }));
+  await expect(page.getByRole("button", { name: /新規登録|確認メール/ })).toHaveCount(0);
   await expectNoPageHorizontalScroll(page);
 });
 

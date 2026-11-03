@@ -8,8 +8,6 @@ import Link from "next/link";
 
 const LOGIN_FAILURE_MESSAGE =
   "ログインに失敗しました。メールアドレスとパスワードを確認してください。";
-const SIGN_UP_FAILURE_MESSAGE =
-  "登録に失敗しました。メールアドレスやパスワードを確認してください。";
 const GOOGLE_LOGIN_FAILURE_MESSAGE =
   "Googleログインに失敗しました。もう一度お試しください。";
 const AUTH_MESSAGE_ID = "auth-message";
@@ -28,7 +26,6 @@ export default function LoginPage() {
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const initialLocation = useSyncExternalStore(subscribeToInitialLocation, clientLocation, serverLocation);
   const displayedMessage = message ?? (new URLSearchParams(initialLocation).get("accountDeleted") === "1"
@@ -124,44 +121,6 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-  // 新規登録の処理
-  const handleSignUp = async () => {
-    if (authInFlightRef.current) return;
-    if (!validateEmailAndPassword()) return;
-
-    authInFlightRef.current = true;
-    setIsLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        setMessageType("error");
-        setInvalidField(null);
-        setMessage(SIGN_UP_FAILURE_MESSAGE);
-        requestErrorFocus("summary");
-      } else {
-        setMessageType("success");
-        setInvalidField(null);
-        setMessage(
-          "確認メールを送信しました🌱 メール内のリンクを押してから、ログインしてください。",
-        );
-        setIsSignUpMode(false);
-      }
-    } catch (error) {
-      console.error("登録中に想定外のエラー:", error);
-      setMessageType("error");
-      setInvalidField(null);
-      setMessage(SIGN_UP_FAILURE_MESSAGE);
-      requestErrorFocus("summary");
-    } finally {
-      authInFlightRef.current = false;
-      setIsLoading(false);
-    }
-  };
   // Googleログインの処理
   const handleGoogleLogin = async () => {
     if (authInFlightRef.current) return;
@@ -201,11 +160,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (isSignUpMode) {
-      await handleSignUp();
-    } else {
-      await handleLogin();
-    }
+    await handleLogin();
   };
 
   return (
@@ -216,25 +171,15 @@ export default function LoginPage() {
     >
       <div className="bg-white p-8 rounded-[2rem] shadow-sm w-full max-w-md">
         <h1 className="text-2xl font-bold text-pink-600 mb-2 text-center">
-          {isSignUpMode ? "はじめての登録🌱" : "おかえりなさい🌷"}
+          おかえりなさい🌷
         </h1>
 
         <p className="text-sm text-pink-700 text-center leading-relaxed mb-6">
-          {isSignUpMode ? (
-            <>
-              メールアドレスとパスワードを入力すると、
-              <br />
-              確認メールが届きます。
-              <br />
-              メール内のリンクを押してからログインしてください。
-            </>
-          ) : (
-            <>
-              登録済みのメールアドレス、
-              <br />
-              またはGoogleアカウントでログインできます。
-            </>
-          )}
+          登録済みのメールアドレス、
+          <br />
+          またはGoogleアカウントでログインできます。
+          <br />
+          新規登録は受け付けていません。
         </p>
         <form onSubmit={handleSubmit} aria-busy={isLoading}>
           {isLoading && (
@@ -260,6 +205,23 @@ export default function LoginPage() {
               {displayedMessage}
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+            className="mb-6 w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Image
+              src="/google-g.svg"
+              alt=""
+              aria-hidden="true"
+              width={20}
+              height={20}
+              className="w-5 h-5"
+            />
+            {isLoading ? "送信中..." : "Googleでログイン"}
+          </button>
 
           <div className="mb-4">
             <label
@@ -302,9 +264,7 @@ export default function LoginPage() {
               ref={passwordInputRef}
               name="password"
               type="password"
-              autoComplete={
-                isSignUpMode ? "new-password" : "current-password"
-              }
+              autoComplete="current-password"
               placeholder="パスワード"
               value={password}
               onChange={(e) => {
@@ -321,62 +281,22 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-3">
-            {!isSignUpMode && (
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <Image
-                  src="/google-g.svg"
-                  alt=""
-                  aria-hidden="true"
-                  width={20}
-                  height={20}
-                  className="w-5 h-5"
-                />
-                {isLoading ? "送信中..." : "Googleでログイン"}
-              </button>
-            )}
-
             <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-pink-700 text-white py-3 rounded-full font-bold hover:bg-pink-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isLoading
-                ? "送信中..."
-                : isSignUpMode
-                  ? "確認メールを送る"
-                  : "ログイン"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (isLoading) return;
-                setMessage("");
-                setInvalidField(null);
-                setIsSignUpMode((prev) => !prev);
-              }}
-              disabled={isLoading}
-              className="w-full text-pink-700 py-2 text-sm hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isSignUpMode
-                ? "すでに登録済みの方はこちら"
-                : "はじめての方はこちら（新規登録）"}
+              {isLoading ? "送信中..." : "ログイン"}
             </button>
           </div>
         </form>
-        {!isSignUpMode && (
-          <p className="mt-4 text-center text-sm">
-            {isLoading ? (
-              <span aria-disabled="true" className="text-pink-700 opacity-60">パスワードを忘れた方</span>
-            ) : (
-              <Link href="/forgot-password" className="inline-block rounded p-2 text-pink-700 underline underline-offset-2">パスワードを忘れた方</Link>
-            )}
-          </p>
-        )}
+        <p className="mt-4 text-center text-sm">
+          {isLoading ? (
+            <span aria-disabled="true" className="text-pink-700 opacity-60">パスワードを忘れた方</span>
+          ) : (
+            <Link href="/forgot-password" className="inline-block rounded p-2 text-pink-700 underline underline-offset-2">パスワードを忘れた方</Link>
+          )}
+        </p>
         <p className="mt-6 text-center text-sm">
           <Link
             href="/privacy"

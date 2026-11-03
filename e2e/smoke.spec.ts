@@ -107,7 +107,7 @@ test("公開ログイン画面をChromiumで表示できる", async ({ page }) =
   );
 });
 
-test("ログイン画面のTab移動順が入力から主要操作へ進む", async ({ page }) => {
+test("ログイン画面のTab移動順がGoogleから入力と主要操作へ進む", async ({ page }) => {
   await page.goto("/login");
 
   const emailInput = page.getByLabel("メールアドレス");
@@ -120,9 +120,6 @@ test("ログイン画面のTab移動順が入力から主要操作へ進む", as
     name: "ログイン",
     exact: true,
   });
-  const signUpToggle = page.getByRole("button", {
-    name: "はじめての方はこちら（新規登録）",
-  });
   const skipLink = page.getByRole("link", {
     name: "メインコンテンツへ移動",
   });
@@ -130,15 +127,17 @@ test("ログイン画面のTab移動順が入力から主要操作へ進む", as
   await page.keyboard.press("Tab");
   await expect(skipLink).toBeFocused();
   await page.keyboard.press("Tab");
+  await expect(googleButton).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(emailInput).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(passwordInput).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(googleButton).toBeFocused();
-  await page.keyboard.press("Tab");
   await expect(loginButton).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(signUpToggle).toBeFocused();
+  await expect(page.getByRole("link", { name: "パスワードを忘れた方" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "プライバシーとデータについて" })).toBeFocused();
 });
 
 test("メールアドレス未入力では認証通信せず入力エラーを表示する", async ({
@@ -196,49 +195,16 @@ test("パスワード未入力では認証通信せず入力エラーを表示�
   expect(supabaseAuthRequests).toHaveLength(0);
 });
 
-test("新規登録モードへ切り替えられる", async ({ page }) => {
+test("登録受付停止を案内し、既存ユーザーのログイン入口を維持する", async ({ page }) => {
+  const authRequests = trackSupabaseAuthRequests(page);
   await page.goto("/login");
-
-  await page
-    .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-    .click();
-
-  await expect(
-    page.getByRole("heading", { name: "はじめての登録🌱" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "確認メールを送る" }),
-  ).toBeVisible();
-  await expect(page.getByLabel("パスワード")).toHaveAttribute(
-    "autocomplete",
-    "new-password",
-  );
-  await expect(
-    page.getByRole("button", { name: /Googleでログイン/ }),
-  ).toBeHidden();
-});
-
-test("新規登録モードからログインモードへ戻せる", async ({ page }) => {
-  await page.goto("/login");
-
-  await page
-    .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-    .click();
-  await page.getByRole("button", { name: "すでに登録済みの方はこちら" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "おかえりなさい🌷" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "ログイン", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByLabel("パスワード")).toHaveAttribute(
-    "autocomplete",
-    "current-password",
-  );
-  await expect(
-    page.getByRole("button", { name: /Googleでログイン/ }),
-  ).toBeVisible();
+  await expect(page.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /新規登録|確認メール|登録済みの方/ })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "はじめての登録🌱" })).toHaveCount(0);
+  await expect(page.getByLabel("パスワード")).toHaveAttribute("autocomplete", "current-password");
+  await expect(page.getByRole("button", { name: "Googleでログイン", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "ログイン", exact: true })).toBeVisible();
+  expect(authRequests).toHaveLength(0);
 });
 
 test("未ログインでdashboardへアクセスするとloginへ戻る", async ({ page }) => {

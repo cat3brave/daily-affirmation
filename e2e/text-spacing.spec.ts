@@ -75,7 +75,7 @@ for (const viewport of viewports) {
   test.describe(`${viewport.width}x${viewport.height}`, () => {
     test.use({ viewport });
 
-    test("ログイン、新規登録、入力エラーがテキスト間隔を維持する", async ({
+    test("ログイン、受付停止の案内、入力エラーがテキスト間隔を維持する", async ({
       page,
     }) => {
       const authRequests = trackSupabaseAuthRequests(page);
@@ -127,21 +127,11 @@ for (const viewport of viewports) {
       );
       await expectNoPageHorizontalScroll(page);
 
-      await page
-        .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-        .click();
-      await expectFullyVisible(
-        page.getByRole("heading", { name: "はじめての登録🌱" }),
-      );
-      await expectFullyVisible(
-        page.getByText(
-          "メール内のリンクを押してからログインしてください。",
-          { exact: false },
-        ),
-      );
-      await expectFullyVisible(
-        page.getByRole("button", { name: "確認メールを送る" }),
-      );
+      await expectFullyVisible(page.getByText(/新規登録は受け付けていません。/));
+      await expectFullyVisible(page.getByRole("button", { name: "Googleでログイン" }));
+      await expectFullyVisible(page.getByRole("link", { name: "パスワードを忘れた方" }));
+      await expectFullyVisible(page.getByRole("link", { name: "プライバシーとデータについて" }));
+      await expect(page.getByRole("button", { name: /新規登録|確認メール/ })).toHaveCount(0);
       await expectNoPageHorizontalScroll(page);
       expect(authRequests).toHaveLength(1);
       expect(authRequests[0]).toMatch(
@@ -150,7 +140,7 @@ for (const viewport of viewports) {
 
       if (viewport.width === 320) {
         await page.screenshot({
-          path: "/tmp/text-spacing-sign-up-320.png",
+          path: "/tmp/text-spacing-login-error-320.png",
           fullPage: true,
         });
       }

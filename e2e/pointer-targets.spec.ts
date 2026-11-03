@@ -31,22 +31,19 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const viewport of viewports) {
-  test(`${viewport.name}でログインと新規登録の操作ターゲットを検証する`, async ({
+  test(`${viewport.name}で既存ユーザーのログイン操作ターゲットを検証する`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto("/login");
     await expectAllEnabledButtonsMeetMinimum(page);
 
-    await page
-      .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-      .click();
-    await expectMinimumTarget(
-      page.getByRole("button", { name: "確認メールを送る" }),
-    );
-    await expectMinimumTarget(
-      page.getByRole("button", { name: "すでに登録済みの方はこちら" }),
-    );
+    await expectMinimumTarget(page.getByRole("button", { name: "Googleでログイン" }));
+    await expectMinimumTarget(page.getByRole("button", { name: "ログイン", exact: true }));
+    await expectMinimumTarget(page.getByLabel("メールアドレス"));
+    await expectMinimumTarget(page.getByLabel("パスワード"));
+    await expect(page.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /新規登録|確認メール/ })).toHaveCount(0);
   });
 
   test(`${viewport.name}でダッシュボードの主要操作ターゲットを検証する`, async ({

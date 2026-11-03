@@ -38,6 +38,8 @@ test("Enter送信の入力不足を通知し、修正後は古いエラーを残
 
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(email).toBeFocused();
   await page.keyboard.press("Enter");
 
@@ -75,6 +77,9 @@ test("ログイン失敗をフォーム全体のエラーとして通知し、�
   const email = page.getByLabel("メールアドレス");
   const password = page.getByLabel("パスワード");
 
+  await expect(page.getByText(/新規登録は受け付けていません。/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /新規登録|確認メール|登録済みの方/ })).toHaveCount(0);
+  await expect(password).toHaveAttribute("autocomplete", "current-password");
   await email.fill(EMAIL);
   await password.fill(PASSWORD);
   await password.press("Enter");
@@ -88,6 +93,8 @@ test("ログイン失敗をフォーム全体のエラーとして通知し、�
   await expect(email).not.toHaveAttribute("aria-invalid");
   await expect(password).not.toHaveAttribute("aria-invalid");
 
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Googleでログイン" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(email).toBeFocused();
   await page.keyboard.press("End");
@@ -107,50 +114,6 @@ test("ログイン失敗をフォーム全体のエラーとして通知し、�
   expect(mock.unexpectedRestRequests).toEqual([]);
 });
 
-test("新規登録失敗後も入力とモード固有属性を保ち、切り替えでエラーを消す", async ({
-  page,
-}) => {
-  const mock = await stubRejectedAuthSupabase(page);
-  await page.goto("/login");
-  const email = page.getByLabel("メールアドレス");
-  const password = page.getByLabel("パスワード");
-
-  await page
-    .getByRole("button", { name: "はじめての方はこちら（新規登録）" })
-    .press("Enter");
-  await expect(email).toHaveAttribute("autocomplete", "email");
-  await expect(password).toHaveAttribute("autocomplete", "new-password");
-  await email.fill(EMAIL);
-  await password.fill(PASSWORD);
-  await password.press("Enter");
-
-  const alert = page.locator("#auth-message");
-  await expect(alert).toHaveText(
-    "登録に失敗しました。メールアドレスやパスワードを確認してください。",
-  );
-  await expect(alert).toBeFocused();
-  await expect(email).toHaveValue(EMAIL);
-  await expect(email).not.toHaveAttribute("aria-invalid");
-  await expect(password).not.toHaveAttribute("aria-invalid");
-
-  await page
-    .getByRole("button", { name: "すでに登録済みの方はこちら" })
-    .press("Enter");
-  await expect(alert).toBeHidden();
-  await expect(password).toHaveAttribute("autocomplete", "current-password");
-  await expect(email).toHaveAttribute("autocomplete", "email");
-
-  expect(mock.signUpRequestBodies).toHaveLength(1);
-  expect(mock.signUpRequestBodies[0]).toMatchObject({
-    email: EMAIL,
-    password: PASSWORD,
-  });
-  expect(mock.loginRequestBodies).toEqual([]);
-  expect(mock.restWriteRequests).toEqual([]);
-  expect(mock.unexpectedAuthRequests).toEqual([]);
-  expect(mock.unexpectedRestRequests).toEqual([]);
-});
-
 test("320x720で入力エラーと再操作UIが重ならず横スクロールしない", async ({
   page,
 }) => {
@@ -160,6 +123,10 @@ test("320x720で入力エラーと再操作UIが重ならず横スクロール�
 
   for (const locator of [
     page.locator("#auth-message"),
+    page.getByRole("button", { name: "Googleでログイン" }),
+    page.getByText(/新規登録は受け付けていません。/),
+    page.getByRole("link", { name: "パスワードを忘れた方" }),
+    page.getByRole("link", { name: "プライバシーとデータについて" }),
     page.getByLabel("メールアドレス"),
     page.getByLabel("パスワード"),
     page.getByRole("button", { name: "ログイン", exact: true }),
