@@ -4,6 +4,7 @@ import FlowerGardenSection from "./FlowerGardenSection";
 
 // 親（page.tsx）から受け取るデータの型を定義します
 type HomeTabProps = {
+  onRecordGoodThings: () => void;
   isLoading: boolean;
   text: string;
   affirmationAuthError: string;
@@ -32,6 +33,7 @@ type HomeTabProps = {
 };
 
 export default function HomeTab({
+  onRecordGoodThings,
   isLoading,
   text,
   affirmationAuthError,
@@ -60,6 +62,16 @@ export default function HomeTab({
 }: HomeTabProps) {
   return (
     <div className="w-full flex flex-col items-center">
+      <div className="w-full mb-6 text-center">
+        <button type="button" onClick={onRecordGoodThings}
+          aria-describedby="good-things-entry-description"
+          className="min-h-11 rounded-xl px-4 py-2 text-sm font-bold text-pink-700 underline decoration-pink-200 underline-offset-4 hover:bg-pink-50">
+          よかったことを記録する
+        </button>
+        <p id="good-things-entry-description" className="mt-1 text-xs text-sky-700">
+          1つでも大丈夫。今日の小さなことを残せます
+        </p>
+      </div>
       <AffirmationSection
         isLoading={isLoading}
         text={text}

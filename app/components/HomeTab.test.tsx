@@ -15,9 +15,10 @@ import HomeTab from "./HomeTab";
 
 afterEach(cleanup);
 
-function renderHomeTab(setShowTada = vi.fn()) {
+function renderHomeTab(setShowTada = vi.fn(), onRecordGoodThings = vi.fn()) {
   render(
     <HomeTab
+      onRecordGoodThings={onRecordGoodThings}
       isLoading={false}
       text=""
       affirmationAuthError=""
@@ -46,6 +47,15 @@ function renderHomeTab(setShowTada = vi.fn()) {
 }
 
 describe("HomeTab", () => {
+  it("穏やかな補足付きの入口から記録へ進める", () => {
+    const onRecordGoodThings = vi.fn();
+    renderHomeTab(vi.fn(), onRecordGoodThings);
+    const entry = screen.getByRole("button", { name: "よかったことを記録する" });
+    expect(entry).toHaveAccessibleDescription("1つでも大丈夫。今日の小さなことを残せます");
+    fireEvent.click(entry);
+    expect(onRecordGoodThings).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
   it("主要な子セクションと有効な失敗の告白ボタンを表示する", () => {
     renderHomeTab();
 

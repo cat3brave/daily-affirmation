@@ -246,6 +246,15 @@ afterEach(() => {
 });
 
 describe("ThreeGoodThingsCard", () => {
+  it("1つだけでも記録できると案内し、見出しをフォーカス先として公開する", async () => {
+    const headingRef = { current: null as HTMLHeadingElement | null };
+    render(<ThreeGoodThingsCard headingRef={headingRef} />);
+    await waitFor(() => expect(screen.queryByText(LOADING_MESSAGE)).not.toBeInTheDocument());
+    expect(screen.getByText("1つだけでも記録できます。空欄があっても大丈夫です。", { exact: false })).toBeVisible();
+    expect(headingRef.current).toBe(screen.getByRole("heading", { name: "🌷 3つのよかったこと" }));
+    expect(headingRef.current).toHaveAttribute("tabindex", "-1");
+    expect(screen.getAllByRole("textbox")).toHaveLength(3);
+  });
   it("表示中の利用者と現在の認証利用者が異なると保存しない", async () => {
     await renderLoadedCard();
     fireEvent.change(screen.getAllByRole("textbox")[0], {

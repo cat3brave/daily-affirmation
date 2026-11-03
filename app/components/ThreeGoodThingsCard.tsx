@@ -1,5 +1,6 @@
 "use client";
 
+import type { Ref } from "react";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import GoodThingsMonthlyHistory from "./GoodThingsMonthlyHistory";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,7 +30,7 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
-export default function ThreeGoodThingsCard() {
+export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
   const { capture, auth } = useDashboardOperation();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [inputDate, setInputDate] = useState(getTodayDate);
@@ -538,11 +539,11 @@ export default function ThreeGoodThingsCard() {
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
-      <h3 className="text-pink-700 font-bold mb-2">🌷 3つのよかったこと</h3>
+      <h3 ref={headingRef} tabIndex={-1} className="text-pink-700 font-bold mb-2 scroll-mt-6 scroll-mb-36 rounded focus:outline-2 focus:outline-violet-700 focus:outline-offset-4">🌷 3つのよかったこと</h3>
       <p className="text-pink-600/80 text-xs text-center mb-6">
         今日あった、どんなに小さなことでも大丈夫。
         <br />
-        よかったことや、感謝したいことを3つ書いてみましょう。
+        1つだけでも記録できます。空欄があっても大丈夫です。
       </p>
       <p className="text-[0.65rem] text-pink-400 text-center -mt-3 mb-4">
         入力内容はこの端末に一時保存されます。

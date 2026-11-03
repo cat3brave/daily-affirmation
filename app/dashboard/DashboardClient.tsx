@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardAuthContext } from "../hooks/dashboardAuth";
 import { useAuthUser } from "../hooks/useAuthUser";
@@ -65,6 +65,22 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
   const [currentTab, setCurrentTab] = useState<"home" | "work" | "amulet">(
     "home",
   );
+  const goodThingsRequested = useRef(false);
+  const [isGoodThingsNavigation, setIsGoodThingsNavigation] = useState(false);
+  const handleGoodThingsReady = useCallback((heading: HTMLHeadingElement) => {
+    if (!goodThingsRequested.current || heading.closest("[hidden]")) return;
+    // 入口からの移動だけを一度消費し、再描画や通常タブ操作では繰り返しません。
+    goodThingsRequested.current = false;
+    setIsGoodThingsNavigation(false);
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: "start", behavior: "instant" });
+  }, []);
+  const openGoodThings = () => {
+    goodThingsRequested.current = true;
+    setIsGoodThingsNavigation(true);
+    setIsBirdView(false);
+    setCurrentTab("work");
+  };
   const { floatingClouds, handleFloatCloud } = useFloatingClouds();
 
   // 🔴 ここがプロの技！お花に関するデータと機能を、フックから一行で受け取る！
@@ -119,7 +135,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
               opacity: isBirdView ? 0.3 : 1,
               y: isBirdView ? 120 : 0,
             }}
-            transition={{ duration: 1, ease: "easeInOut" }}
+            transition={{ duration: isGoodThingsNavigation ? 0 : 1, ease: "easeInOut" }}
             className="w-full max-w-lg flex flex-col items-center z-10 origin-bottom"
           >
             {dashboardTabs.map(({ id }) => (
@@ -134,6 +150,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
                 <AnimatePresence mode="wait">
                   {id === "home" && currentTab === id && (
                     <HomeTab
+                      onRecordGoodThings={openGoodThings}
                       isLoading={isLoading}
                       text={text}
                       affirmationAuthError={authError}
@@ -165,7 +182,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
                   )}
 
                   {id === "work" && currentTab === id && (
-                    <WorkTab handleFloatCloud={handleFloatCloud} />
+                    <WorkTab handleFloatCloud={handleFloatCloud} onGoodThingsReady={handleGoodThingsReady} />
                   )}
 
                   {id === "amulet" && currentTab === id && (
@@ -185,7 +202,11 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
           </motion.div>
         </div>
 
-        <BottomTabBar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        <BottomTabBar currentTab={currentTab} setCurrentTab={(tab) => {
+          goodThingsRequested.current = false;
+          setIsGoodThingsNavigation(false);
+          setCurrentTab(tab);
+        }} />
       </div>
 
       <TadaModal

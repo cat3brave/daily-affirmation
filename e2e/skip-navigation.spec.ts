@@ -84,6 +84,8 @@ test("認証済みダッシュボードで現在のタブ内容へ移動後も�
   await expect(page.getByText("ログイン情報を確認しています...")).toBeHidden();
   await useSkipLink(page, page.locator("#main-content"));
   await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "よかったことを記録する" })).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "言葉を受け取る" })).toBeFocused();
 
   const homeTab = page.getByRole("tab", { name: "ホーム" });
