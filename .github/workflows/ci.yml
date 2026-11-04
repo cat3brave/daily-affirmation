@@ -52,7 +52,61 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E smoke tests
+        id: normal_e2e
         run: npm run e2e
 
       - name: Build and run production E2E smoke tests
+        id: production_e2e
         run: npm run e2e:prod
+
+      - name: Upload normal E2E diagnostics
+        id: normal_artifact
+        if: ${{ always() && steps.normal_e2e.outcome != 'skipped' && steps.normal_e2e.outcome != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-normal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/normal/
+            test-results/normal/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload production E2E diagnostics
+        id: production_artifact
+        if: ${{ always() && steps.production_e2e.outcome != 'skipped' && steps.production_e2e.outcome != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-production-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/production/
+            test-results/production/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Summarize E2E verification
+        if: ${{ always() }}
+        env:
+          TESTED_COMMIT: ${{ github.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          NORMAL_RESULT: ${{ steps.normal_e2e.outcome }}
+          PRODUCTION_RESULT: ${{ steps.production_e2e.outcome }}
+          NORMAL_ARTIFACT: ${{ steps.normal_artifact.outputs.artifact-url }}
+          PRODUCTION_ARTIFACT: ${{ steps.production_artifact.outputs.artifact-url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo '## E2E verification'
+            echo "- Tested commit: \`$TESTED_COMMIT\` (PR runs test the merge commit)"
+            echo "- PR head: \`${PR_HEAD:-not a PR}\`"
+            echo
+            echo '| Target | Result | Diagnostics (7 days) |'
+            echo '| --- | --- | --- |'
+            echo "| Normal E2E / local dev server | ${NORMAL_RESULT:-not run} | ${NORMAL_ARTIFACT:-not generated or upload failed} |"
+            echo "| Production build + E2E / local next start | ${PRODUCTION_RESULT:-not run} | ${PRODUCTION_ARTIFACT:-not generated or upload failed} |"
+            echo
+            echo '- Production captures: home entry, card after navigation, full card; 320/1280 x 720, normal/reduced motion. Open the HTML report or PNGs from the downloaded artifact.'
+            echo '- Both artifacts contain HTML reports and generated test results, including traces and screenshots on failure. Early failures may produce no diagnostics.'
+            echo '- Synthetic data and local mocks only. Real Vercel production, Google authentication, DB/RLS and physical-device software keyboards are not verified.'
+            echo '- Captures are review material: image presence does not mean visually reviewed or beautiful. No visual comparison baseline is registered.'
+            echo "- [Run logs and artifacts]($RUN_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"

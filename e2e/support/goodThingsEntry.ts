@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
 async function expectAboveNavigation(page: Page, target: Locator) {
   const box = await target.boundingBox();
@@ -10,7 +10,13 @@ async function expectAboveNavigation(page: Page, target: Locator) {
 }
 
 // 通常・本番の双方で、実サービスへ送らず既存フォームを操作します。
-export async function checkGoodThingsEntry(page: Page) {
+export async function checkGoodThingsEntry(page: Page, screenshots?: TestInfo) {
+  async function capture(name: string) {
+    if (!screenshots) return;
+    const path = screenshots.outputPath(`${name}.png`);
+    await page.screenshot({ path, animations: "disabled" });
+    await screenshots.attach(name, { path, contentType: "image/png" });
+  }
   const writes: Record<string, string>[] = [];
   await page.route("http://127.0.0.1:54321/rest/v1/three_good_things**", async route => {
     if (route.request().method() !== "POST") return route.fallback();
@@ -22,6 +28,7 @@ export async function checkGoodThingsEntry(page: Page) {
   await expect(entry).toHaveCount(1);
   await expect(page.getByLabel("1つ目のよかったこと")).toHaveCount(0);
   await entry.focus();
+  await capture("home-entry");
   await page.keyboard.press("Enter");
   const heading = page.getByRole("heading", { name: "🌷 3つのよかったこと" });
   await expect(heading).toBeFocused();
@@ -32,6 +39,12 @@ export async function checkGoodThingsEntry(page: Page) {
   await expect(input).not.toBeFocused();
   expect(await heading.evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe("none");
   await expect(input).toBeEnabled();
+  await capture("record-card-navigation");
+  if (screenshots) {
+    const path = screenshots.outputPath("record-card-full.png");
+    await heading.locator("..").screenshot({ path, animations: "disabled" });
+    await screenshots.attach("record-card-full", { path, contentType: "image/png" });
+  }
   await page.keyboard.press("Tab");
   await expect(input).toBeFocused();
   await input.fill("小さな花を見つけた");
