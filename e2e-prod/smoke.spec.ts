@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { checkGoodThingsEntry } from "../e2e/support/goodThingsEntry";
+
 const appOrigin = "http://127.0.0.1:3200";
 const mockOrigin = "http://127.0.0.1:54321";
 const externalRequests: string[] = [];
@@ -143,3 +145,12 @@ test("password recovery responses prohibit shared caching and use fixed redirect
     expect(response.headers()["cache-control"]).toContain("no-store");
   }
 });
+
+for (const reducedMotion of ["no-preference", "reduce"] as const) {
+  test(`home entry to one good thing (${reducedMotion}, 320px)`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.emulateMedia({ reducedMotion });
+    await login(page);
+    await checkGoodThingsEntry(page);
+  });
+}

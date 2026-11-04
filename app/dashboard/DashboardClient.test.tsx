@@ -50,6 +50,7 @@ type WindowSizeReturn = {
   windowSize: WindowSize;
 };
 type HomeTabProps = {
+  onRecordGoodThings: () => void;
   isLoading: boolean;
   text: string;
   handleClick: () => void;
@@ -67,6 +68,7 @@ type HomeTabProps = {
   setShowTada: (value: boolean) => void;
 };
 type WorkTabProps = {
+  onGoodThingsReady?: (heading: HTMLHeadingElement) => void;
   handleFloatCloud: (text: string) => void;
 };
 type AmuletTabProps = {
@@ -182,6 +184,7 @@ vi.mock("../components/HomeTab", () => ({
 
     return (
       <section data-testid="home-tab">
+        <button onClick={props.onRecordGoodThings}>よかったことを記録する</button>
         <span data-testid="favorite-disabled-state">
           {String(props.isFavoriteDisabled)}
         </span>
@@ -205,7 +208,10 @@ vi.mock("../components/WorkTab", () => ({
   default: (props: WorkTabProps) => {
     dashboardMocks.renderWorkTab(props);
 
-    return <section data-testid="work-tab">WorkTab mock</section>;
+    return <section data-testid="work-tab">
+      <h3 tabIndex={-1}>記録の見出し</h3>
+      <button onClick={(event) => props.onGoodThingsReady?.(event.currentTarget.previousElementSibling as HTMLHeadingElement)}>入場完了</button>
+    </section>;
   },
 }));
 
@@ -454,6 +460,32 @@ afterEach(() => {
 });
 
 describe("DashboardPage", () => {
+  it("入口の要求だけを描画完了時に一度消費し、通常タブ操作では移動しない", async () => {
+    const scroll = vi.fn();
+    // jsdomにはスクロール実装がないため、この操作だけを置き換える。
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    try {
+      render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+      fireEvent.click(screen.getByRole("button", { name: "よかったことを記録する" }));
+      await screen.findByTestId("work-tab");
+      expectTabPanelRelationships("work");
+      expect(scroll).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "入場完了" }));
+      expect(screen.getByRole("heading", { name: "記録の見出し" })).toHaveFocus();
+      expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: "start", behavior: "instant" });
+      fireEvent.click(screen.getByRole("button", { name: "入場完了" }));
+      expect(scroll).toHaveBeenCalledOnce();
+      clickTab("ホーム");
+      await screen.findByTestId("home-tab");
+      clickTab("ワーク");
+      await screen.findByTestId("work-tab");
+      fireEvent.click(screen.getByRole("button", { name: "入場完了" }));
+      expect(scroll).toHaveBeenCalledOnce();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
   it("サーバー認証済みユーザーを渡し、認証待ち表示を出さない", () => {
     render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(dashboardMocks.useAuthUser).toHaveBeenCalledWith({ id: "user-dashboard-1", email: "dashboard@example.com" });
