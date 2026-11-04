@@ -146,11 +146,13 @@ test("password recovery responses prohibit shared caching and use fixed redirect
   }
 });
 
-for (const reducedMotion of ["no-preference", "reduce"] as const) {
-  test(`home entry to one good thing (${reducedMotion}, 320px)`, async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 720 });
-    await page.emulateMedia({ reducedMotion });
-    await login(page);
-    await checkGoodThingsEntry(page);
-  });
+for (const width of [320, 1280]) {
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    test(`home entry to one good thing (${reducedMotion}, ${width}px)`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 720 });
+      await page.emulateMedia({ reducedMotion });
+      await login(page);
+      await checkGoodThingsEntry(page, testInfo);
+    });
+  }
 }

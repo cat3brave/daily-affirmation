@@ -11,7 +11,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   timeout: 60_000,
-  reporter: "list",
+  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/production" }]],
   outputDir: "test-results/production",
   use: {
     ...devices["Desktop Chrome"],
