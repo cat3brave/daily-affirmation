@@ -31,16 +31,19 @@ export async function checkAiSources(page: Page, info: TestInfo) {
       await expect(page.getByText("入力された内容をもとに、自分を責めすぎない見方の一例を提案します。")).toBeVisible();
       await page.getByLabel("優しい言葉に翻訳したい自分への厳しい声").fill("一度間違えただけで全部だめだと思う");
     }
-    const button = page.getByRole("button", { name: kind === "affirmation" ? "言葉を受け取る" : "優しい言葉に翻訳する 🪄", exact: true });
+    const button = page.getByRole("button", { name: kind === "affirmation" ? /言葉を受け取る|受け取り中/ : /優しい言葉に翻訳する|翻訳中/ });
     for (const [index, result] of cases.entries()) {
       await button.click();
       if (index === 1) {
         const paused = pauses[kind === "affirmation" ? 0 : 1];
         await paused.started;
-        await expect(button).toBeDisabled();
-        await expect(page.getByRole("main").getByText(/AIによる提案|AIの応答を取得できなかったため/)).toHaveCount(0);
-        await expect(page.getByRole("main").getByText(text, { exact: true })).toHaveCount(0);
-        paused.resume();
+        try {
+          await expect(button).toBeDisabled();
+          await expect(page.getByRole("main").getByText(/AIによる提案|AIの応答を取得できなかったため/)).toHaveCount(0);
+          await expect(page.getByRole("main").getByText(text, { exact: true })).toHaveCount(0);
+        } finally {
+          paused.resume();
+        }
       }
       await expect(button).toBeEnabled();
       const success = !(result instanceof Error) && result.status === "success";
@@ -61,6 +64,8 @@ export async function checkAiSources(page: Page, info: TestInfo) {
         expect(box!.x).toBeGreaterThanOrEqual(0);
         expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
         if (kind === "affirmation") {
+          await expect.poll(() => page.getByRole("button", { name: "お気に入りにする 🌷" })
+            .evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
           const card = await output.locator("../..").boundingBox();
           const favorite = await page.getByRole("button", { name: "お気に入りにする 🌷" }).boundingBox();
           expect(box!.y).toBeGreaterThanOrEqual(card!.y);

@@ -29,7 +29,7 @@ export default function AffirmationSection({
   return (
     <>
       {/* 1. 肯定文の表示エリア */}
-      <div className="min-h-64 h-auto flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
+      <div className="min-h-64 h-auto flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-4 sm:p-8 shadow-sm border-2 border-white">
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.p
