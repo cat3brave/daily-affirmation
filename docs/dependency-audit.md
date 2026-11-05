@@ -1,6 +1,148 @@
 # npm依存関係監査・引き継ぎ記録
 
-## 最新: SDK移行と許可されたundici最小更新（2026-10-25 JST）
+## 最新: main再監査・minimatchのModerate残存（2026-11-05 JST）
+
+この節の監査・公開版・呼出経路の確認結果はすべて2026-11-05 JST時点の記録。
+2026-11-06 JSTの文書保存作業では再監査・公開版の再照会を行っておらず、
+本番依存0件・全依存Moderate 8パッケージを保存日の現在値として主張しない。
+以下の過去の対応記録は各記載日の履歴であり、現在の安全性や作業許可を示すものではない。
+
+基準は取得した最新main `802e12f5b17661370b3a21d1252ad061bb84b0dc`（PR #73）。
+作業ブランチは `audit/dependencies-review-20261105`。開始時のブランチは `work`、
+HEADは `1183dcc4b240cb0bdd7ceba823d4e8f15fb6acb2`、
+`git status -sb` / `git status --short` は変更なしだった。
+初回fetchはサンドボックスのプロキシ接続エラーで失敗したため、ネットワーク許可付きで
+`git fetch origin main` を実行し直し、GitHub公式APIのmain SHAとも一致を確認した。
+古いローカルorigin/mainから作成した未変更ブランチをfast-forwardし、上記名へ変更してから監査した。
+旧PR #52とそのブランチの操作は行っていない。
+
+### 今回実測した監査と終了コード
+
+Linux、Node v24.19.0、npm 11.9.0。監査は2026-11-04 22:29 UTC
+（2026-11-05 07:29 JST）から実施。過去の「Moderate 8件」を現在値として流用せず、
+今回の正常な監査JSONと通常レポートで改めて確認した。
+
+| 対象 | 調査開始時の実測 | 終了時（依存変更なし） | 終了コード |
+| --- | --- | --- | --- |
+| 本番依存 | 全severity 0、計0 | 同じ監査結果、計0 | 0 |
+| 全依存 | Moderate 8、他0、計8 | 同じ監査結果、計8 | 1（脆弱性検出） |
+
+全依存の8件は影響パッケージ件数であり、独立したadvisoryは1件。
+本番JSON・全依存JSONとも `auditReportVersion: 2` と `metadata.vulnerabilities` を持つ
+正常応答で、通信失敗ではない。本番の終了0だけから全依存の安全性を判断しない。
+全依存0件は今回は確認できていない。下記2026-10-25の0件はその時点の履歴であり、
+今回や将来の脆弱性不存在を保証しない。
+
+実際のコマンドと結果（キャッシュ指定はコマンド環境の `NPM_CONFIG_CACHE=/tmp/daily-audit-npm`）:
+
+| コマンド | 結果 |
+| --- | --- |
+| `timeout 300s npm ci`（初回、キャッシュ指定なし） | 終了254。ホーム配下のnpmキャッシュ作成がENOENTで失敗。脆弱性検出やtimeoutではない |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm ci` | 終了0、535パッケージ導入。キャッシュの環境問題を解消 |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm run audit` | 終了1、`Missing script: "audit"`。監査未実行。スクリプトは追加しない |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm run audit:prod` | 終了0、`found 0 vulnerabilities`。既存scriptは `npm audit --omit=dev --audit-level=high` |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm audit --omit=dev --json` | 終了0、全severity 0、`vulnerabilities: {}` |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm audit --json` | 終了1、Moderate 8、他0。下記1 advisoryと上位への伝播 |
+| `NPM_CONFIG_CACHE=/tmp/daily-audit-npm timeout 300s npm audit` | 終了1、同じ8件・同じadvisory |
+| `npm ls --all` | 終了0、依存ツリー整合 |
+| `npm ls minimatch typescript-eslint @typescript-eslint/typescript-estree --all` | 終了0、下記経路と版を確認 |
+
+いずれもtimeoutによる終了ではない。依存変更を行わないため、成功済み監査の重複実行は省略する。
+
+### 直接advisory・依存経路・影響
+
+直接の問題パッケージは推移依存 `minimatch@9.0.9`。
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+（CVE-2026-118764、Moderate）。GitHub公式advisory APIを今回取得し、
+影響範囲 `>=7.0.0 <11.0.1`、最初の修正版 `11.0.1` を確認した。
+公開は2026-10-30 23:09:55 UTC、更新は2026-11-04 16:50:04 UTC。
+
+```text
+eslint-config-next@16.4.2（直接devDependency）
+  → typescript-eslint@8.56.0
+    → @typescript-eslint/typescript-estree@8.56.0
+      → minimatch@9.0.9（要求 ^9.0.5）
+```
+
+`@typescript-eslint/eslint-plugin`、`@typescript-eslint/parser`、
+`@typescript-eslint/type-utils`、`@typescript-eslint/utils` も8.56.0で、
+typescript-estreeへ直接または上記相互依存を通じて到達する。
+全8パッケージは `minimatch` と、この4パッケージ、`@typescript-eslint/typescript-estree`、
+`typescript-eslint`、`eslint-config-next`。後者7件は同じ問題の伝播であり固有advisoryではない。
+いずれも開発依存経路。本番依存監査では除外される。
+別経路の `eslint` / ESLint pluginsが共有する `minimatch@3.1.5` は今回の影響範囲外。
+
+公式説明の発現条件は、攻撃者がglobパターンを制御し、`optimizationLevel >= 2` の
+前処理へ渡せること。`**/..` 変換で配列要素が増幅し、その後の二重ループ処理で
+CPU・メモリを過剰消費するDoS。開発・CIの可用性も評価対象とする。
+導入済みtypescript-estreeの `useProgramFromProjectService.js` では
+`allowDefaultProject` のパターンを `minimatch(filePath, pattern, { dot: true })` へ渡す。
+ここではoptimizationLevelを指定せず、導入済みminimatchの既定値は1。
+リポジトリの `eslint.config.mjs` にallowDefaultProjectやoptimizationLevelの指定はなく、
+app / e2e / e2e-prodにもminimatchの直接利用は見つからなかった。
+確認した呼出だけから発現条件を満たすとは判断しない一方、開発依存であることを理由に
+安全とも断定しない。PoC、全間接経路の網羅、外部入力からの実到達性は未検証。
+本件による公開アプリへの攻撃成立・情報漏えい・コード実行は確認していない。
+
+### 修正版と許可範囲での対応可否
+
+- [公式修正commit](https://github.com/isaacs/minimatch/commit/77a0f5c4b80bdc641c3c930a1d9edf5ad2db57f8)
+  の内容は `limit **/.. optimization pass to avoid quadratic explosion`。
+  npm公式registryの `minimatch@11.0.1` の公開・tarball・integrityとNode要求
+  `18 || 20 || >=22` も確認した。Node 24は満たすが、現在の `^9.0.5` 外のメジャー更新となる。
+- advisoryに記載された公式release URL `https://github.com/isaacs/minimatch/releases/tag/v11.0.1`
+  は、今回のGitHub release API照会では404。release本文は確認できず、
+  修正版の根拠は公式advisory・修正commit・npm公開メタデータとする。
+- 親の `@typescript-eslint/typescript-estree` は安定版8.72.1が最新。
+  公式npm registryの8系安定版メタデータを調査したが、minimatch 11系を要求する版はない。
+  最新8.72.1も `^10.2.2` を要求し、修正版11.0.1を選択できない。
+  `typescript-eslint` の最新安定版も8.72.1。
+- `eslint-config-next@16.4.2` は `typescript-eslint: ^8.56.0`。
+  公式registryにある後続16.4.3 / 16.4.4 / 16.4.5も同じ要求であり、
+  親の互換パッチ・マイナー更新だけでこの問題を解消できる根拠は得られない。
+- npmの提案は `eslint-config-next@15.5.29` へのメジャーダウングレード。
+  Next 16との互換性を今回保証できず、指定の禁止範囲でもあるため採用しない。
+
+修正版はあるが、許可された互換最小更新では解消できないため依存変更なし。
+force fix・overrides・直接依存追加・メジャー更新・無関係なNext / React / SDK更新は行わない。
+対応案は、typescript-eslint 8系で安全な依存経路を採用した安定版、またはminimatch 9/10系の
+公式修正版とadvisory更新を待って再監査すること。11系への移行は別途範囲承認と互換性評価が必要。
+
+### 調査停止時の状態（2026-11-05 JST）
+
+変更は本ドキュメントのみ。`package.json` / `package-lock.json` はmainのまま。
+ドキュメントのみのため `timeout 300s npm run test`、`timeout 300s npm run test:coverage`、
+`timeout 300s npm run lint`、`timeout 300s npm run build`、`timeout 600s npm run e2e`、
+`timeout 600s npm run e2e:prod` は省略。Chromium例外は使用していない。
+`git diff --check` は終了0。`git diff --stat`、`git diff --name-only`、
+`git status -sb` / `git status --short` でも、本ドキュメントだけの未stage差分を確認した。
+
+停止理由: 全依存にModerate 8パッケージ（独立advisory 1件）が未解消で残るため、
+依頼の停止条件に従いcommit・push・PR作成を行わない。
+Commit SHA / PR URL: なし。Verify / Vercel / PR競合: PR未作成のため対象なし。
+auto-merge・承認・merge・ブランチ削除は行っていない。
+
+### 調査文書のみのPR保存（2026-11-06 JST）
+
+ユーザーから、既知のModerate残存を明記した調査文書だけをcommit・通常push・main向け
+通常PRとして保存する許可を得た。上記の「未解消ならcommit・PR作成を停止する」条件は、
+この文書保存に限って変更された。脆弱性は未解消であり、安全性・全依存0件の確認や、
+依存更新・アプリ変更・監査基準の緩和を許可するものではない。
+
+再開時は既存ブランチ `audit/dependencies-review-20261105`、HEAD `802e12f5b17661370b3a21d1252ad061bb84b0dc`、
+本ドキュメントのみ未stage変更という状態を保持した。
+文書全体と差分を読み直し、過去の監査結果・停止状態と今回の保存許可を区別した。
+`package.json` / `package-lock.json` は変更しない。
+ローカルのnpm ci・監査・test・coverage・lint・build・通常E2E・本番E2Eは、
+文書だけの変更に対する重複検証を避けるため再実行しない。存在しないauditスクリプトも再実行しない。
+
+`git diff --check`、`git diff --stat`、`git diff --name-only` とGit状態を確認し、
+stage対象は `docs/dependency-audit.md` のみとする。
+最新headのVerify・Vercel・競合状態はPRで確認・報告し、レビュー待ちで停止する。
+CIが成功しても全依存監査0件の証明とは扱わない。既知のModerateは上記の再監査方針へ引き継ぐ。
+auto-merge・承認・merge・ブランチ削除、旧PR #52とそのブランチの操作は行わない。
+
+## 履歴: SDK移行と許可されたundici最小更新（2026-10-25 JST）
 
 `feature/migrate-google-genai`、基準main `4037e062116fece11f4f2dd1312cad14330fc03d`。
 undici更新前：SDKを`@google/genai` 2.31.0へ変更したlockで、`timeout 300s npm ci --cache /tmp/daily-npm`は成功。
@@ -33,7 +175,7 @@ JSONの`vulnerabilities`は空で、正常な監査応答を確認していま�
 
 ## 履歴: 開発依存の再監査・修正（2026-10-24 JST）
 
-この節は2026-10-24時点の結果であり、現在の結果は冒頭のSDK移行節を参照する。以降のPR #65・CI #90等も履歴として保持する。
+この節は2026-10-24時点の結果であり、現在の結果は冒頭のmain再監査節を参照する。以降のPR #65・CI #90等も履歴として保持する。
 基準は取得した最新main `54c6d7077f9a569fea595de5a872b8aad5d5bf2a`（PR #65）。
 作業ブランチは `feature/fix-development-dependency-audit`。開始時の
 `git status -sb` / `git status --short` は変更なし。PR #65の日付・保存削除排他・認証境界のコードを維持し、旧PR #52とそのブランチは操作しない。
