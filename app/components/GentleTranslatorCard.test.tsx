@@ -47,7 +47,7 @@ vi.mock("framer-motion", () => ({
 import GentleTranslatorCard from "./GentleTranslatorCard";
 
 const FALLBACK_MESSAGE =
-  "エラーが発生しました。少し休んでからもう一度試してみてくださいね。";
+  "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。";
 
 function createDeferred<T>(): Deferred<T> {
   let resolve: Deferred<T>["resolve"] | undefined;
@@ -234,7 +234,7 @@ describe("GentleTranslatorCard", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("throw時に詳細をログへ出さずalertを表示し再操作可能に戻る", async () => {
+  it("throw時に詳細をログへ出さず定型文を表示し再操作可能に戻る", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const error = new Error("translate failed");
     translatorMocks.translateHarshVoice.mockRejectedValueOnce(error);
@@ -248,7 +248,9 @@ describe("GentleTranslatorCard", () => {
       clickError = caughtError;
     }
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(FALLBACK_MESSAGE);
+    expect(await screen.findByRole("status")).toHaveTextContent(FALLBACK_MESSAGE);
+    expect(screen.getByRole("status")).toHaveTextContent("AIの応答を取得できなかったため、用意した言葉を表示しています。");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(clickError).toBeUndefined();
     expect(consoleError).not.toHaveBeenCalled();
     expect(getTextbox()).toBeEnabled();
@@ -280,13 +282,13 @@ describe("GentleTranslatorCard", () => {
 it("時間切れではalertと既存フォールバックを表示し入力を保持して再試行できる", async () => {
   translatorMocks.translateHarshVoice.mockResolvedValueOnce({
     status: "timed_out", message: "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。",
-    text: "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。",
+    text: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。",
   });
   render(<GentleTranslatorCard />);
   fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
   fireEvent.click(getTranslateButton());
   expect(await screen.findByRole("alert")).toHaveTextContent("応答に時間がかかっています。");
-  expect(screen.getByRole("status")).toHaveTextContent("今はAIがお休み中のようです。");
+  expect(screen.getByRole("status")).toHaveTextContent("ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。");
   expect(getTextbox()).toHaveValue("保持する入力");
   expect(getTextbox()).toBeEnabled();
   expect(getTranslateButton()).toBeEnabled();
@@ -319,4 +321,26 @@ it.each(["usage_limited", "usage_unavailable"] as const)("%s後も入力を保�
   fireEvent.click(getTranslateButton());
   await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   expect(await screen.findByRole("status")).toHaveTextContent("事実と気持ちを分けて見られていますね。");
+});
+
+
+it.each(["success", "fallback", "timed_out"] as const)("%sの表示元を区別し再操作で消す", async (status) => {
+  translatorMocks.translateHarshVoice.mockResolvedValueOnce(
+    status === "timed_out" ? { status, text: "同じ文章", message: "時間切れ案内" } : { status, text: "同じ文章" },
+  );
+  render(<GentleTranslatorCard />);
+  fireEvent.change(getTextbox(), { target: { value: "入力" } });
+  fireEvent.click(getTranslateButton());
+  const output = await screen.findByRole("status");
+  expect(output).toHaveTextContent(status === "success" ? "AIによる提案（見方の一例）" : "AIの応答を取得できなかったため、用意した言葉を表示しています。");
+  expect(output).not.toHaveTextContent(status === "success" ? "用意した言葉" : "AIによる提案");
+  const next = createDeferred<GeminiActionResult>();
+  translatorMocks.translateHarshVoice.mockReturnValueOnce(next.promise);
+  fireEvent.click(getTranslateButton());
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await act(async () => next.resolve({ status: "auth_required", message: "認証の案内" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("認証の案内");
+  expect(screen.getByRole("link", { name: "ログイン画面へ" })).toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });

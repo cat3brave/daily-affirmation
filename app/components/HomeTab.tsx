@@ -1,3 +1,4 @@
+import type { GenerationStatus } from "../actions";
 import AffirmationSection from "./AffirmationSection";
 import FavoriteAffirmationsList from "./FavoriteAffirmationsList";
 import FlowerGardenSection from "./FlowerGardenSection";
@@ -7,6 +8,7 @@ type HomeTabProps = {
   onRecordGoodThings: () => void;
   isLoading: boolean;
   text: string;
+  affirmationResultStatus: GenerationStatus | null;
   affirmationAuthError: string;
   affirmationRateLimitError: string;
   affirmationTimeoutError?: string;
@@ -36,6 +38,7 @@ export default function HomeTab({
   onRecordGoodThings,
   isLoading,
   text,
+  affirmationResultStatus,
   affirmationAuthError,
   affirmationRateLimitError,
   affirmationTimeoutError,
@@ -75,6 +78,7 @@ export default function HomeTab({
       <AffirmationSection
         isLoading={isLoading}
         text={text}
+        resultStatus={affirmationResultStatus}
         authError={affirmationAuthError}
         rateLimitError={affirmationRateLimitError}
         timeoutError={affirmationTimeoutError}

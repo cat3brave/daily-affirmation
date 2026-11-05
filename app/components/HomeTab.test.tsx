@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./AffirmationSection", () => ({
-  default: () => <section aria-label="今日の言葉" />,
+  default: ({ resultStatus }: { resultStatus: string | null }) => <section aria-label="今日の言葉" data-source={resultStatus ?? "none"} />,
 }));
 vi.mock("./FavoriteAffirmationsList", () => ({
   default: () => <section aria-label="お気に入りの言葉" />,
@@ -21,6 +21,7 @@ function renderHomeTab(setShowTada = vi.fn(), onRecordGoodThings = vi.fn()) {
       onRecordGoodThings={onRecordGoodThings}
       isLoading={false}
       text=""
+      affirmationResultStatus={null}
       affirmationAuthError=""
       affirmationRateLimitError=""
       handleClick={vi.fn()}
@@ -59,7 +60,7 @@ describe("HomeTab", () => {
   it("主要な子セクションと有効な失敗の告白ボタンを表示する", () => {
     renderHomeTab();
 
-    expect(screen.getByRole("region", { name: "今日の言葉" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "今日の言葉" })).toHaveAttribute("data-source", "none");
     expect(
       screen.getByRole("region", { name: "お気に入りの言葉" }),
     ).toBeInTheDocument();

@@ -57,6 +57,7 @@ function Owned({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
     <output data-testid="favorites">{favorites.favoriteAffirmations.join(",")}</output>
     <output data-testid="favorite-error">{favorites.favoriteError}{favorites.favoriteLoadError}</output>
     <output data-testid="garden">{JSON.stringify([garden.growth, garden.totalBlooms, garden.currentFlower, garden.isBloomSaving, garden.flowerError, garden.flowerLoadError])}</output>
+    <output data-testid="ai-source">{ai.resultStatus ?? "none"}</output>
     <output data-testid="ai">{ai.text}{ai.authError}{ai.rateLimitError}{ai.timeoutError}{ai.usageError}{String(ai.isLoading)}</output>
     <button onClick={() => favorites.handleFavoriteAffirmation("same")}>save</button>
     <button onClick={() => favorites.handleRemoveFavoriteAffirmation("same")}>delete</button>
@@ -259,7 +260,7 @@ describe("dashboard authentication boundary (mock only)", () => {
     expect(screen.queryByRole("button", { name: "成長記録を再読み込み" })).not.toBeInTheDocument();
   });
 
-  it.each(["timed_out", "success", "reject"])("old AI %s cannot update or unlock new requests after authentication changes", async (outcome) => {
+  it.each(["timed_out", "fallback", "success", "reject"])("old AI %s cannot update or unlock new requests after authentication changes", async (outcome) => {
     const oldAI = deferred<unknown>(); const oldTranslation = deferred<unknown>();
     const newAI = deferred<unknown>(); const newTranslation = deferred<unknown>();
     mocks.generate.mockReturnValueOnce(oldAI.promise).mockReturnValueOnce(newAI.promise);
@@ -280,6 +281,8 @@ describe("dashboard authentication boundary (mock only)", () => {
       }
     });
     expect(screen.getByTestId("ai")).toHaveTextContent("true");
+    expect(screen.getByTestId("ai-source")).toHaveTextContent("none");
+    expect(screen.queryByText(/AIによる提案|AIの応答を取得できなかったため/)).not.toBeInTheDocument();
     expect(screen.getByTestId("ai")).not.toHaveTextContent(/old/);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText("old result")).not.toBeInTheDocument();
@@ -292,11 +295,13 @@ describe("dashboard authentication boundary (mock only)", () => {
       newTranslation.resolve({ status: "success", text: "new translation" });
     });
     expect(screen.getByTestId("ai")).toHaveTextContent("new AIfalse");
+    expect(screen.getByTestId("ai-source")).toHaveTextContent("success");
+    expect(screen.getByText(/AIによる提案/)).toBeInTheDocument();
     expect(screen.getByLabelText(input)).toBeEnabled();
     expect(screen.getByText("new translation")).toBeInTheDocument();
   });
 
-  it.each(["timed_out", "success", "reject"])("discards AI %s after logout or unmount", async (outcome) => {
+  it.each(["timed_out", "fallback", "success", "reject"])("discards AI %s after logout or unmount", async (outcome) => {
     for (const logout of [true, false]) {
       const ai = deferred<unknown>(); const translation = deferred<unknown>();
       mocks.generate.mockReturnValueOnce(ai.promise); mocks.translate.mockReturnValueOnce(translation.promise);
@@ -335,4 +340,24 @@ it.each(["B", null, "unmount"])("discards late usage denials after %s", async (d
   });
   expect(screen.queryByText(/old usage/)).not.toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it.each(["success", "fallback", "timed_out"] as const)("認証切替で表示済みの%s本文・表示元・案内を消す", async (status) => {
+  const value = status === "timed_out"
+    ? { status, text: "前の利用者の結果", message: "前の時間切れ案内" }
+    : { status, text: "前の利用者の結果" };
+  mocks.generate.mockResolvedValueOnce(value);
+  mocks.translate.mockResolvedValueOnce(value);
+  render(<Boundary />);
+  await flush();
+  await click("generate");
+  fireEvent.change(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声"), { target: { value: "前の入力" } });
+  await click("優しい言葉に翻訳する 🪄");
+  expect(screen.getByTestId("ai-source")).toHaveTextContent(status);
+  expect(screen.getByText(status === "success" ? /AIによる提案/ : /AIの応答を取得できなかったため/)).toBeInTheDocument();
+  await change("B");
+  expect(screen.getByTestId("ai-source")).toHaveTextContent("none");
+  expect(screen.getByTestId("ai")).not.toHaveTextContent(/前の/);
+  expect(screen.queryByText(/前の利用者|前の時間切れ|AIによる提案|AIの応答を取得できなかったため/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声")).toHaveValue("");
 });
