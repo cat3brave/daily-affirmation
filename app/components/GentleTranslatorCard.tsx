@@ -1,7 +1,7 @@
 import { useDashboardOperation } from "../hooks/dashboardAuth";
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { translateHarshVoice } from "../actions";
+import { translateHarshVoice, type GenerationStatus } from "../actions";
 
 const MAX_HARSH_VOICE_LENGTH = 300;
 
@@ -9,6 +9,8 @@ export default function GentleTranslatorCard() {
   const { capture } = useDashboardOperation();
   const [harshVoice, setHarshVoice] = useState("");
   const [translatedVoice, setTranslatedVoice] = useState("");
+  const [resultStatus, setResultStatus] = useState<GenerationStatus | null>(null);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [translationError, setTranslationError] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const isTranslatingRef = useRef(false);
@@ -20,6 +22,8 @@ export default function GentleTranslatorCard() {
     isTranslatingRef.current = true;
     setIsTranslating(true);
     setTranslatedVoice("");
+    setResultStatus(null);
+    setErrorStatus(null);
     setTranslationError("");
     try {
       const result = await translateHarshVoice(harshVoice);
@@ -32,17 +36,20 @@ export default function GentleTranslatorCard() {
         result.status === "usage_unavailable"
       ) {
         setTranslationError(result.message);
+        setErrorStatus(result.status);
       } else if (result.status === "timed_out") {
         setTranslationError(result.message);
+        setErrorStatus(result.status);
         setTranslatedVoice(result.text);
+        setResultStatus(result.status);
       } else {
         setTranslatedVoice(result.text);
+        setResultStatus(result.status);
       }
     } catch {
       if (!current()) return;
-      setTranslationError(
-        "エラーが発生しました。少し休んでからもう一度試してみてくださいね。",
-      );
+      setTranslatedVoice("ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。");
+      setResultStatus("fallback");
     } finally {
       if (current()) {
         isTranslatingRef.current = false;
@@ -57,9 +64,7 @@ export default function GentleTranslatorCard() {
         🗣️➡️🕊️ 優しい翻訳機
       </p>
       <p className="text-sky-700/60 text-xs mb-4 text-center leading-relaxed">
-        自分を責める厳しい声を、AIが「思いやりのある大人」の視点で
-        <br />
-        客観的な事実と労わりの言葉に翻訳します。
+        入力された内容をもとに、自分を責めすぎない見方の一例を提案します。
       </p>
       <p
         id="gentle-translator-guidance"
@@ -100,13 +105,19 @@ export default function GentleTranslatorCard() {
           <motion.div
             key="translation-result"
             role="status"
+            aria-atomic="true"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-blue-50 border border-blue-200 text-blue-800 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
+            className="bg-blue-50 border border-blue-200 text-blue-800 px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
           >
             <span className="font-bold text-blue-500 block mb-2 tracking-wide">
-              🕊️ 翻訳結果：
+              {resultStatus === "success" ? "🕊️ AIによる提案（見方の一例）" : "🕊️ 用意した言葉"}
             </span>
+            {(resultStatus === "fallback" || resultStatus === "timed_out") && (
+              <p className="text-xs leading-relaxed mb-2">
+                AIの応答を取得できなかったため、用意した言葉を表示しています。
+              </p>
+            )}
             {translatedVoice}
           </motion.div>
         )}
@@ -116,11 +127,10 @@ export default function GentleTranslatorCard() {
             role="alert"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-red-50 border border-red-200 text-red-700 px-5 py-5 rounded-2xl text-sm leading-loose w-full shadow-sm"
+            className="bg-red-50 border border-red-200 text-red-700 px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
           >
             <p>{translationError}</p>
-            {translationError ===
-              "ログイン状態を確認できませんでした。ログインし直してください。" && (
+            {errorStatus === "auth_required" && (
               <a
                 className="font-bold underline underline-offset-4"
                 href="/login"

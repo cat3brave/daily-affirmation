@@ -1,8 +1,10 @@
+import type { GenerationStatus } from "../actions";
 import { motion, AnimatePresence } from "framer-motion";
 
 type AffirmationSectionProps = {
   isLoading: boolean;
   text: string;
+  resultStatus: GenerationStatus | null;
   authError: string;
   rateLimitError: string;
   timeoutError?: string;
@@ -15,6 +17,7 @@ type AffirmationSectionProps = {
 export default function AffirmationSection({
   isLoading,
   text,
+  resultStatus,
   authError,
   rateLimitError,
   timeoutError,
@@ -26,7 +29,7 @@ export default function AffirmationSection({
   return (
     <>
       {/* 1. 肯定文の表示エリア */}
-      <div className="h-64 flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-8 shadow-sm border-2 border-white">
+      <div className="min-h-64 h-auto flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-4 sm:p-8 shadow-sm border-2 border-white">
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.p
@@ -62,9 +65,8 @@ export default function AffirmationSection({
               key={text}
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
-              className="flex flex-col items-center gap-4"
+              className="flex min-w-0 flex-col items-center gap-4 break-words"
             >
               {timeoutError && (
                 <p
@@ -79,6 +81,13 @@ export default function AffirmationSection({
                 aria-atomic="true"
                 className="text-xl md:text-2xl text-blue-800/80 font-medium text-center leading-loose tracking-widest"
               >
+                <span className="block text-xs leading-relaxed tracking-normal mb-2">
+                  {resultStatus === "success"
+                    ? "AIによる提案（見方の一例）"
+                    : resultStatus === "fallback" || resultStatus === "timed_out"
+                      ? "用意した言葉：AIの応答を取得できなかったため、用意した言葉を表示しています。"
+                      : null}
+                </span>
                 {text}
               </p>
 
@@ -86,7 +95,7 @@ export default function AffirmationSection({
                 type="button"
                 onClick={handleFavoriteAffirmation}
                 disabled={isFavoriteDisabled}
-                className="px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="max-w-full px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isFavoriteDisabled
                   ? "お気に入り済み 🌸"
@@ -126,7 +135,7 @@ export default function AffirmationSection({
           onClick={handleClick}
           disabled={isLoading}
           aria-describedby="affirmation-ai-guidance"
-          className={`px-12 py-5 bg-sky-700 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-700 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
+          className={`max-w-full px-6 sm:px-12 py-5 bg-sky-700 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-700 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
         >
           {isLoading ? "受け取り中..." : "言葉を受け取る"}
         </motion.button>

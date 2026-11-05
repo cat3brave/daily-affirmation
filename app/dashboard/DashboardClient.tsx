@@ -41,6 +41,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
 
   const {
     text,
+    resultStatus,
     authError,
     rateLimitError,
     timeoutError,
@@ -153,6 +154,7 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
                       onRecordGoodThings={openGoodThings}
                       isLoading={isLoading}
                       text={text}
+                      affirmationResultStatus={resultStatus}
                       affirmationAuthError={authError}
                       affirmationRateLimitError={rateLimitError}
                       affirmationTimeoutError={timeoutError}

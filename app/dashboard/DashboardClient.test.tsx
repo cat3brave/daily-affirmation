@@ -16,6 +16,7 @@ type AuthUserReturn = {
   isAuthChecked: boolean;
 };
 type AffirmationGeneratorReturn = {
+  resultStatus: "success" | "fallback" | "timed_out" | null;
   text: string;
   authError: string;
   rateLimitError: string;
@@ -50,6 +51,7 @@ type WindowSizeReturn = {
   windowSize: WindowSize;
 };
 type HomeTabProps = {
+  affirmationResultStatus: "success" | "fallback" | "timed_out" | null;
   onRecordGoodThings: () => void;
   isLoading: boolean;
   text: string;
@@ -357,6 +359,7 @@ function configureDashboardMocks({
     isAuthChecked,
   });
   dashboardMocks.useAffirmationGenerator.mockReturnValue({
+    resultStatus: "success",
     text: affirmationText,
     authError: "",
     rateLimitError: "",
@@ -678,4 +681,14 @@ describe("DashboardPage", () => {
       userId: "user-dashboard-1",
     });
   });
+});
+
+
+it.each(["success", "fallback", "timed_out", null] as const)("表示元%sをHomeTabに渡す", (resultStatus) => {
+  dashboardMocks.useAffirmationGenerator.mockReturnValue({
+    resultStatus, text: "同じ文章", authError: "", rateLimitError: "", isLoading: false,
+    handleGenerateAffirmation: dashboardMocks.handleGenerateAffirmation,
+  });
+  render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+  expect(getLastHomeTabProps().affirmationResultStatus).toBe(resultStatus);
 });
