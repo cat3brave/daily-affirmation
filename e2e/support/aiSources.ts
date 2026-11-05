@@ -80,7 +80,10 @@ export async function checkAiSources(page: Page, info: TestInfo) {
           await info.attach(`${kind}-${result instanceof Error ? "catch" : result.status}`, { path, contentType: "image/png" });
         }
       } else {
-        await expect(main.getByRole("alert")).toHaveText(result.message!);
+        await expect(main.getByRole("alert")).toContainText(result.message!);
+        if (!(result instanceof Error) && result.status === "auth_required") {
+          await expect(main.getByRole("link", { name: "ログイン画面へ" })).toBeVisible();
+        }
         await expect(main.getByText(/AIによる提案|AIの応答を取得できなかったため/)).toHaveCount(0);
         await expect(main.getByText(text, { exact: true })).toHaveCount(0);
       }
