@@ -1,9 +1,19 @@
 import { expect, type Page, type Locator, type TestInfo } from "@playwright/test";
 import { stubAiActionResults } from "./supabaseMock";
 
+// Element screenshots can pan hidden-overflow ancestors. Viewport checks begin
+// at the ordinary horizontal position; only vertical scrolling is under test.
+async function resetHorizontalScroll(target: Locator) {
+  await target.evaluate(el => {
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) parent.scrollLeft = 0;
+    window.scrollTo({ left: 0, top: scrollY, behavior: "instant" });
+  });
+}
+
 // Text is checked line by line at scroll positions above the real fixed nav.
 // Viewport captures retain the navigation and do not resize or hide any UI.
 async function captureReadableScreens(page: Page, output: Locator, info: TestInfo, name: string) {
+  await resetHorizontalScroll(output);
   const lines = await output.evaluate(el => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     const rects: Array<{ left: number; right: number; top: number; bottom: number }> = [];
@@ -27,6 +37,8 @@ async function captureReadableScreens(page: Page, output: Locator, info: TestInf
   }
   await page.evaluate(top => window.scrollTo({ top, behavior: "instant" }), lines[0].top - 16);
   for (const line of lines) {
+    expect(line.left).toBeGreaterThanOrEqual(0);
+    expect(line.right).toBeLessThanOrEqual(page.viewportSize()!.width);
     const bottom = (await navigation.boundingBox())!.y - 12;
     let scroll = await page.evaluate(() => scrollY);
     if (line.top - scroll < 0 || line.bottom - scroll > bottom) {
@@ -46,6 +58,7 @@ async function captureReadableScreens(page: Page, output: Locator, info: TestInf
 
 async function checkScrollableControl(page: Page, control: Locator, info: TestInfo, name: string) {
   await control.evaluate(el => el.scrollIntoView({ block: "start", behavior: "instant" }));
+  await resetHorizontalScroll(control);
   await control.evaluate(el => window.scrollBy({ top: el.getBoundingClientRect().top - 16, behavior: "instant" }));
   const box = (await control.boundingBox())!;
   const nav = (await page.getByRole("tablist", { name: "ダッシュボード" }).locator("..").boundingBox())!;
@@ -54,6 +67,7 @@ async function checkScrollableControl(page: Page, control: Locator, info: TestIn
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   await control.click({ trial: true });
+  await resetHorizontalScroll(control);
   const path = info.outputPath(`${name}-control-screen.png`);
   await page.screenshot({ path, animations: "disabled" });
   await info.attach(`${name}-control-screen`, { path, contentType: "image/png" });
