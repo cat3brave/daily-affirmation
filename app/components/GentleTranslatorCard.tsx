@@ -59,7 +59,7 @@ export default function GentleTranslatorCard() {
   };
 
   return (
-    <div className="w-full max-w-md bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
+    <div className="w-full max-w-md bg-white/60 backdrop-blur-md px-1.5 py-6 sm:px-6 rounded-[2rem] border-2 border-white shadow-sm mb-8 flex flex-col items-center">
       <p className="text-sky-800/80 font-bold mb-2 tracking-wide text-center">
         🗣️➡️🕊️ 優しい翻訳機
       </p>
@@ -68,7 +68,7 @@ export default function GentleTranslatorCard() {
       </p>
       <p
         id="gentle-translator-guidance"
-        className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-4 py-3 mb-4"
+        className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-2 sm:px-4 py-3 mb-4"
       >
         入力した文章はGoogle Gemini APIへ送信されます。個人情報・連絡先・医療情報など、機微な情報は入力しないでください。
       </p>
@@ -83,7 +83,7 @@ export default function GentleTranslatorCard() {
         maxLength={MAX_HARSH_VOICE_LENGTH}
         disabled={isTranslating}
         placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
-        className="w-full px-4 py-4 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full px-2 sm:px-4 py-4 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner resize-none h-28 mb-2 leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
       />
 
       <p
@@ -96,7 +96,7 @@ export default function GentleTranslatorCard() {
         type="button"
         onClick={handleTranslate}
         disabled={!harshVoice.trim() || isTranslating}
-        className="px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
+        className="px-2 sm:px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
       >
         {isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄"}
       </button>
@@ -108,7 +108,7 @@ export default function GentleTranslatorCard() {
             aria-atomic="true"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-blue-50 border border-blue-200 text-blue-800 px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
+            className="bg-blue-50 border border-blue-200 text-blue-800 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
           >
             <span className="font-bold text-blue-500 block mb-2 tracking-wide">
               {resultStatus === "success" ? "🕊️ AIによる提案（見方の一例）" : "🕊️ 用意した言葉"}
@@ -118,7 +118,7 @@ export default function GentleTranslatorCard() {
                 AIの応答を取得できなかったため、用意した言葉を表示しています。
               </p>
             )}
-            {translatedVoice}
+            <p>{translatedVoice}</p>
           </motion.div>
         )}
         {translationError && (
@@ -127,7 +127,7 @@ export default function GentleTranslatorCard() {
             role="alert"
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-red-50 border border-red-200 text-red-700 px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
+            className="bg-red-50 border border-red-200 text-red-700 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
           >
             <p>{translationError}</p>
             {errorStatus === "auth_required" && (

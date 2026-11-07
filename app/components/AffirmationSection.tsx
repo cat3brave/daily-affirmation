@@ -29,7 +29,7 @@ export default function AffirmationSection({
   return (
     <>
       {/* 1. 肯定文の表示エリア */}
-      <div className="min-h-64 h-auto flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] p-4 sm:p-8 shadow-sm border-2 border-white">
+      <div className="min-h-64 h-auto flex items-center justify-center mb-6 w-full max-w-lg bg-white/60 backdrop-blur-md rounded-[3rem] px-2 py-4 sm:p-8 shadow-sm border-2 border-white">
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.p
@@ -95,7 +95,7 @@ export default function AffirmationSection({
                 type="button"
                 onClick={handleFavoriteAffirmation}
                 disabled={isFavoriteDisabled}
-                className="max-w-full px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="max-w-full px-3 sm:px-5 py-2 rounded-full bg-pink-100 text-pink-500 text-sm font-bold border border-pink-200 hover:bg-pink-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isFavoriteDisabled
                   ? "お気に入り済み 🌸"
