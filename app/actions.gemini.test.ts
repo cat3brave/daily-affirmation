@@ -17,8 +17,8 @@ function deferred<T>() {
 const payload = { candidates: [{ content: { parts: [{ text: "  優しい言葉  " }], role: "model" } }] };
 const timeoutMessage = "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。";
 const actions = [
-  { name: "generateAffirmation", call: generateAffirmation, fallback: "あなたは、そのままで素晴らしい存在です。" },
-  { name: "translateHarshVoice", call: () => translateHarshVoice("private-input-secret"), fallback: "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。" },
+  { name: "generateAffirmation", call: generateAffirmation, fallback: "自分に向ける言葉を、少し穏やかにしてもいいですね。" },
+  { name: "translateHarshVoice", call: () => translateHarshVoice("private-input-secret"), fallback: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。" },
 ];
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 beforeEach(() => {

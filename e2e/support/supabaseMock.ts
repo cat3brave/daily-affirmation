@@ -330,10 +330,11 @@ export async function stubAiActionResults(page: Page, results: unknown[]) {
     if (route.request().method() !== "POST" || !route.request().headers()["next-action"]) {
       return route.fallback();
     }
-    const result = results[calls++];
+    const entry = results[calls++];
+    const result = typeof entry === "function" ? await entry() : entry;
     if (!result) throw new Error("Unexpected extra AI action");
     await route.fulfill({ status: 200, contentType: "text/x-component",
-      body: `0:{"a":"$@1","f":"","b":"test"}\n1:${JSON.stringify(result)}\n` });
+      body: `0:{"a":"$@1","f":"","b":"test"}\n1:${result instanceof Error ? 'E{"digest":"mock-ai-failure","message":"Mock action failure"}' : JSON.stringify(result)}\n` });
   });
   return () => calls;
 }

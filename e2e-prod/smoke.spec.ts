@@ -111,20 +111,30 @@ test("login, tabs, unsaved draft, reload and logout", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("real production Server Actions: repeatable AI fallback", async ({ page, request }) => {
+test("real production Server Actions: repeatable AI fallback", async ({ page, request }, testInfo) => {
   await login(page);
   const baseline = (await (await request.get(`${mockOrigin}/__requests`)).json()).requests.length;
   for (let repeat = 0; repeat < 2; repeat++) {
     await action(page, "言葉を受け取る");
-    await expect(page.getByRole("status").filter({ hasText: "あなたは、そのままで素晴らしい存在です。" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "自分に向ける言葉を、少し穏やかにしてもいいですね。" })).toBeVisible();
+    await expect(page.getByText("AIの応答を取得できなかったため、用意した言葉を表示しています。", { exact: false })).toBeVisible();
+    await expect(page.getByText(/AIによる提案/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "言葉を受け取る", exact: true })).toBeEnabled();
+    if (repeat === 0) {
+      const path = testInfo.outputPath("affirmation-real-action-fallback.png");
+      await page.screenshot({ path, fullPage: true, animations: "disabled" });
+      await testInfo.attach("affirmation-real-action-fallback", { path, contentType: "image/png" });
+    }
   }
   await page.getByRole("tab", { name: /ワーク/ }).click();
   for (const input of ["少し失敗した", "今日は疲れた"]) {
     const textbox = page.getByLabel("優しい言葉に翻訳したい自分への厳しい声");
     await textbox.fill(input);
     await action(page, "優しい言葉に翻訳する 🪄");
-    await expect(page.getByRole("status").filter({ hasText: "今はAIがお休み中のようです。でも、あなたが一生懸命に頑張っていることは、私がちゃんと知っていますよ。深呼吸してくださいね。" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。" })).toBeVisible();
+    await expect(page.getByText("AIの応答を取得できなかったため、用意した言葉を表示しています。", { exact: true })).toBeVisible();
+    await expect(page.getByText(/AIによる提案/)).toHaveCount(0);
+    await expect(textbox).toHaveValue(input);
     await expect(textbox).toBeEnabled();
     await expect(page.getByRole("button", { name: "優しい言葉に翻訳する 🪄" })).toBeEnabled();
   }
@@ -155,4 +165,16 @@ for (const width of [320, 1280]) {
       await checkGoodThingsEntry(page, testInfo);
     });
   }
+}
+
+// Production bundle UI only: these cases replace the Action response, unlike
+// the real missing-key Action test above. Never call Gemini or spend usage.
+for (const enlarged of [false, true]) {
+  test(`production UI AI sources: 320px, enlarged=${enlarged} (mock actions)`, async ({ page }, info) => {
+    const { checkAiSources } = await import("../e2e/support/aiSources");
+    await page.setViewportSize({ width: 320, height: 720 });
+    await login(page);
+    if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+    await checkAiSources(page, info);
+  });
 }

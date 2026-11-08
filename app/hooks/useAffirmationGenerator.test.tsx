@@ -21,7 +21,7 @@ vi.mock("../actions", () => ({
 
 import { useAffirmationGenerator } from "./useAffirmationGenerator";
 
-const HOOK_FALLBACK = "深呼吸して、もう一度試してみてくださいね。";
+const HOOK_FALLBACK = "自分に向ける言葉を、少し穏やかにしてもいいですね。";
 
 function createDeferred<T>(): Deferred<T> {
   let resolve: Deferred<T>["resolve"] | undefined;
@@ -84,6 +84,7 @@ describe("useAffirmationGenerator", () => {
       expect(result.current.isLoading).toBe(true);
     });
     expect(result.current.text).toBe("");
+    expect(result.current.resultStatus).toBeNull();
 
     await act(async () => {
       generateDeferred.resolve({ status: "success", text: "新しい言葉です" });
@@ -105,6 +106,7 @@ describe("useAffirmationGenerator", () => {
     });
 
     expect(result.current.text).toBe(HOOK_FALLBACK);
+    expect(result.current.resultStatus).toBe("fallback");
     expect(result.current.isLoading).toBe(false);
 
     affirmationMocks.generateAffirmation.mockResolvedValueOnce({ status: "success", text: "再生成できました" });
@@ -130,6 +132,7 @@ describe("useAffirmationGenerator", () => {
     });
 
     expect(result.current.text).toBe("");
+    expect(result.current.resultStatus).toBeNull();
     expect(result.current.authError).toContain("ログインし直してください");
     expect(result.current.isLoading).toBe(false);
   });
@@ -149,6 +152,7 @@ describe("useAffirmationGenerator", () => {
     });
 
     expect(result.current.text).toBe("");
+    expect(result.current.resultStatus).toBeNull();
     expect(result.current.rateLimitError).toContain("もう一度お試しください");
     expect(result.current.isLoading).toBe(false);
 
@@ -185,12 +189,13 @@ describe("useAffirmationGenerator", () => {
 
 it("時間切れは案内とフォールバックを保持し、次の操作で消して成功へ復帰する", async () => {
   affirmationMocks.generateAffirmation.mockResolvedValueOnce({
-    status: "timed_out", message: "応答に時間がかかっています。", text: "あなたは、そのままで素晴らしい存在です。",
+    status: "timed_out", message: "応答に時間がかかっています。", text: "自分に向ける言葉を、少し穏やかにしてもいいですね。",
   });
   const { result } = renderHook(() => useAffirmationGenerator());
   await act(async () => { await result.current.handleGenerateAffirmation(); });
   expect(result.current.timeoutError).toBe("応答に時間がかかっています。");
-  expect(result.current.text).toBe("あなたは、そのままで素晴らしい存在です。");
+  expect(result.current.resultStatus).toBe("timed_out");
+  expect(result.current.text).toBe("自分に向ける言葉を、少し穏やかにしてもいいですね。");
   expect(result.current.authError).toBe("");
   expect(result.current.rateLimitError).toBe("");
   expect(result.current.isLoading).toBe(false);
@@ -203,6 +208,7 @@ it("時間切れは案内とフォールバックを保持し、次の操作で�
   expect(affirmationMocks.generateAffirmation).toHaveBeenCalledTimes(2);
   expect(result.current.timeoutError).toBe("");
   expect(result.current.text).toBe("");
+    expect(result.current.resultStatus).toBeNull();
   expect(result.current.isLoading).toBe(true);
   await act(async () => { retry.resolve({ status: "success", text: "再試行成功" }); });
   expect(result.current.text).toBe("再試行成功");
@@ -217,8 +223,18 @@ it.each(["usage_limited", "usage_unavailable"] as const)("%sを表示し次の�
   const { result } = renderHook(() => useAffirmationGenerator());
   await act(async () => { await result.current.handleGenerateAffirmation(); });
   expect(result.current.usageError).toBe(failure.message);
+  expect(result.current.resultStatus).toBeNull();
   expect(result.current.isLoading).toBe(false);
   await act(async () => { await result.current.handleGenerateAffirmation(); });
   expect(result.current.usageError).toBe("");
   expect(result.current.text).toBe("今日はここまでで十分ですよ");
+});
+
+
+it.each(["success", "fallback"] as const)("%sを同じ文章でも明示状態として保持する", async (status) => {
+  affirmationMocks.generateAffirmation.mockResolvedValueOnce({ status, text: HOOK_FALLBACK });
+  const { result } = renderHook(() => useAffirmationGenerator());
+  await act(async () => { await result.current.handleGenerateAffirmation(); });
+  expect(result.current.resultStatus).toBe(status);
+  expect(result.current.text).toBe(HOOK_FALLBACK);
 });

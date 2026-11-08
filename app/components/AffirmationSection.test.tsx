@@ -61,7 +61,7 @@ afterEach(cleanup);
 describe("AffirmationSection", () => {
   it("生成ボタンに高コントラストの背景色を使用する", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -78,7 +78,7 @@ describe("AffirmationSection", () => {
   });
   it("初期状態で待機メッセージと有効な受け取りボタンを表示する", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -102,7 +102,7 @@ describe("AffirmationSection", () => {
   it("受け取りボタンをクリックするとhandleClickを1回呼ぶ", () => {
     const handleClick = vi.fn();
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -120,7 +120,7 @@ describe("AffirmationSection", () => {
 
   it("読み込み中は表示文言とボタン名が変わりボタンを無効にする", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading
         rateLimitError=""
         authError=""
@@ -141,7 +141,7 @@ describe("AffirmationSection", () => {
 
   it("認証切れではalertとログインリンクを表示し生成結果として扱わない", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError="ログイン状態を確認できませんでした。ログインし直してください。"
@@ -163,7 +163,7 @@ describe("AffirmationSection", () => {
 
   it("利用制限をalertで通知し再操作を可能にする", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         authError=""
         rateLimitError="利用が集中しています。少し時間をおいてから、もう一度お試しください。"
@@ -181,7 +181,7 @@ describe("AffirmationSection", () => {
 
   it("外部AI案内を生成ボタンへ関連付ける", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         authError=""
         rateLimitError=""
@@ -203,7 +203,7 @@ describe("AffirmationSection", () => {
 
   it("生成成功後にアファメーションと有効なお気に入りボタンを表示する", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -229,7 +229,7 @@ describe("AffirmationSection", () => {
   it("お気に入りボタンをクリックするとhandleFavoriteAffirmationを1回呼ぶ", () => {
     const handleFavoriteAffirmation = vi.fn();
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -249,7 +249,7 @@ describe("AffirmationSection", () => {
 
   it("登録済み状態ではお気に入り済みボタンを表示して無効にする", () => {
     render(
-      <AffirmationSection
+      <AffirmationSection resultStatus="success"
         isLoading={false}
         rateLimitError=""
         authError=""
@@ -268,20 +268,30 @@ describe("AffirmationSection", () => {
 
 it("時間切れ案内とフォールバックを別々のARIA通知で表示し、お気に入りと再操作を維持する", () => {
   const favorite = vi.fn();
-  render(<AffirmationSection isLoading={false} authError="" rateLimitError=""
+  render(<AffirmationSection resultStatus="timed_out" isLoading={false} authError="" rateLimitError=""
     timeoutError="応答に時間がかかっています。少し時間をおいて、もう一度お試しください。"
-    text="あなたは、そのままで素晴らしい存在です。"
+    text="自分に向ける言葉を、少し穏やかにしてもいいですね。"
     handleClick={vi.fn()} handleFavoriteAffirmation={favorite} isFavoriteDisabled={false} />);
   expect(screen.getByRole("alert")).toHaveTextContent("応答に時間がかかっています。");
-  expect(screen.getByRole("status")).toHaveTextContent("あなたは、そのままで素晴らしい存在です。");
+  expect(screen.getByRole("status")).toHaveTextContent("自分に向ける言葉を、少し穏やかにしてもいいですね。");
   expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "お気に入りにする 🌷" }));
   expect(favorite).toHaveBeenCalledOnce();
 });
 
 it.each(["短時間の利用上限に達しました。再利用の目安：2026/10/18 09:01:00（日本時間）。", "本日の利用上限に達しました。", "本日の利用上限と短時間の利用上限に達しました。", "利用状況を確認できませんでした。"])("利用枠の案内をalertで表示する: %s", (message) => {
-  render(<AffirmationSection isLoading={false} text="" authError="" rateLimitError="" usageError={message}
+  render(<AffirmationSection resultStatus="success" isLoading={false} text="" authError="" rateLimitError="" usageError={message}
     handleClick={vi.fn()} handleFavoriteAffirmation={vi.fn()} isFavoriteDisabled={false} />);
   expect(screen.getByRole("alert")).toHaveTextContent(message);
   expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
+});
+
+
+it.each(["success", "fallback", "timed_out"] as const)("%sの表示元を文章の一致に頼らず表示する", (status) => {
+  render(<AffirmationSection resultStatus={status} isLoading={false} text="同じ文章" authError="" rateLimitError=""
+    handleClick={vi.fn()} handleFavoriteAffirmation={vi.fn()} isFavoriteDisabled={false} />);
+  const result = screen.getByRole("status");
+  expect(result).toHaveTextContent("同じ文章");
+  expect(result).toHaveTextContent(status === "success" ? "AIによる提案（見方の一例）" : "AIの応答を取得できなかったため、用意した言葉を表示しています。");
+  expect(result).not.toHaveTextContent(status === "success" ? "用意した言葉" : "AIによる提案");
 });
