@@ -1238,6 +1238,171 @@ describe("対象日と非同期処理", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("翌日の保存済み記録を日付変更だけで最近2週間に表示する", async () => {
+    const rows = [
+      { date: previous, things1: "前日の保存済み", things2: "", things3: "" },
+      { date: today, things1: "翌日の保存済み", things2: "", things3: "" },
+    ];
+    // The server applies the requested dates before returning persisted rows.
+    supabaseMocks.selectEq.mockImplementation(async () => createSelectResult(
+      rows.filter(row => supabaseMocks.selectIn.mock.lastCall![1].includes(row.date)),
+    ));
+    await renderLoadedCard();
+    nextDay();
+    await waitFor(() => expect(screen.getByTitle(today)).toHaveAccessibleName(`${today}、記録あり、詳細を開く`));
+    expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2);
+    expect(firstInput()).toHaveValue("前日の保存済み");
+    expect(screen.getByText(`入力対象日：${previous}`)).toBeVisible();
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent("保存済み");
+  });
+
+  it("同日の復帰イベントは取得中・成功後とも重複取得しない", async () => {
+    await renderLoadedCard();
+    const pending = deferred<SelectResult>();
+    supabaseMocks.selectEq.mockReturnValueOnce(pending.promise);
+    nextDay();
+    for (const event of ["focus", "pageshow", "visibilitychange", "focus"]) nextDay(event);
+    await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2));
+    edit("取得中も編集できる");
+    await act(async () => pending.resolve(createSelectResult([
+      { date: today, things1: "翌日の記録", things2: "", things3: "" },
+    ])));
+    for (const event of ["focus", "pageshow", "visibilitychange"]) nextDay(event);
+    await act(async () => {});
+    expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2);
+    expect(firstInput()).toHaveValue("取得中も編集できる");
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent("未保存の変更があります");
+  });
+
+  it.each(["error", "throw", "null"])("一覧取得失敗（%s）は未確認とし、イベント連打で再取得せず明示再試行できる", async kind => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await renderLoadedCard();
+    edit("下書きを残す");
+    const draft = localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID));
+    if (kind === "throw") supabaseMocks.selectEq.mockRejectedValueOnce(new Error("offline"));
+    else supabaseMocks.selectEq.mockResolvedValueOnce({ data: null, error: kind === "error" ? { message: "offline" } : null });
+    nextDay();
+    const retry = await screen.findByRole("button", { name: "3つのよかったことを再読み込み" });
+    expect(screen.getByTitle(today)).toHaveAccessibleName(`${today}、記録の有無は未確認`);
+    nextDay("pageshow"); nextDay("visibilitychange");
+    await act(async () => {});
+    expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2);
+    expect(firstInput()).toHaveValue("下書きを残す");
+    expect(localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBe(draft);
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent("未保存の変更があります");
+    supabaseMocks.selectEq.mockResolvedValueOnce(createSelectResult([
+      { date: today, things1: "翌日の記録", things2: "", things3: "" },
+    ]));
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.getByTitle(today)).toHaveAccessibleName(`${today}、記録あり、詳細を開く`));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(firstInput()).toHaveValue("下書きを残す");
+    expect(localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBe(draft);
+  });
+
+  it("20日後の一覧更新も入力対象日・下書き・保存基準を変えない", async () => {
+    configureSupabaseMock({ selectResult: createSelectResult([
+      { date: previous, things1: "元の保存済み", things2: "", things3: "" },
+    ]) });
+    await renderLoadedCard();
+    edit("別タブで保存された下書き");
+    const draft = localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID));
+    supabaseMocks.selectEq.mockResolvedValueOnce(createSelectResult([
+      { date: previous, things1: "別タブで保存された下書き", things2: "", things3: "" },
+      { date: "2026-11-11", things1: "新しい日", things2: "", things3: "" },
+    ]));
+    vi.setSystemTime(new Date(2026, 10, 11, 0, 5));
+    act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(screen.getByTitle("2026-11-11")).toHaveAccessibleName(/記録あり/));
+    expect(supabaseMocks.selectIn.mock.lastCall![1]).toHaveLength(15);
+    expect(supabaseMocks.selectIn.mock.lastCall![1]).toContain(previous);
+    expect(supabaseMocks.selectEq).toHaveBeenLastCalledWith("user_id", USER_ID);
+    expect(firstInput()).toHaveValue("別タブで保存された下書き");
+    expect(localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBe(draft);
+    expect(screen.getByText(`入力対象日：${previous}`)).toBeVisible();
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent("未保存の変更があります");
+  });
+
+  it.each(["保存", "削除"])("%s中の日付変更は完了後に一覧を取得する", async kind => {
+    configureSupabaseMock({ selectResult: createSelectResult([
+      { date: previous, things1: "保存済み", things2: "", things3: "" },
+    ]) });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderLoadedCard();
+    const pending = deferred<MutationResult>();
+    if (kind === "保存") { edit("新しい保存"); supabaseMocks.upsert.mockReturnValueOnce(pending.promise); save(); }
+    else {
+      supabaseMocks.deleteDateEq.mockReturnValueOnce(pending.promise);
+      fireEvent.click(screen.getByTitle(previous));
+      fireEvent.click(screen.getByRole("button", { name: `${previous} の記録を削除` }));
+    }
+    nextDay();
+    await act(async () => {});
+    expect(supabaseMocks.selectEq).toHaveBeenCalledOnce();
+    supabaseMocks.selectEq.mockResolvedValueOnce(createSelectResult([
+      { date: today, things1: "翌日の記録", things2: "", things3: "" },
+    ]));
+    await act(async () => pending.resolve({ error: null }));
+    await waitFor(() => expect(screen.getByTitle(today)).toHaveAccessibleName(/記録あり/));
+    expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2);
+    expect(firstInput()).toHaveValue(kind === "保存" ? "新しい保存" : "");
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent(kind === "保存" ? "保存済み" : "対象日の記録はまだありません");
+  });
+
+  it.each(["保存", "削除"])("一覧の古い応答が最新の%s結果を上書きしない", async kind => {
+    configureSupabaseMock({ selectResult: createSelectResult([
+      { date: previous, things1: "古い文章", things2: "", things3: "" },
+    ]) });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderLoadedCard();
+    const pending = deferred<SelectResult>();
+    supabaseMocks.selectEq.mockReturnValueOnce(pending.promise);
+    nextDay();
+    await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2));
+    supabaseMocks.selectEq.mockResolvedValue(createSelectResult(kind === "保存" ? [
+      { date: previous, things1: "最新の保存", things2: "", things3: "" },
+    ] : []));
+    if (kind === "保存") { edit("最新の保存"); save(); }
+    else {
+      fireEvent.click(screen.getByTitle(previous));
+      fireEvent.click(screen.getByRole("button", { name: `${previous} の記録を削除` }));
+    }
+    await waitFor(() => expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(3));
+    await act(async () => pending.resolve(createSelectResult([
+      { date: previous, things1: "古い文章", things2: "", things3: "" },
+      { date: today, things1: "無効な古い一覧", things2: "", things3: "" },
+    ])));
+    expect(firstInput()).toHaveValue(kind === "保存" ? "最新の保存" : "");
+    expect(screen.getByTitle(today)).toHaveAccessibleName(/記録なし/);
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent(kind === "保存" ? "保存済み" : "対象日の記録はまだありません");
+  });
+
+  it.each(["認証確認", "DB応答"])("一覧の%s中の認証切替後に古い本人の応答を表示しない", async stage => {
+    await renderLoadedCard();
+    const user = deferred<UserResult>();
+    const rows = deferred<SelectResult>();
+    if (stage === "認証確認") supabaseMocks.getUser.mockReturnValueOnce(user.promise);
+    else supabaseMocks.selectEq.mockReturnValueOnce(rows.promise);
+    nextDay();
+    await act(async () => {});
+    supabaseMocks.getUser.mockResolvedValue(createUserResult("user-B"));
+    supabaseMocks.selectEq.mockResolvedValue(createSelectResult([
+      { date: today, things1: "Bの記録", things2: "", things3: "" },
+    ]));
+    const authCallback = supabaseMocks.onAuthStateChange.mock.calls[0][0];
+    act(() => authCallback("SIGNED_IN", { user: { id: "user-B" } }));
+    await waitFor(() => expect(firstInput()).toHaveValue("Bの記録"));
+    await act(async () => {
+      user.resolve(createUserResult());
+      rows.resolve(createSelectResult([{ date: today, things1: "Aの古い記録", things2: "", things3: "" }]));
+    });
+    expect(firstInput()).toHaveValue("Bの記録");
+    fireEvent.click(screen.getByTitle(today));
+    expect(screen.getAllByText("Bの記録").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Aの古い記録")).not.toBeInTheDocument();
+    expect(supabaseMocks.selectEq).toHaveBeenLastCalledWith("user_id", "user-B");
+  });
+
   it("初回は本人の直近14日だけをサーバー側で取得する", async () => {
     await renderLoadedCard();
     expect(supabaseMocks.selectIn).toHaveBeenCalledExactlyOnceWith("date", [
@@ -1250,12 +1415,13 @@ describe("対象日と非同期処理", () => {
 
   it("14日を超えて開いたままの再試行も元の入力対象日と下書きを維持する", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    supabaseMocks.selectEq.mockResolvedValueOnce({ data: null, error: { message: "failed" } });
+    supabaseMocks.selectEq.mockResolvedValue({ data: null, error: { message: "failed" } });
     await renderLoadedCard();
     edit("元の日付の下書き");
     const draft = localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID));
     vi.setSystemTime(new Date(2026, 10, 11, 0, 5));
     act(() => window.dispatchEvent(new Event("focus")));
+    await waitFor(() => expect(screen.getByRole("button", { name: "3つのよかったことを再読み込み" })).toBeEnabled());
     supabaseMocks.selectEq.mockResolvedValue(createSelectResult([
       { date: previous, things1: "元の日付の保存済み", things2: "", things3: "" },
     ]));
@@ -1310,6 +1476,7 @@ describe("対象日と非同期処理", () => {
     save();
     await act(async () => {});
     expect(screen.getByText(/保存しました/)).toBeVisible();
+    expect(supabaseMocks.selectEq).toHaveBeenCalledTimes(2);
     const timersBeforeUnmount = vi.getTimerCount();
     card.unmount();
     // React/testing-library can also own timers; both card timers must be gone.
@@ -1404,10 +1571,11 @@ describe("対象日と非同期処理", () => {
 
   it("読込エラーの再試行で編集中の文章と対象日を変更しない", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    supabaseMocks.selectEq.mockResolvedValueOnce({ data: null, error: { message: "failed" } });
+    supabaseMocks.selectEq.mockResolvedValue({ data: null, error: { message: "failed" } });
     await renderLoadedCard();
     edit("再試行前の文章");
     nextDay();
+    await waitFor(() => expect(screen.getByRole("button", { name: "3つのよかったことを再読み込み" })).toBeEnabled());
     supabaseMocks.selectEq.mockResolvedValue(createSelectResult([
       { date: today, things1: "今日の保存済み", things2: "", things3: "" },
     ]));

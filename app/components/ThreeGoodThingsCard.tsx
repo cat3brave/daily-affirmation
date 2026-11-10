@@ -22,17 +22,15 @@ function sameSavedValues(things: string[], saved: string[]) {
   return things.every((thing, index) => thing.trim() === saved[index].trim());
 }
 
-function getTodayDate() {
-  const d = new Date();
+function getTodayDate(d = new Date()) {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function getPast14Days() {
+function getPast14Days(today = new Date()) {
   const dates = [];
-  const today = new Date();
   for (let i = 13; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
@@ -56,6 +54,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
   const [historyRevision, setHistoryRevision] = useState(0);
   const [things, setThings] = useState<string[]>(["", "", ""]);
   const [savedRecordKnown, setSavedRecordKnown] = useState(false);
+  const [savedRecordExists, setSavedRecordExists] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -70,9 +69,14 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
   const authUserIdRef = useRef<string | null | undefined>(undefined);
   const authGenerationRef = useRef(0);
   const [draftRestored, setDraftRestored] = useState(false);
-  const savedThingsRef = useRef<string[]>(["", "", ""]);
+  const [savedThings, setSavedThings] = useState<string[]>(["", "", ""]);
   const isMountedRef = useRef(true);
   const loadRequestRef = useRef(0);
+  const attemptedDayRef = useRef<string | null>(null);
+  const backgroundLoadRef = useRef(false);
+  const backgroundRequestRef = useRef<number | null>(null);
+  const [isRefreshingRecords, setIsRefreshingRecords] = useState(false);
+  const [knownDates, setKnownDates] = useState<string[]>([]);
   const savedMessageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -85,17 +89,28 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     setIsSaved(false);
   }, []);
 
-  const fetchRecords = useCallback(() => {
+  const fetchRecords = useCallback((background = false) => {
       const current = capture();
       if (!current() || mutationRef.current) return;
       const targetDate = inputDateRef.current;
+      const now = new Date();
+      const requestedDates = [...new Set([...getPast14Days(now), targetDate])];
+      attemptedDayRef.current = getTodayDate(now);
+      backgroundLoadRef.current = background;
       const authGeneration = authGenerationRef.current;
       const requestId = ++loadRequestRef.current;
+      backgroundRequestRef.current = background ? requestId : null;
 
-      return supabase.auth.getUser().catch((error) => {
-        if (current()) auth?.onOwnerMismatch(null);
-        throw error;
-      }).then(async ({ data: { user }, error: userError }) => {
+      return Promise.resolve().then(async () => {
+        if (!current() || requestId !== loadRequestRef.current ||
+            authGeneration !== authGenerationRef.current) return;
+        if (background) setIsRefreshingRecords(true);
+        setKnownDates([]);
+        const { data: { user }, error: userError } = await supabase.auth.getUser().catch((error) => {
+          if (current() && requestId === loadRequestRef.current &&
+              authGeneration === authGenerationRef.current) auth?.onOwnerMismatch(null);
+          throw error;
+        });
 
         if (
           !current() ||
@@ -121,7 +136,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
         }
         authUserIdRef.current = user.id;
 
-        const initializeEditor = !editorInitializedRef.current;
+        const initializeEditor = !background && !editorInitializedRef.current;
         const draft = initializeEditor
           ? readThreeGoodThingsDraft(user.id, targetDate)
           : null;
@@ -137,11 +152,11 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
           .from("three_good_things")
           .select("*")
           // Bound the server response, including an editor left open on an older day.
-          .in("date", [...new Set([...getPast14Days(), targetDate])])
+          .in("date", requestedDates)
           .eq("user_id", user.id);
 
         if (!current() || requestId !== loadRequestRef.current || authGeneration !== authGenerationRef.current) return;
-        if (error) {
+        if (error || !data) {
           console.error("3つのよかったこと取得エラー:", error);
           if (current() && requestId === loadRequestRef.current) {
             setLoadError(loadErrorMessage);
@@ -167,10 +182,15 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
             authUserIdRef.current !== user.id
           ) return;
 
+          setKnownDates(requestedDates);
+          setLoadError("");
           setAllRecords(recordsObj);
+          // List refreshes never change the editor's saved baseline or draft.
+          if (background) return;
 
           const savedThings = recordsObj[targetDate] ?? ["", "", ""];
-          savedThingsRef.current = savedThings;
+          setSavedThings(savedThings);
+          setSavedRecordExists(Boolean(recordsObj[targetDate]));
           setSavedRecordKnown(true);
           const currentDraft = readThreeGoodThingsDraft(user.id, targetDate);
           if (currentDraft && sameSavedValues(currentDraft, savedThings)) {
@@ -194,6 +214,8 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
       }).finally(() => {
         if (current() && requestId === loadRequestRef.current) {
           setIsLoadingRecords(false);
+          setIsRefreshingRecords(false);
+          backgroundRequestRef.current = null;
         }
       });
   }, [auth, capture, supabase]);
@@ -220,9 +242,14 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
         userIdRef.current = null;
         setUserId(null);
         setThings(["", "", ""]);
-        savedThingsRef.current = ["", "", ""];
+        setSavedThings(["", "", ""]);
         setSavedRecordKnown(false);
+        setSavedRecordExists(false);
         setAllRecords({});
+        setKnownDates([]);
+        attemptedDayRef.current = null;
+        backgroundRequestRef.current = null;
+        setIsRefreshingRecords(false);
         setSelectedDate(null);
         setDraftRestored(false);
         setIsSaved(false);
@@ -279,19 +306,35 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     };
   }, []);
 
+  useEffect(() => {
+    if (userId && !isLoadingRecords && !isSaving && deletingDate === null &&
+        attemptedDayRef.current !== todayDate) {
+      void fetchRecords(true);
+    }
+  }, [todayDate, userId, isLoadingRecords, isSaving, deletingDate, fetchRecords]);
+
+  const invalidateBackgroundLoad = () => {
+    if (backgroundRequestRef.current === null) return;
+    backgroundRequestRef.current = null;
+    loadRequestRef.current += 1;
+    attemptedDayRef.current = null;
+    setIsRefreshingRecords(false);
+  };
+
   const handleToday = () => {
     if (!capture()() || mutationRef.current || isLoadingRecords || !userId) return;
     const today = getTodayDate();
     if (today === inputDateRef.current) return;
     const dirty = savedRecordKnown
-      ? !sameSavedValues(things, savedThingsRef.current)
+      ? !sameSavedValues(things, savedThings)
       : things.some((thing) => thing.trim() !== "");
     if (dirty && !window.confirm("未保存の変更を破棄して、今日の入力へ切り替えますか？")) return;
     if (!capture()() || mutationRef.current) return;
+    invalidateBackgroundLoad();
     clearSavedMessage();
     const saved = allRecords[today] ?? ["", "", ""];
     const draft = readThreeGoodThingsDraft(userId, today);
-    savedThingsRef.current = saved;
+    setSavedThings(saved);
     setSavedRecordKnown(false);
     inputDateRef.current = today;
     setInputDate(today);
@@ -320,7 +363,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     if (!userId) return;
     if (
       !newThings.some((thing) => thing.trim() !== "") ||
-      (savedRecordKnown && sameSavedValues(newThings, savedThingsRef.current))
+      (savedRecordKnown && sameSavedValues(newThings, savedThings))
     ) {
       removeThreeGoodThingsDraft(userId);
     } else {
@@ -349,10 +392,11 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
 
     const normalizedThings = things.map((thing) => thing.trim());
     if (!normalizedThings.some((thing) => thing !== "")) return;
-    if (savedRecordKnown && allRecords[inputDateRef.current] &&
-      sameSavedValues(normalizedThings, savedThingsRef.current)) return;
+    if (savedRecordKnown && savedRecordExists &&
+      sameSavedValues(normalizedThings, savedThings)) return;
 
     const today = inputDateRef.current;
+    invalidateBackgroundLoad();
     mutationRef.current = operation;
     clearSavedMessage();
     setSaveError("");
@@ -402,10 +446,12 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
       }
 
       removeThreeGoodThingsDraft(displayedUserId);
-      savedThingsRef.current = normalizedThings;
+      setSavedThings(normalizedThings);
+      setSavedRecordExists(true);
       setSavedRecordKnown(true);
 
       setHistoryRevision((value) => value + 1);
+      setKnownDates((dates) => [...new Set([...dates, today])]);
       setThings(normalizedThings);
       setAllRecords((records) => ({ ...records, [today]: normalizedThings }));
       setSelectedDate(today);
@@ -455,6 +501,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
       return;
 
     if (!isCurrentOperation() || mutationRef.current) return;
+    invalidateBackgroundLoad();
     mutationRef.current = operation;
     clearSavedMessage();
     setDeleteError("");
@@ -495,6 +542,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
       }
 
       setHistoryRevision((value) => value + 1);
+      setKnownDates((dates) => [...new Set([...dates, dateToDelete])]);
       setAllRecords((currentRecords) => {
         const updatedRecords = { ...currentRecords };
         delete updatedRecords[dateToDelete];
@@ -503,7 +551,8 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
 
       if (dateToDelete === inputDateRef.current) {
         removeThreeGoodThingsDraft(displayedUserId);
-        savedThingsRef.current = ["", "", ""];
+        setSavedThings(["", "", ""]);
+        setSavedRecordExists(false);
         setSavedRecordKnown(true);
         setSaveError("");
         setThings(["", "", ""]);
@@ -530,8 +579,8 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     selectedDate !== null && deletingDate === selectedDate;
   const hasThingToSave = things.some((thing) => thing.trim() !== "");
 
-  const matchesSaved = savedRecordKnown && sameSavedValues(things, allRecords[inputDate] ?? ["", "", ""]);
-  const unchangedRecord = matchesSaved && Boolean(allRecords[inputDate]);
+  const matchesSaved = savedRecordKnown && sameSavedValues(things, savedThings);
+  const unchangedRecord = matchesSaved && savedRecordExists;
   const saveStatus = isLoadingRecords ? "保存済み内容を読み込んでいます..."
     : isSaving ? "保存中..."
     : saveError ? "保存に失敗しました。もう一度お試しください。"
@@ -616,7 +665,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
         <p className="text-[0.65rem] text-pink-400 font-bold mb-2">
           🌱 最近の記録（2週間）
         </p>
-        {isLoadingRecords && !loadError ? (
+        {(isLoadingRecords || isRefreshingRecords) && !loadError ? (
           <p
             aria-live="polite"
             className="w-full mb-3 rounded-xl bg-white/60 px-3 py-2 text-center text-xs font-bold text-pink-400"
@@ -626,8 +675,12 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
         ) : loadError ? (
           <div role="alert" className="w-full mb-3 rounded-xl border border-red-100 bg-red-50/60 px-3 py-2 text-center text-xs font-bold text-red-500">
             <p>{loadError}</p>
-            <button type="button" onClick={() => { setIsLoadingRecords(true); void fetchRecords(); }} disabled={isLoadingRecords || isMutating} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
-              {isLoadingRecords ? "再読み込み中..." : "3つのよかったことを再読み込み"}
+            <button type="button" onClick={() => {
+                const background = backgroundLoadRef.current && savedRecordKnown;
+                if (!background) setIsLoadingRecords(true);
+                void fetchRecords(background);
+              }} disabled={isLoadingRecords || isRefreshingRecords || isMutating} className="mt-2 rounded-full border border-red-200 bg-white px-4 py-2 disabled:opacity-60">
+              {isLoadingRecords || isRefreshingRecords ? "再読み込み中..." : "3つのよかったことを再読み込み"}
             </button>
           </div>
         ) : null}
@@ -649,6 +702,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
             const hasRecord =
               allRecords[date] &&
               allRecords[date].some((text) => text.trim() !== "");
+            const isKnown = knownDates.includes(date);
             const isSelected = selectedDate === date;
 
             return (
@@ -656,7 +710,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
                 key={date}
                 type="button"
                 title={date}
-                aria-label={`${date}、${hasRecord ? `記録あり、詳細を${isSelected ? "閉じる" : "開く"}` : "記録なし"}`}
+                aria-label={`${date}、${hasRecord ? `記録あり、詳細を${isSelected ? "閉じる" : "開く"}` : isKnown ? "記録なし" : "記録の有無は未確認"}`}
                 aria-pressed={hasRecord ? isSelected : undefined}
                 disabled={!hasRecord}
                 onClick={() => {
@@ -668,7 +722,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
               >
                 <span
                   aria-hidden="true"
-                  data-recorded={hasRecord ? "true" : "false"}
+                  data-recorded={hasRecord ? "true" : isKnown ? "false" : "unknown"}
                   className={`good-thing-day h-4 w-4 rounded-[4px] transition-all ${
                     hasRecord
                       ? "bg-green-400 group-hover:bg-green-500 shadow-sm"
