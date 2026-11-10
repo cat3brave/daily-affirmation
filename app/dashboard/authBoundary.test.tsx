@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => {
   const records = vi.fn();
   const signOut = vi.fn();
   const from = vi.fn((table: string) => ({
-    select: (_: string, options?: unknown) => ({ eq: () => table === "favorite_affirmations" ? { order: load } : table === "three_good_things" ? records() : options ? count() : { gte: graph } }),
+    select: (_: string, options?: unknown) => ({ in: () => ({ eq: records }), eq: () => table === "favorite_affirmations" ? { order: load } : table === "three_good_things" ? records() : options ? count() : { gte: graph } }),
     insert, upsert: insert,
     delete: () => ({ eq: () => ({ eq: remove }) }),
   }));

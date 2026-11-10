@@ -30,6 +30,20 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
+function getPast14Days() {
+  const dates = [];
+  const today = new Date();
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    dates.push(`${year}-${month}-${day}`);
+  }
+  return dates;
+}
+
 export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
   const { capture, auth } = useDashboardOperation();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -70,19 +84,6 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     }
     setIsSaved(false);
   }, []);
-
-  const getPast14Days = () => {
-    const dates = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      dates.push(`${year}-${month}-${day}`);
-    }
-    return dates;
-  };
 
   const fetchRecords = useCallback(() => {
       const current = capture();
@@ -135,6 +136,8 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
         const { data, error } = await supabase
           .from("three_good_things")
           .select("*")
+          // Bound the server response, including an editor left open on an older day.
+          .in("date", [...new Set([...getPast14Days(), targetDate])])
           .eq("user_id", user.id);
 
         if (!current() || requestId !== loadRequestRef.current || authGeneration !== authGenerationRef.current) return;
