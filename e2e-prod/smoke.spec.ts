@@ -178,3 +178,8 @@ for (const enlarged of [false, true]) {
     await checkAiSources(page, info);
   });
 }
+
+test("bounded good things reads with capped historical data and failed day switch", async ({ page }) => {
+  const { checkBoundedGoodThingsLoad } = await import("../e2e/support/goodThingsLoad");
+  await checkBoundedGoodThingsLoad(page);
+});

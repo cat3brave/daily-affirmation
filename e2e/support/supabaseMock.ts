@@ -244,8 +244,19 @@ export async function stubAuthenticatedSupabase(
     }
 
     let rows = currentData[table as keyof DashboardMockData] ?? [];
+    // Apply the editor's server-side filters before the simulated API row cap.
+    if (table === "three_good_things" && url.searchParams.get("date")?.startsWith("in.(")) {
+      expect(url.searchParams.get("user_id")).toBe(`eq.${currentUser?.id}`);
+      const dates = url.searchParams.get("date")!.slice(4, -1).split(",");
+      expect(dates.length).toBeGreaterThanOrEqual(14);
+      expect(dates.length).toBeLessThanOrEqual(15);
+      rows = rows.filter(value => {
+        const row = value as { date: string; user_id?: string };
+        return (!row.user_id || row.user_id === currentUser?.id) && dates.includes(row.date);
+      });
+    }
     // Evaluate monthly history filters locally; never forward mock requests.
-    if (table === "three_good_things" && url.searchParams.has("date")) {
+    if (table === "three_good_things" && url.searchParams.has("date") && !url.searchParams.get("date")?.startsWith("in.(")) {
       const filters = url.searchParams.getAll("date");
       expect(url.searchParams.get("user_id")).toBe(`eq.${currentUser?.id}`);
       expect(url.searchParams.get("select")).toBe("date,things1,things2,things3");
@@ -260,6 +271,8 @@ export async function stubAuthenticatedSupabase(
         });
       }).sort((a, b) => (b as { date: string }).date.localeCompare((a as { date: string }).date));
     }
+
+    if (table === "three_good_things") rows = rows.slice(0, 1000);
 
     await route.fulfill({
       status: 200,

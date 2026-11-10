@@ -80,7 +80,8 @@ const supabaseMocks = vi.hoisted(() => {
   const selectEq = vi.fn<
     (column: string, value: string) => Promise<SelectResult>
   >();
-  const select = vi.fn<(columns: string) => { eq: typeof selectEq }>();
+  const selectIn = vi.fn<(column: string, values: string[]) => { eq: typeof selectEq }>();
+  const select = vi.fn<(columns: string) => { in: typeof selectIn }>();
   const upsert = vi.fn<
     (values: UpsertValues, options: UpsertOptions) => Promise<MutationResult>
   >();
@@ -113,6 +114,7 @@ const supabaseMocks = vi.hoisted(() => {
     onAuthStateChange,
     unsubscribe,
     select,
+    selectIn,
     selectEq,
     upsert,
   };
@@ -179,6 +181,7 @@ function configureSupabaseMock({
   supabaseMocks.from.mockReset();
   supabaseMocks.select.mockReset();
   supabaseMocks.selectEq.mockReset();
+  supabaseMocks.selectIn.mockReset();
   supabaseMocks.upsert.mockReset();
   supabaseMocks.deleteRecord.mockReset();
   supabaseMocks.deleteUserEq.mockReset();
@@ -206,7 +209,8 @@ function configureSupabaseMock({
     select: supabaseMocks.select,
     upsert: supabaseMocks.upsert,
   });
-  supabaseMocks.select.mockReturnValue({ eq: supabaseMocks.selectEq });
+  supabaseMocks.select.mockReturnValue({ in: supabaseMocks.selectIn });
+  supabaseMocks.selectIn.mockReturnValue({ eq: supabaseMocks.selectEq });
   supabaseMocks.selectEq.mockResolvedValue(selectResult);
   supabaseMocks.upsert.mockImplementation(async () => {
     if (upsertException) {
@@ -1233,6 +1237,41 @@ describe("対象日と非同期処理", () => {
     vi.setSystemTime(new Date(2026, 9, 22, 23, 59));
   });
   afterEach(() => vi.useRealTimers());
+
+  it("初回は本人の直近14日だけをサーバー側で取得する", async () => {
+    await renderLoadedCard();
+    expect(supabaseMocks.selectIn).toHaveBeenCalledExactlyOnceWith("date", [
+      "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12", "2026-10-13",
+      "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-17", "2026-10-18",
+      "2026-10-19", "2026-10-20", "2026-10-21", previous,
+    ]);
+    expect(supabaseMocks.selectEq).toHaveBeenCalledWith("user_id", USER_ID);
+  });
+
+  it("14日を超えて開いたままの再試行も元の入力対象日と下書きを維持する", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    supabaseMocks.selectEq.mockResolvedValueOnce({ data: null, error: { message: "failed" } });
+    await renderLoadedCard();
+    edit("元の日付の下書き");
+    const draft = localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID));
+    vi.setSystemTime(new Date(2026, 10, 11, 0, 5));
+    act(() => window.dispatchEvent(new Event("focus")));
+    supabaseMocks.selectEq.mockResolvedValue(createSelectResult([
+      { date: previous, things1: "元の日付の保存済み", things2: "", things3: "" },
+    ]));
+    fireEvent.click(screen.getByRole("button", { name: "3つのよかったことを再読み込み" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    const dates = supabaseMocks.selectIn.mock.lastCall![1];
+    expect(dates).toEqual([
+      "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02",
+      "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07",
+      "2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", previous,
+    ]);
+    expect(firstInput()).toHaveValue("元の日付の下書き");
+    expect(screen.getByText(`入力対象日：${previous}`)).toBeVisible();
+    expect(localStorage.getItem(getThreeGoodThingsDraftKey(USER_ID))).toBe(draft);
+    expect(screen.getByRole("status", { name: "保存状態" })).toHaveTextContent("未保存の変更があります");
+  });
 
   it("初期対象日と保存先はローカル日付で一致する", async () => {
     await renderLoadedCard();
