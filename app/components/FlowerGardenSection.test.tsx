@@ -51,17 +51,18 @@ const renderGarden = (overrides: Partial<ComponentProps<typeof FlowerGardenSecti
 };
 
 describe("FlowerGardenSection", () => {
-  it("散歩ボタンに高コントラストの文字色を使用する", () => {
+  it("水やりボタンに高コントラストの文字色を使用する", () => {
     renderGarden();
 
     expect(
-      screen.getByRole("button", { name: "今日もお散歩した！ 💧" }),
+      screen.getByRole("button", { name: "水をあげる 💧" }),
     ).toHaveClass("text-green-700");
   });
   it("初期成長状態を案内とともに表示する", () => {
     renderGarden();
-    expect(screen.getByRole("img", { name: "花の成長状態: 種を植えました。お散歩して育てよう！" })).toHaveTextContent("🌰");
-    expect(screen.getByText("種を植えました。お散歩して育てよう！")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("img", { name: "花の成長状態: 種を植えました。水をあげて育てよう！" })).toHaveTextContent("🌰");
+    expect(screen.getByText("種を植えました。水をあげて育てよう！")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByText("水をあげると育ちます。途中の成長は保存されず、満開になった花だけが記録されます。")).toBeVisible();
   });
 
   it("中間の成長状態を表示する", () => {
@@ -98,7 +99,7 @@ describe("FlowerGardenSection", () => {
   it("有効な操作ボタンを押すとhandleWalkを1回呼ぶ", () => {
     const handleWalk = vi.fn();
     renderGarden({ handleWalk });
-    fireEvent.click(screen.getByRole("button", { name: "今日もお散歩した！ 💧" }));
+    fireEvent.click(screen.getByRole("button", { name: "水をあげる 💧" }));
     expect(handleWalk).toHaveBeenCalledTimes(1);
   });
 

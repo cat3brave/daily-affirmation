@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 const flowerStages = ["🌰", "🌱", "🌿", "🌷", "🌸"];
 const growthMessages = [
-  "種を植えました。お散歩して育てよう！",
+  "種を植えました。水をあげて育てよう！",
   "芽が出ました！その調子！",
   "葉っぱが育っています。いいペースですね！",
   "つぼみがつきました！あともう少し！",
@@ -61,9 +61,12 @@ export default function FlowerGardenSection({
       </motion.div>
       <p
         aria-live="polite"
-        className="text-sky-800/80 text-sm font-medium mb-6 text-center h-5"
+        className="text-sky-800/80 text-sm font-medium mb-4 text-center min-h-5 leading-relaxed"
       >
         {growthMessages[growth]}
+      </p>
+      <p className="mb-6 w-full text-center text-sm leading-relaxed text-sky-800/80">
+        水をあげると育ちます。途中の成長は保存されず、満開になった花だけが記録されます。
       </p>
       {flowerError && (
         <p
@@ -96,7 +99,7 @@ export default function FlowerGardenSection({
           ? "お花を記録中... 🌸"
           : growth >= flowerStages.length - 1
             ? "新しい種を植える 🌱"
-            : "今日もお散歩した！ 💧"}
+            : "水をあげる 💧"}
       </motion.button>
     </div>
   );

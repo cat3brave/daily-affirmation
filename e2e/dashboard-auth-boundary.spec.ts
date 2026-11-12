@@ -23,12 +23,12 @@ test("mock account change hides old personal data and ignores an old deletion fa
   });
   await page.getByRole("button", { name: "「削除待ちのA」を削除", exact: true }).click();
   await deleteStarted;
-  await page.getByRole("button", { name: "今日もお散歩した！ 💧", exact: true }).click();
+  await page.getByRole("button", { name: "水をあげる 💧", exact: true }).click();
   await expect(page.getByRole("img", { name: "花の成長状態: 芽が出ました！その調子！" })).toBeVisible();
   await mock.changeAuthUser("user-B", { favorite_affirmations: [{ text: "Bだけのお気に入り" }] });
   await expect(page.getByText("Bだけのお気に入り", { exact: true })).toBeVisible();
   await expect(page.getByText("Aだけのお気に入り", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("img", { name: "花の成長状態: 種を植えました。お散歩して育てよう！" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "花の成長状態: 種を植えました。水をあげて育てよう！" })).toBeVisible();
   const oldResponse = page.waitForResponse((response) => response.request().method() === "DELETE");
   release(); await oldResponse;
   // Complete a current-owner operation after the old response, ensuring the
