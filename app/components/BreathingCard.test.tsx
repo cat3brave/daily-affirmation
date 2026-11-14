@@ -109,7 +109,7 @@ describe("BreathingCard", () => {
     render(<BreathingCard />);
 
     startBreathing();
-    await advanceTimers(2000);
+    await advanceTimers(21000);
     const stopButton = screen.getByRole("button", { name: "ストップ" });
     expect(stopButton).toHaveAttribute("type", "button");
     fireEvent.click(stopButton);
@@ -125,18 +125,52 @@ describe("BreathingCard", () => {
     expect(
       screen.queryByText("お疲れ様でした。少し心は落ち着きましたか？"),
     ).not.toBeInTheDocument();
+
+    startBreathing();
+    expect(screen.getByText("1 / 3回目")).toBeInTheDocument();
+    expect(screen.getByText("4", { exact: true })).toBeInTheDocument();
+    await advanceTimers(3000);
+    expect(screen.getByRole("status")).toHaveTextContent("鼻から深く吸って...");
+    expect(screen.getByText("1", { exact: true })).toBeInTheDocument();
+    await advanceTimers(1000);
+    expect(screen.getByRole("status")).toHaveTextContent("そのまま止めて...");
   });
 
-  it("完了後にもう一度おこなうで初期状態へ戻る", async () => {
+  it("案内だけをpoliteなライブ領域で通知し、秒数は含めない", async () => {
+    render(<BreathingCard />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    startBreathing();
+    expect(status).toHaveTextContent(/^鼻から深く吸って\.\.\.$/);
+    expect(status).not.toContainElement(screen.getByText("4", { exact: true }));
+    await advanceTimers(1000);
+    expect(status).toHaveTextContent(/^鼻から深く吸って\.\.\.$/);
+  });
+
+  it("完了後にもう一度おこなうを1回押すと1回目の吸う4秒から始まる", async () => {
     render(<BreathingCard />);
 
     startBreathing();
     await advanceTimers(48000);
     fireEvent.click(screen.getByRole("button", { name: "もう一度おこなう" }));
 
-    expect(screen.getByText("準備ができたらスタート")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "深呼吸をはじめる" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("鼻から深く吸って...");
+    expect(screen.getByText("1 / 3回目")).toBeInTheDocument();
+    expect(screen.getByText("4", { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ストップ" })).toBeInTheDocument();
+
+    await advanceTimers(3000);
+    expect(screen.getByRole("status")).toHaveTextContent("鼻から深く吸って...");
+    expect(screen.getByText("1", { exact: true })).toBeInTheDocument();
+    await advanceTimers(1000);
+    expect(screen.getByRole("status")).toHaveTextContent("そのまま止めて...");
+    expect(screen.getByText("4", { exact: true })).toBeInTheDocument();
+    await advanceTimers(4000);
+    expect(screen.getByRole("status")).toHaveTextContent("口からゆっくり吐いて...");
+    expect(screen.getByText("8", { exact: true })).toBeInTheDocument();
+    await advanceTimers(8000);
+    expect(screen.getByText("2 / 3回目")).toBeInTheDocument();
+    await advanceTimers(32000);
+    expect(screen.getByRole("button", { name: "もう一度おこなう" })).toBeInTheDocument();
   });
 });

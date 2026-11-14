@@ -49,6 +49,12 @@ export default function BreathingCard() {
     return () => clearTimeout(timer);
   }, [phase, timeLeft, cycleCount]);
 
+  const startBreathing = () => {
+    setCycleCount(0);
+    setPhase("inhale");
+    setTimeLeft(4);
+  };
+
   const circleVariants: Variants = {
     idle: { scale: 1, backgroundColor: "#e0f2fe", transition: { duration: 1 } },
     inhale: {
@@ -122,11 +128,7 @@ export default function BreathingCard() {
       {phase === "idle" ? (
         <button
           type="button"
-          onClick={() => {
-            setCycleCount(0);
-            setPhase("inhale");
-            setTimeLeft(4); // 🔴 ボタンを押した時に最初の4秒をセットする
-          }}
+          onClick={startBreathing}
           className="bg-sky-700 hover:bg-sky-800 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm"
         >
           深呼吸をはじめる
@@ -134,10 +136,7 @@ export default function BreathingCard() {
       ) : phase === "completed" ? (
         <button
           type="button"
-          onClick={() => {
-            setCycleCount(0);
-            setPhase("idle");
-          }}
+          onClick={startBreathing}
           className="bg-green-400 hover:bg-green-500 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm text-sm"
         >
           もう一度おこなう
