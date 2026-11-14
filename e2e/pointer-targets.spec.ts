@@ -106,3 +106,58 @@ for (const viewport of viewports) {
     expectSafeAuthenticatedRequests(supabaseMock);
   });
 }
+
+for (const width of [320, 1280]) {
+  test(`${width}px・文字サイズ200%でも長いお気に入りの全文と削除操作がカード内に収まる`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    const favorites = [
+      "焦らなくても大丈夫。あなたの歩幅で進んでいることに意味があります。".repeat(3),
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".repeat(5),
+    ];
+    const mock = await loginToDashboard(page, {
+      favorite_affirmations: favorites.map((text) => ({ text })),
+    });
+    await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+
+    for (const favorite of favorites) {
+      const text = page.getByText(favorite, { exact: true });
+      const remove = page.getByRole("button", { name: `「${favorite}」を削除`, exact: true });
+      await expect(text).toHaveCSS("font-size", "28px");
+      await expect(text).toHaveText(favorite);
+      const layout = await text.evaluate((element) => {
+        const card = element.closest("li")!;
+        const button = card.querySelector("button")!;
+        const c = card.getBoundingClientRect();
+        const t = element.getBoundingClientRect();
+        const b = button.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return {
+          cardInside: c.left >= 0 && c.right <= innerWidth && card.scrollWidth <= card.clientWidth,
+          textInside: t.left >= c.left && t.right <= c.right && element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight,
+          allLinesInside: Array.from(range.getClientRects()).every(r => r.left >= t.left - 1 && r.right <= t.right + 1 && r.bottom <= t.bottom + 1),
+          buttonInside: b.left >= c.left && b.right <= c.right && b.bottom <= c.bottom,
+          separate: b.top >= t.bottom || b.left >= t.right,
+          below: b.top >= t.bottom,
+          targetWidth: b.width,
+          targetHeight: b.height,
+        };
+      });
+      expect(layout).toMatchObject({ cardInside: true, textInside: true, allLinesInside: true, buttonInside: true, separate: true });
+      if (width === 320) expect(layout.below).toBe(true);
+      expect(layout.targetWidth).toBeGreaterThanOrEqual(44);
+      expect(layout.targetHeight).toBeGreaterThanOrEqual(44);
+
+      await remove.focus();
+      await page.keyboard.press("Tab");
+      await page.keyboard.press("Shift+Tab");
+      await expect(remove).toBeFocused();
+      await expect(remove).toHaveCSS("outline-style", "solid");
+      await expect(remove).toHaveCSS("outline-width", "3px");
+      expect(await remove.evaluate(el => el.matches(":focus-visible"))).toBe(true);
+    }
+    const list = page.getByText(favorites[0], { exact: true }).locator("../..");
+    await list.screenshot({ path: `/tmp/favorite-after-${width}.png` });
+    expectSafeAuthenticatedRequests(mock);
+  });
+}
