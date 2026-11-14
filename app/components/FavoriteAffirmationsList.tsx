@@ -47,15 +47,15 @@ export default function FavoriteAffirmationsList({
           {favoriteAffirmations.map((affirmation, index) => (
             <li
               key={`${affirmation}-${index}`}
-              className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed flex items-start justify-between gap-3"
+              className="bg-white/80 border border-pink-100 rounded-2xl px-4 py-3 text-sm text-pink-700 leading-relaxed flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row"
             >
-              <span className="flex-1">{affirmation}</span>
+              <span className="min-w-0 w-full flex-1 [overflow-wrap:anywhere]">{affirmation}</span>
 
               <button
                 type="button"
                 aria-label={`「${affirmation}」を削除`}
                 onClick={() => handleRemoveFavoriteAffirmation(affirmation)}
-                className="inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center text-xs text-pink-400 hover:text-pink-600 font-bold"
+                className="inline-flex min-h-[44px] min-w-[44px] shrink-0 self-end items-center justify-center text-xs text-pink-400 hover:text-pink-600 font-bold sm:self-start"
               >
                 削除
               </button>
