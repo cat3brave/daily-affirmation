@@ -10,6 +10,7 @@ type MotionDivProps = ComponentProps<"div"> & {
 };
 
 vi.mock("framer-motion", () => ({
+  useReducedMotion: () => false,
   motion: {
     div: (props: MotionDivProps) => {
       const { animate, children, initial, transition, variants, ...divProps } =

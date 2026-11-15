@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 
+import { captureWork, expectWorkControl, expectWorkCopy } from "./workLayout";
+
 async function expectAboveNavigation(page: Page, target: Locator) {
   const box = await target.boundingBox();
   const navigation = await page.getByRole("tablist", { name: "ダッシュボード" }).boundingBox();
@@ -47,15 +49,21 @@ export async function checkGoodThingsEntry(page: Page, screenshots?: TestInfo) {
   }
   await page.keyboard.press("Tab");
   await expect(input).toBeFocused();
+  await expectWorkControl(page, input);
   await input.fill("小さな花を見つけた");
   await expect(page.getByLabel("2つ目のよかったこと")).toHaveValue("");
   await expect(page.getByLabel("3つ目のよかったこと")).toHaveValue("");
   const save = page.getByRole("button", { name: "記録する", exact: true });
   await save.evaluate(el => el.scrollIntoView({ block: "center", behavior: "instant" }));
   await expectAboveNavigation(page, save);
+  await expectWorkCopy(heading.locator(".."));
+  await expectWorkControl(page, save);
+  await captureWork(page, screenshots, "record-ready");
   await save.click();
   await expect(page.getByRole("status", { name: "保存状態" })).toHaveText("保存済み");
   await expect(save).toBeDisabled();
+  await expectWorkControl(page, page.getByRole("status", { name: "保存状態" }));
+  await captureWork(page, screenshots, "record-saved");
   expect(writes).toEqual([expect.objectContaining({ things1: "小さな花を見つけた", things2: "", things3: "", user_id: "e2e-user-id" })]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 

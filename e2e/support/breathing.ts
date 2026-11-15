@@ -1,7 +1,10 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 
-export async function checkBreathingRestart(page: Page) {
+import { captureWork, expectWorkControl, expectWorkCopy } from "./workLayout";
+
+export async function checkBreathingRestart(page: Page, info?: TestInfo) {
   await page.getByRole("tab", { name: /ワーク/ }).click();
+  await expect(page.getByRole("region", { name: "心を整えるワーク" })).toHaveCSS("opacity", "1");
   const card = page.getByText("🎈 4-4-8 深呼吸ナビ").locator("..");
   const status = card.getByRole("status");
   const now = Date.now();
@@ -40,12 +43,20 @@ export async function checkBreathingRestart(page: Page) {
   await page.keyboard.press("Tab");
   const start = card.getByRole("button", { name: "深呼吸をはじめる" });
   await expect(start).toBeFocused();
+  await expectWorkCopy(card);
+  await expectWorkControl(page, start);
+  await captureWork(page, info, "breathing-ready");
   await start.focus();
   await page.keyboard.press("Enter");
   await expect(status).toHaveAttribute("aria-live", "polite");
   await expect(status).toHaveText("鼻から深く吸って...");
   await expect(card.getByText("4", { exact: true })).toBeVisible();
   await expect(card.getByText("1 / 3回目")).toBeVisible();
+  if (reduced) {
+    await expect.poll(() => card.locator(".absolute").evaluate(el =>
+      new DOMMatrixReadOnly(getComputedStyle(el).transform).a
+    )).toBe(1);
+  }
 
   // Let React commit each countdown update before advancing the next second.
   async function countdown(seconds: number) {
@@ -68,6 +79,9 @@ export async function checkBreathingRestart(page: Page) {
   }
   await expect(status).toHaveText("お疲れ様でした。少し心は落ち着きましたか？");
   const restart = card.getByRole("button", { name: "もう一度おこなう" });
+  await expectWorkCopy(card);
+  await expectWorkControl(page, restart);
+  await captureWork(page, info, "breathing-completed");
   await restart.focus();
   await page.keyboard.press("Enter");
   await expect(status).toHaveText("鼻から深く吸って...");

@@ -162,6 +162,7 @@ for (const width of [320, 1280]) {
       await page.setViewportSize({ width, height: 720 });
       await page.emulateMedia({ reducedMotion });
       await login(page);
+      await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
       await checkGoodThingsEntry(page, testInfo);
     });
   }
