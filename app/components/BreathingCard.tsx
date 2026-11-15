@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type Ref } from "react";
 import { motion, Variants } from "framer-motion";
 
-export default function BreathingCard() {
+export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
   const [phase, setPhase] = useState<
     "idle" | "inhale" | "hold" | "exhale" | "completed"
   >("idle");
@@ -89,7 +89,7 @@ export default function BreathingCard() {
 
   return (
     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-sky-50 w-full mb-6 flex flex-col items-center">
-      <h3 className="text-sky-800 font-bold mb-2">🎈 4-4-8 深呼吸ナビ</h3>
+      <h3 id="breathing-guide" ref={headingRef} tabIndex={-1} className="text-sky-800 font-bold mb-2 scroll-mt-6 scroll-mb-36 rounded focus:outline-2 focus:outline-sky-800 focus:outline-offset-4">🎈 4-4-8 深呼吸ナビ</h3>
       <p className="text-sky-600/80 text-xs text-center mb-8 h-8 whitespace-pre-wrap">
         {phase === "completed"
           ? "深呼吸のワークが完了しました🌿"

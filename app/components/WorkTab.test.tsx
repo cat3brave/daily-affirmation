@@ -36,7 +36,7 @@ vi.mock("./MaybeCloudCard", () => ({
   ),
 }));
 vi.mock("./SixtyScoreCard", () => ({ default: () => <article>60点で十分</article> }));
-vi.mock("./BreathingCard", () => ({ default: () => <article>深呼吸</article> }));
+vi.mock("./BreathingCard", () => ({ default: ({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) => <article><h3 id="breathing-guide" ref={headingRef} tabIndex={-1}>深呼吸</h3></article> }));
 vi.mock("./ThreeGoodThingsCard", () => ({ default: ({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) => <article><h3 ref={headingRef}>3つのよかったこと</h3></article> }));
 
 import WorkTab from "./WorkTab";
@@ -68,7 +68,27 @@ describe("WorkTab", () => {
 
     const section = screen.getByRole("region", { name: "心を整えるワーク" });
     expect(section).toBeInTheDocument();
-    expect(screen.getAllByRole("article")).toHaveLength(6);
+    expect(screen.getAllByRole("article").map(card => card.textContent)).toEqual([
+      "やさしい翻訳", "心の天秤", "かも雲雲を浮かべる", "60点で十分", "深呼吸", "3つのよかったこと",
+    ]);
+    expect(screen.getByRole("link", { name: "深呼吸ガイドへ" }).compareDocumentPosition(screen.getAllByRole("article")[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it.each([false, true])("深呼吸の見出しにフォーカスして移動する（動きを減らす: %s）", (reduced) => {
+    animation.reduced = reduced;
+    const scroll = vi.fn();
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    try {
+      render(<WorkTab handleFloatCloud={vi.fn()} />);
+      const entry = screen.getByRole("link", { name: "深呼吸ガイドへ" });
+      expect(entry).toHaveAttribute("href", "#breathing-guide");
+      fireEvent.click(entry);
+      expect(screen.getByRole("heading", { name: "深呼吸" })).toHaveFocus();
+      expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: "start", behavior: reduced ? "instant" : "smooth" });
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
   });
 
   it("MaybeCloudCardの操作結果をhandleFloatCloudへ渡す", () => {

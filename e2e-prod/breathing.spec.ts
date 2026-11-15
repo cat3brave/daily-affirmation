@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { checkBreathingRestart } from "../e2e/support/breathing";
 
+for (const width of [320, 1280]) {
 for (const reducedMotion of ["no-preference", "reduce"] as const) {
-  test(`本番ビルドの深呼吸を1操作で再開し停止できる (${reducedMotion})`, async ({ page }) => {
+  test(`本番ビルドの深呼吸を1操作で再開し停止できる (${width}px・${reducedMotion})`, async ({ page }) => {
     const externalRequests: string[] = [];
     await page.context().route("**/*", async (route) => {
       const url = new URL(route.request().url());
@@ -10,6 +11,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       externalRequests.push(url.origin);
       await route.abort();
     });
+    await page.setViewportSize({ width, height: 720 });
     await page.emulateMedia({ reducedMotion });
     await page.goto("/login");
     await page.getByLabel("メールアドレス").fill("e2e-user@example.com");
@@ -22,4 +24,5 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     expect(audit.ok()).toBe(true);
     expect((await audit.json()).unexpected).toEqual([]);
   });
+}
 }
