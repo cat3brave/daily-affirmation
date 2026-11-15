@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, type Ref } from "react";
-import { motion, Variants } from "framer-motion";
+import { motion, useReducedMotion, Variants } from "framer-motion";
 
 export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
+  const reduceMotion = useReducedMotion();
   const [phase, setPhase] = useState<
     "idle" | "inhale" | "hold" | "exhale" | "completed"
   >("idle");
@@ -79,6 +80,12 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
     },
   };
 
+  const displayVariants: Variants = reduceMotion
+    ? Object.fromEntries(Object.entries(circleVariants).map(([name, variant]) => [
+        name, { ...variant, scale: 1, transition: { duration: 0 } },
+      ]))
+    : circleVariants;
+
   const messages = {
     idle: "準備ができたらスタート",
     inhale: "鼻から深く吸って...",
@@ -88,20 +95,20 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-sky-50 w-full mb-6 flex flex-col items-center">
+    <div className="bg-white/80 backdrop-blur-sm px-4 py-6 sm:p-6 rounded-[2rem] shadow-sm border border-sky-50 w-full mb-6 flex flex-col items-center">
       <h3 id="breathing-guide" ref={headingRef} tabIndex={-1} className="text-sky-800 font-bold mb-2 scroll-mt-6 scroll-mb-36 rounded focus:outline-2 focus:outline-sky-800 focus:outline-offset-4">🎈 4-4-8 深呼吸ナビ</h3>
-      <p className="text-sky-600/80 text-xs text-center mb-8 h-8 whitespace-pre-wrap">
+      <p className="text-sky-600/80 text-xs text-center mb-8 whitespace-pre-wrap">
         {phase === "completed"
           ? "深呼吸のワークが完了しました🌿"
           : "心を落ち着かせる深呼吸を、\n一緒に3回行いましょう。"}
       </p>
 
-      <div className="relative w-32 h-32 flex items-center justify-center mb-8">
+      <div className="relative w-full max-w-32 aspect-square shrink-0 flex items-center justify-center mb-8">
         <motion.div
-          variants={circleVariants}
+          variants={displayVariants}
           initial="idle"
           animate={phase}
-          className="absolute w-20 h-20 rounded-full opacity-60"
+          className="absolute w-[55%] aspect-square rounded-full opacity-60"
         />
         <div className="z-10 text-sky-800 font-bold flex flex-col items-center">
           {phase === "idle" || phase === "completed" ? (
@@ -120,7 +127,7 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
       <p
         role="status"
         aria-live="polite"
-        className="text-sky-700 font-bold mb-6 h-6 text-center text-sm"
+        className="text-sky-700 font-bold mb-6 text-center text-sm"
       >
         {messages[phase]}
       </p>
@@ -129,7 +136,7 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
         <button
           type="button"
           onClick={startBreathing}
-          className="bg-sky-700 hover:bg-sky-800 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm"
+          className="bg-sky-700 hover:bg-sky-800 text-white max-w-full scroll-mb-36 px-4 py-2 rounded-full font-bold transition-colors shadow-sm"
         >
           深呼吸をはじめる
         </button>
@@ -137,7 +144,7 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
         <button
           type="button"
           onClick={startBreathing}
-          className="bg-green-400 hover:bg-green-500 text-white px-6 py-2 rounded-full font-bold transition-colors shadow-sm text-sm"
+          className="bg-green-400 hover:bg-green-500 text-white max-w-full scroll-mb-36 px-4 py-2 rounded-full font-bold transition-colors shadow-sm text-sm"
         >
           もう一度おこなう
         </button>
@@ -148,7 +155,7 @@ export default function BreathingCard({ headingRef }: { headingRef?: Ref<HTMLHea
             setPhase("idle");
             setCycleCount(0);
           }}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-500 px-6 py-2 rounded-full font-bold transition-colors text-sm"
+          className="bg-gray-100 hover:bg-gray-200 text-gray-500 max-w-full scroll-mb-36 px-4 py-2 rounded-full font-bold transition-colors text-sm"
         >
           ストップ
         </button>

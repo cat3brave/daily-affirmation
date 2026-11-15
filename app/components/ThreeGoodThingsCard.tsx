@@ -590,7 +590,7 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
     : "対象日の記録はまだありません";
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
+    <div className="bg-white/80 backdrop-blur-sm px-4 py-6 sm:p-6 rounded-[2rem] shadow-sm border border-pink-50 w-full mb-24 flex flex-col items-center">
       <h3 ref={headingRef} tabIndex={-1} className="text-pink-700 font-bold mb-2 scroll-mt-6 scroll-mb-36 rounded focus:outline-2 focus:outline-violet-700 focus:outline-offset-4">🌷 3つのよかったこと</h3>
       <p className="text-pink-600/80 text-xs text-center mb-6">
         今日あった、どんなに小さなことでも大丈夫。
@@ -630,18 +630,18 @@ export default function ThreeGoodThingsCard({ headingRef }: { headingRef?: Ref<H
               onChange={(e) => handleChange(index, e.target.value)}
               disabled={isLoadingRecords || isMutating || !userId}
               placeholder={`（例：${["美味しいコーヒーを飲んだ", "天気が良くて気持ちよかった", "ゆっくり休めた"][index]}）`}
-              className="w-full min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
+              className="min-w-0 flex-1 w-full scroll-mb-36 min-h-16 [field-sizing:content] bg-pink-50/50 border border-pink-100 rounded-xl p-3 text-sm text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-200 resize-none"
             />
           </div>
         ))}
       </div>
 
-      <div className="relative w-full flex justify-center h-10 mb-4">
+      <div className="relative w-full flex justify-center min-h-10 mb-4">
         <button
           type="button"
           onClick={handleSave}
           disabled={isMutating || isLoadingRecords || !userId || !hasThingToSave || unchangedRecord}
-          className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white px-8 py-2 rounded-full font-bold transition-colors shadow-sm"
+          className="bg-pink-700 hover:bg-pink-800 disabled:bg-pink-300 disabled:cursor-not-allowed text-white max-w-full scroll-mb-36 px-4 py-2 rounded-full font-bold transition-colors shadow-sm"
         >
           {isSaving ? "保存中..." : "記録する"}
         </button>
