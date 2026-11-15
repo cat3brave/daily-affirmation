@@ -52,6 +52,20 @@ afterEach(() => {
 });
 
 describe("BreathingCard", () => {
+  it("移動先の見出しにフォーカスしてもタイマーは始まらない", async () => {
+    const headingRef = { current: null as HTMLHeadingElement | null };
+    render(<BreathingCard headingRef={headingRef} />);
+    const heading = screen.getByRole("heading", { name: "🎈 4-4-8 深呼吸ナビ" });
+    expect(headingRef.current).toBe(heading);
+    expect(heading).toHaveAttribute("id", "breathing-guide");
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    heading.focus();
+    await advanceTimers(60000);
+    expect(heading).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("準備ができたらスタート");
+    expect(screen.queryByRole("button", { name: "ストップ" })).not.toBeInTheDocument();
+  });
+
   it("開始ボタンに高コントラストの背景色を使用する", () => {
     render(<BreathingCard />);
 

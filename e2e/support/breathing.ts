@@ -8,7 +8,38 @@ export async function checkBreathingRestart(page: Page) {
   await page.clock.install({ time: new Date(now) });
   await page.clock.pauseAt(new Date(now + 1000));
 
+  const entry = page.getByRole("link", { name: "深呼吸ガイドへ" });
+  const heading = card.getByRole("heading", { name: "🎈 4-4-8 深呼吸ナビ" });
+  await expect(entry).toHaveCount(1);
+  const reduced = await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
+  // Observe the real scroll call while preserving native browser scrolling.
+  await heading.evaluate(el => {
+    const scroll = el.scrollIntoView.bind(el);
+    el.scrollIntoView = options => {
+      el.setAttribute("data-scroll-behavior", typeof options === "object" ? options.behavior ?? "auto" : "auto");
+      scroll(options);
+    };
+  });
+  if (page.viewportSize()!.width === 320) {
+    await entry.focus();
+    await page.keyboard.press("Enter");
+  } else {
+    await entry.click();
+  }
+  await expect(heading).toBeFocused();
+  await expect(heading).toHaveAttribute("data-scroll-behavior", reduced ? "instant" : "smooth");
+  await expect.poll(async () => {
+    const box = await heading.boundingBox();
+    const nav = await page.getByRole("tablist", { name: "ダッシュボード" }).boundingBox();
+    return !!box && !!nav && box.y >= 0 && box.y + box.height < nav.y;
+  }).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.clock.runFor(60000);
+  await expect(status).toHaveText("準備ができたらスタート");
+  await expect(card.getByRole("button", { name: "ストップ" })).toHaveCount(0);
+  await page.keyboard.press("Tab");
   const start = card.getByRole("button", { name: "深呼吸をはじめる" });
+  await expect(start).toBeFocused();
   await start.focus();
   await page.keyboard.press("Enter");
   await expect(status).toHaveAttribute("aria-live", "polite");

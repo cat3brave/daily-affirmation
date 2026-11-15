@@ -13,6 +13,7 @@ type WorkTabProps = {
 };
 
 export default function WorkTab({ handleFloatCloud, onGoodThingsReady }: WorkTabProps) {
+  const breathingHeadingRef = useRef<HTMLHeadingElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const reduceMotion = useReducedMotion();
   const isPresent = useIsPresent();
@@ -37,12 +38,25 @@ export default function WorkTab({ handleFloatCloud, onGoodThingsReady }: WorkTab
       onAnimationComplete={notifyReady}
       className="w-full flex flex-col items-center mt-4"
     >
+      <a
+        href="#breathing-guide"
+        onClick={(event) => {
+          const heading = breathingHeadingRef.current;
+          if (!heading) return;
+          event.preventDefault();
+          heading.focus({ preventScroll: true });
+          heading.scrollIntoView({ block: "start", behavior: reduceMotion ? "instant" : "smooth" });
+        }}
+        className="self-start mb-6 px-4 py-3 rounded-full bg-sky-50 text-sky-800 font-bold underline underline-offset-4 hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-sky-800 focus-visible:outline-offset-4"
+      >
+        深呼吸ガイドへ
+      </a>
       {/* 5つのカードを並べるだけ！（順番もここで自由に入れ替えられます） */}
       <GentleTranslatorCard />
       <AndBalanceCard />
       <MaybeCloudCard handleFloatCloud={handleFloatCloud} />
       <SixtyScoreCard />
-      <BreathingCard />
+      <BreathingCard headingRef={breathingHeadingRef} />
       <ThreeGoodThingsCard headingRef={headingRef} />
     </motion.div>
   );
