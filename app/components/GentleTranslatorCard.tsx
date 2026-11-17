@@ -1,6 +1,6 @@
 import { useDashboardOperation } from "../hooks/dashboardAuth";
 import { useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { translateHarshVoice, type GenerationStatus } from "../actions";
 
 const MAX_HARSH_VOICE_LENGTH = 300;
@@ -79,7 +79,15 @@ export default function GentleTranslatorCard() {
         id="harsh-voice-input"
         aria-describedby="gentle-translator-guidance gentle-translator-character-count"
         value={harshVoice}
-        onChange={(e) => setHarshVoice(e.target.value)}
+        onChange={(e) => {
+          setHarshVoice(e.target.value);
+          setTranslatedVoice("");
+          setResultStatus(null);
+          if (errorStatus === "timed_out") {
+            setErrorStatus(null);
+            setTranslationError("");
+          }
+        }}
         maxLength={MAX_HARSH_VOICE_LENGTH}
         disabled={isTranslating}
         placeholder="例: 私って本当にダメな人間だ。いつも失敗ばかりして迷惑をかけている..."
@@ -95,52 +103,60 @@ export default function GentleTranslatorCard() {
       <button
         type="button"
         onClick={handleTranslate}
-        disabled={!harshVoice.trim() || isTranslating}
-        className="px-2 sm:px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
+        disabled={!harshVoice.trim()}
+        aria-disabled={isTranslating}
+        aria-describedby="gentle-translator-guidance"
+        className="px-2 sm:px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
       >
         {isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄"}
       </button>
-      <AnimatePresence mode="wait">
-        {translatedVoice && (
-          <motion.div
-            key="translation-result"
-            role="status"
-            aria-atomic="true"
-            initial={{ opacity: 0, y: 10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-blue-50 border border-blue-200 text-blue-800 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
-          >
-            <span className="font-bold text-blue-500 block mb-2 tracking-wide">
-              {resultStatus === "success" ? "🕊️ AIによる提案（見方の一例）" : "🕊️ 用意した言葉"}
-            </span>
-            {(resultStatus === "fallback" || resultStatus === "timed_out") && (
-              <p className="text-xs leading-relaxed mb-2">
-                AIの応答を取得できなかったため、用意した言葉を表示しています。
-              </p>
-            )}
-            <p>{translatedVoice}</p>
-          </motion.div>
-        )}
-        {translationError && (
-          <motion.div
-            key="translation-error"
-            role="alert"
-            initial={{ opacity: 0, y: 10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            className="bg-red-50 border border-red-200 text-red-700 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
-          >
-            <p>{translationError}</p>
-            {errorStatus === "auth_required" && (
-              <a
-                className="font-bold underline underline-offset-4"
-                href="/login"
-              >
-                ログイン画面へ
-              </a>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isTranslating && (
+        <p role="status" className="w-full text-center text-sm text-sky-800">
+          入力した文章を翻訳しています…
+        </p>
+      )}
+      {translationError && (
+        <motion.div
+          key="translation-error"
+          role="alert"
+          initial={{ opacity: 0, y: 10, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: "auto" }}
+          className="bg-red-50 border border-red-200 text-red-700 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose mb-3 w-full min-w-0 break-words shadow-sm"
+        >
+          <p>{translationError}</p>
+          {errorStatus === "auth_required" && (
+            <a
+              className="font-bold underline underline-offset-4"
+              href="/login"
+            >
+              ログイン画面へ
+            </a>
+          )}
+        </motion.div>
+      )}
+      {translatedVoice && (
+        <motion.div
+          key="translation-result"
+          role="status"
+          aria-atomic="true"
+          initial={{ opacity: 0, y: 10, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: "auto" }}
+          className="bg-blue-50 border border-blue-200 text-blue-800 px-1.5 sm:px-5 py-5 rounded-2xl text-sm leading-loose w-full min-w-0 break-words shadow-sm"
+        >
+          <span className="font-bold text-blue-500 block mb-2 tracking-wide">
+            {resultStatus === "success" ? "🕊️ AIによる提案（見方の一例）" : "🕊️ 用意した言葉"}
+          </span>
+          {resultStatus === "fallback" && (
+            <p className="text-xs leading-relaxed mb-2">
+              AIの応答を取得できなかったため、用意した言葉を表示しています。
+            </p>
+          )}
+          <p>{translatedVoice}</p>
+          {resultStatus === "fallback" && (
+            <p className="mt-2 text-xs leading-relaxed">入力はそのままです。もう一度翻訳できます。</p>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 }

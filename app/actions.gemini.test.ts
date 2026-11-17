@@ -15,7 +15,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 const payload = { candidates: [{ content: { parts: [{ text: "  優しい言葉  " }], role: "model" } }] };
-const timeoutMessage = "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。";
+const timeoutMessage = "AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。";
 const actions = [
   { name: "generateAffirmation", call: generateAffirmation, fallback: "自分に向ける言葉を、少し穏やかにしてもいいですね。" },
   { name: "translateHarshVoice", call: () => translateHarshVoice("private-input-secret"), fallback: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。" },

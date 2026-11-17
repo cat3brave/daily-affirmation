@@ -80,12 +80,12 @@ export async function checkAiSources(page: Page, info: TestInfo) {
   const cases = [
     { status: "success", text },
     { status: "fallback", text },
-    { status: "timed_out", text, message: "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。" },
+    { status: "timed_out", text, message: "AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。" },
     new Error("mock rejection"),
     { status: "auth_required", message: "ログイン状態を確認できませんでした。ログインし直してください。" },
-    { status: "rate_limited", message: "利用が集中しています。" },
-    { status: "usage_limited", reason: "daily_limit", retryAt: "2026-11-06T15:00:00Z", message: "本日の利用上限に達しました。" },
-    { status: "usage_unavailable", message: "利用状況を確認できませんでした。" },
+    { status: "rate_limited", message: "利用が集中しています。少し時間をおいてから、もう一度お試しください。" },
+    { status: "usage_limited", reason: "daily_limit", retryAt: "2026-11-06T15:00:00Z", message: "本日の利用上限に達しました。 再利用の目安：2026/11/07 00:00:00（日本時間）。目安の時刻を過ぎてから、もう一度お試しください。その後の利用状況によっては再び制限される場合があります。" },
+    { status: "usage_unavailable", message: "利用状況を確認できませんでした。時間をおいて再度お試しください。" },
     { status: "success", text },
   ];
   const translationText = "ひとつの出来事で、自分のすべてを決めなくてもよさそうですね。別の見方を少しずつ考えてみてもいいかもしれません。".repeat(2);
@@ -100,20 +100,30 @@ export async function checkAiSources(page: Page, info: TestInfo) {
   }
   const pauses = [pause(), pause()];
   const calls = await stubAiActionResults(page, [cases, translationCases].flatMap((results, kind) => results.map((value, index) => index === 1 ? pauses[kind].response : value)));
+  const input = page.getByLabel("優しい言葉に翻訳したい自分への厳しい声");
+  const originalInput = "一度間違えただけで全部だめだと思う";
   for (const [kind, results] of [["affirmation", cases], ["translation", translationCases]] as const) {
     if (kind === "translation") {
       await page.getByRole("tab", { name: "ワーク", exact: true }).click();
       await expect(page.getByText("入力された内容をもとに、自分を責めすぎない見方の一例を提案します。")).toBeVisible();
-      await page.getByLabel("優しい言葉に翻訳したい自分への厳しい声").fill("一度間違えただけで全部だめだと思う");
+      await input.fill(originalInput);
     }
     const button = page.getByRole("button", { name: kind === "affirmation" ? /言葉を受け取る|受け取り中/ : /優しい言葉に翻訳する|翻訳中/ });
+    await button.focus();
     for (const [index, result] of results.entries()) {
-      await button.click();
+      await expect(button).toBeFocused();
+      await page.keyboard.press(index === 1 ? "Space" : "Enter");
       if (index === 1) {
         const paused = pauses[kind === "affirmation" ? 0 : 1];
         await paused.started;
         try {
           await expect(button).toBeDisabled();
+          await expect(button).toBeFocused();
+          const pending = kind === "affirmation" ? "言葉を紡いでいます..." : "入力した文章を翻訳しています…";
+          await expect(page.getByRole("main").getByRole("status").filter({ hasText: pending })).toBeVisible();
+          await page.keyboard.press("Enter");
+          await page.keyboard.press("Space");
+          expect(calls()).toBe(kind === "affirmation" ? 2 : cases.length + 2);
           await expect(page.getByRole("main").getByText(/AIによる提案|AIの応答を取得できなかったため/)).toHaveCount(0);
           await expect(page.getByRole("main").getByText(text, { exact: true })).toHaveCount(0);
           await expect(page.getByRole("main").getByText(translationText, { exact: true })).toHaveCount(0);
@@ -122,13 +132,18 @@ export async function checkAiSources(page: Page, info: TestInfo) {
         }
       }
       await expect(button).toBeEnabled();
+      await expect(button).toBeFocused();
       const success = !(result instanceof Error) && result.status === "success";
       const preset = result instanceof Error || ["fallback", "timed_out"].includes(result.status);
       const main = page.getByRole("main");
       if (success || preset) {
-        const output = main.getByRole("status").filter({ hasText: success ? "AIによる提案（見方の一例）" : notice });
+        const output = main.getByRole("status").filter({ hasText: success ? "AIによる提案（見方の一例）" : "用意した言葉" });
         await expect(output).toBeVisible();
         await expect(main.getByText(success ? notice : /AIによる提案/)).toHaveCount(0);
+        if (result instanceof Error || result.status === "fallback") {
+          await expect(output).toContainText(notice);
+          await expect(output).toContainText(kind === "affirmation" ? "もう一度試せます。" : "入力はそのままです。もう一度翻訳できます。");
+        }
         if (!(result instanceof Error) && result.status === "timed_out") {
           await expect(main.getByRole("alert")).toHaveText(result.message!);
         } else {
@@ -151,13 +166,13 @@ export async function checkAiSources(page: Page, info: TestInfo) {
         }
         if (kind === "translation") {
           const rootSize = await page.locator("html").evaluate(el => parseFloat(getComputedStyle(el).fontSize));
-          const body = output.locator("p").last();
+          const body = output.getByText(result instanceof Error ? "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。" : result.text!, { exact: true });
           const metrics = await body.evaluate(el => ({ width: el.getBoundingClientRect().width, fontSize: parseFloat(getComputedStyle(el).fontSize) }));
           expect(metrics.fontSize).toBeCloseTo(14 * rootSize / 16);
           // Leave room for at least six full-width characters without reducing text size.
           expect(metrics.width / metrics.fontSize).toBeGreaterThanOrEqual(6);
-          if (preset) {
-            const guidance = output.locator("p").first();
+          if (result instanceof Error || result.status === "fallback") {
+            const guidance = output.getByText(notice, { exact: true });
             expect(await guidance.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeCloseTo(12 * rootSize / 16);
           }
         }
@@ -178,15 +193,32 @@ export async function checkAiSources(page: Page, info: TestInfo) {
       } else {
         await expect(main.getByRole("alert")).toContainText(result.message!);
         if (!(result instanceof Error) && result.status === "auth_required") {
-          await expect(main.getByRole("link", { name: "ログイン画面へ" })).toBeVisible();
+          const login = main.getByRole("link", { name: "ログイン画面へ" });
+          if (kind === "affirmation") await page.keyboard.press("Shift+Tab");
+          else await page.keyboard.press("Tab");
+          await expect(login).toBeFocused();
+          if (kind === "affirmation") await page.keyboard.press("Tab");
+          else await page.keyboard.press("Shift+Tab");
+          await expect(button).toBeFocused();
         }
         await expect(main.getByText(/AIによる提案|AIの応答を取得できなかったため/)).toHaveCount(0);
         await expect(main.getByText(text, { exact: true })).toHaveCount(0);
         await expect(main.getByText(translationText, { exact: true })).toHaveCount(0);
       }
       if (kind === "translation") {
-        await expect(page.getByLabel("優しい言葉に翻訳したい自分への厳しい声")).toHaveValue("一度間違えただけで全部だめだと思う");
+        await expect(input).toHaveValue(originalInput);
+        await expect(input).toBeEnabled();
       }
+    }
+    if (kind === "translation") {
+      await page.keyboard.press("Shift+Tab");
+      await expect(input).toBeFocused();
+      await page.keyboard.press("End");
+      await page.keyboard.insertText("。");
+      await expect(input).toHaveValue(`${originalInput}。`);
+      await expect(page.getByText(translationText, { exact: true })).toBeHidden();
+      await page.keyboard.press("Tab");
+      await expect(button).toBeFocused();
     }
   }
   expect(calls()).toBe(cases.length * 2);
