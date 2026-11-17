@@ -29,6 +29,19 @@ describe("RPC contract", () => {
     expect(mock.abortSignal.mock.calls[0][0].aborted).toBe(false);
   });
   it.each([
+    denied,
+    { ...denied, reason: "daily_limit", daily_remaining: 0, minute_remaining: 2 },
+    { ...denied, reason: "daily_and_minute_limit", daily_remaining: 0 },
+  ])("gives a retry time and next action for $reason", async (row) => {
+    const mock = setup({ data: [row], error: null });
+    await expect(reserveAiUsage(mock.client)).resolves.toMatchObject({
+      status: "usage_limited",
+      reason: row.reason,
+      retryAt: row.retry_at,
+      message: expect.stringContaining("再利用の目安：2026/10/18 09:01:00（日本時間）。目安の時刻を過ぎてから、もう一度お試しください。"),
+    });
+  });
+  it.each([
     null, [], [allowed, allowed], {}, [null], ["allowed"],
     [{ ...allowed, allowed: "true" }], [{ ...allowed, reason: "unknown" }],
     [{ ...allowed, daily_remaining: 20 }], [{ ...allowed, minute_remaining: 3 }],

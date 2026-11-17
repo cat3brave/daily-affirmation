@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-type MotionProps<Element extends "button" | "div" | "p"> =
+type MotionProps<Element extends "button" | "div"> =
   ComponentProps<Element> & {
     animate?: unknown;
     exit?: unknown;
@@ -13,7 +13,6 @@ type MotionProps<Element extends "button" | "div" | "p"> =
   };
 
 vi.mock("framer-motion", () => ({
-  AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
   motion: {
     button: ({
       children,
@@ -39,18 +38,7 @@ vi.mock("framer-motion", () => ({
       void transition;
       return <div {...props}>{children}</div>;
     },
-    p: ({
-      animate,
-      children,
-      exit,
-      initial,
-      ...props
-    }: MotionProps<"p">) => {
-      void animate;
-      void exit;
-      void initial;
-      return <p {...props}>{children}</p>;
-    },
+
   },
 }));
 
@@ -118,14 +106,15 @@ describe("AffirmationSection", () => {
     expect(handleClick).toHaveBeenCalledOnce();
   });
 
-  it("読み込み中は表示文言とボタン名が変わりボタンを無効にする", () => {
+  it("読み込み中はフォーカス可能なボタンからの再操作を受け付けない", () => {
+    const handleClick = vi.fn();
     render(
       <AffirmationSection resultStatus="success"
         isLoading
         rateLimitError=""
         authError=""
         text=""
-        handleClick={vi.fn()}
+        handleClick={handleClick}
         handleFavoriteAffirmation={vi.fn()}
         isFavoriteDisabled={false}
       />,
@@ -134,9 +123,12 @@ describe("AffirmationSection", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "言葉を紡いでいます...",
     );
-    expect(
-      screen.getByRole("button", { name: "受け取り中..." }),
-    ).toBeDisabled();
+    const button = screen.getByRole("button", { name: "受け取り中..." });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    button.focus();
+    expect(button).toHaveFocus();
+    fireEvent.click(button);
+    expect(handleClick).not.toHaveBeenCalled();
   });
 
   it("認証切れではalertとログインリンクを表示し生成結果として扱わない", () => {
@@ -269,10 +261,10 @@ describe("AffirmationSection", () => {
 it("時間切れ案内とフォールバックを別々のARIA通知で表示し、お気に入りと再操作を維持する", () => {
   const favorite = vi.fn();
   render(<AffirmationSection resultStatus="timed_out" isLoading={false} authError="" rateLimitError=""
-    timeoutError="応答に時間がかかっています。少し時間をおいて、もう一度お試しください。"
+    timeoutError="AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。"
     text="自分に向ける言葉を、少し穏やかにしてもいいですね。"
     handleClick={vi.fn()} handleFavoriteAffirmation={favorite} isFavoriteDisabled={false} />);
-  expect(screen.getByRole("alert")).toHaveTextContent("応答に時間がかかっています。");
+  expect(screen.getByRole("alert")).toHaveTextContent("AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。");
   expect(screen.getByRole("status")).toHaveTextContent("自分に向ける言葉を、少し穏やかにしてもいいですね。");
   expect(screen.getByRole("button", { name: "言葉を受け取る" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "お気に入りにする 🌷" }));
@@ -292,6 +284,7 @@ it.each(["success", "fallback", "timed_out"] as const)("%sの表示元を文章�
     handleClick={vi.fn()} handleFavoriteAffirmation={vi.fn()} isFavoriteDisabled={false} />);
   const result = screen.getByRole("status");
   expect(result).toHaveTextContent("同じ文章");
-  expect(result).toHaveTextContent(status === "success" ? "AIによる提案（見方の一例）" : "AIの応答を取得できなかったため、用意した言葉を表示しています。");
+  expect(result).toHaveTextContent(status === "success" ? "AIによる提案（見方の一例）" : "用意した言葉");
   expect(result).not.toHaveTextContent(status === "success" ? "用意した言葉" : "AIによる提案");
+  if (status === "fallback") expect(result).toHaveTextContent("もう一度試せます。");
 });

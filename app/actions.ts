@@ -16,7 +16,7 @@ export type GeminiActionResult =
 export type GenerationStatus = Extract<GeminiActionResult, { text: string }>["status"];
 
 const TIMEOUT_MESSAGE =
-  "応答に時間がかかっています。少し時間をおいて、もう一度お試しください。";
+  "AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。";
 const AUTH_REQUIRED_MESSAGE =
   "ログイン状態を確認できませんでした。ログインし直してください。";
 const INVALID_INPUT_MESSAGE = "入力内容を確認してください。";

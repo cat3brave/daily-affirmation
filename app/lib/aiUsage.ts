@@ -64,7 +64,7 @@ export async function reserveAiUsage(
     const reason = row.reason as AiUsageReason;
     const retryAt = row.retry_at!;
     const guidance = {
-      minute_limit: "短時間の利用上限に達しました。少し待ってから再度お試しください。",
+      minute_limit: "短時間の利用上限に達しました。",
       daily_limit: "本日の利用上限に達しました。",
       daily_and_minute_limit: "本日の利用上限と短時間の利用上限に達しました。",
     }[reason];
@@ -73,7 +73,7 @@ export async function reserveAiUsage(
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
     }).format(new Date(retryAt));
     return { status: "usage_limited", reason, retryAt,
-      message: `${guidance} 再利用の目安：${time}（日本時間）。その後の利用状況によっては再び制限される場合があります。` };
+      message: `${guidance} 再利用の目安：${time}（日本時間）。目安の時刻を過ぎてから、もう一度お試しください。その後の利用状況によっては再び制限される場合があります。` };
   } catch {
     return UNAVAILABLE;
   } finally {

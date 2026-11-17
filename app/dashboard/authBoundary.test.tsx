@@ -282,7 +282,7 @@ describe("dashboard authentication boundary (mock only)", () => {
     });
     expect(screen.getByTestId("ai")).toHaveTextContent("true");
     expect(screen.getByTestId("ai-source")).toHaveTextContent("none");
-    expect(screen.queryByText(/AIによる提案|AIの応答を取得できなかったため/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/AIによる提案|用意した言葉/)).not.toBeInTheDocument();
     expect(screen.getByTestId("ai")).not.toHaveTextContent(/old/);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText("old result")).not.toBeInTheDocument();
@@ -354,10 +354,11 @@ it.each(["success", "fallback", "timed_out"] as const)("認証切替で表示済
   fireEvent.change(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声"), { target: { value: "前の入力" } });
   await click("優しい言葉に翻訳する 🪄");
   expect(screen.getByTestId("ai-source")).toHaveTextContent(status);
-  expect(screen.getByText(status === "success" ? /AIによる提案/ : /AIの応答を取得できなかったため/)).toBeInTheDocument();
+  expect(screen.getByText(status === "success" ? /AIによる提案/ : /用意した言葉/, { selector: "span" })).toBeInTheDocument();
+  if (status === "timed_out") expect(screen.getByRole("alert")).toHaveTextContent("前の時間切れ案内");
   await change("B");
   expect(screen.getByTestId("ai-source")).toHaveTextContent("none");
   expect(screen.getByTestId("ai")).not.toHaveTextContent(/前の/);
-  expect(screen.queryByText(/前の利用者|前の時間切れ|AIによる提案|AIの応答を取得できなかったため/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/前の利用者|前の時間切れ|AIによる提案|用意した言葉/)).not.toBeInTheDocument();
   expect(screen.getByLabelText("優しい言葉に翻訳したい自分への厳しい声")).toHaveValue("");
 });
