@@ -4,7 +4,7 @@ Gemini APIの利用プランや制限、データ取扱いは変更される可�
 
 ## 応答時間の制限
 
-`generateAffirmation`と`translateHarshVoice`は、Gemini呼び出し開始からレスポンス本文・テキスト取得までを共通の15秒で制限します。入力検証、`auth.getUser()`による認証確認、APIキー確認、利用枠RPC確認の順序です。認証確認やServer Actionの通信全体が15秒以内に完了する保証ではありません。
+`generateAffirmation`と`translateHarshVoice`は、Gemini呼び出し開始からレスポンス本文・テキスト取得までを共通の15秒で制限します。翻訳では入力検証、`auth.getUser()`による認証確認、翻訳の無効化設定、APIキー確認、利用枠RPC確認の順です。認証確認やServer Actionの通信全体が15秒以内に完了する保証ではありません。
 
 採用SDKは`@google/genai` **2.31.0**（exact固定）。2026-10-25 JSTにnpmのstable/latest、
 配布パッケージの`engines`（Node >=20）、`dist/genai.d.ts`と`dist/node/index.mjs`を確認しました。
@@ -42,6 +42,12 @@ SDKのtext getterは混在応答で診断ログを出し得るため、候補の
 時間切れは`timed_out`として固定案内と既存フォールバックを表示し、入力を保持して再操作可能に戻します。自動再試行は行いません。Geminiの429は従来の`rate_limited`として扱います。利用者別の利用枠は共通の引数なし `reserve_ai_usage()` で確認し、上限は `usage_limited`、確認失敗は `usage_unavailable` として区別します。
 
 実SDKとモックfetchを組み合わせたfake timerテストで、fetch・本文待機中の中断、遅延応答の破棄、タイマー・リスナーの後始末を検証します。実Supabase・実Geminiには接続しません。
+
+## 優しい翻訳機を定型文に切り替える手順
+
+1. 対象デプロイのサーバー環境変数に `GEMINI_TRANSLATION_ENABLED=false` を設定し、再デプロイします。小文字の `false` に完全一致した場合に有効になります。`NEXT_PUBLIC_` は付けません。アファメーション生成は既存のAPIキー設定で動作します。
+2. 新デプロイにトラフィックが切り替わったことを確認します。隔離環境のテスト利用者でログインし、架空の有効な入力を翻訳して「用意した言葉」が表示されることを確認します。この翻訳は入力検証と本人認証の後に定型文を返し、Gemini送信と `reserve_ai_usage()` の呼び出しは各0回です。
+3. AI翻訳を復旧するには、`GEMINI_TRANSLATION_ENABLED` を削除するか `true` に設定して再デプロイします。APIキーが設定され、翻訳の利用枠がある隔離環境で「AIによる提案（見方の一例）」が表示されることを確認します。復旧確認に失敗した場合は `false` に戻して再デプロイします。
 
 ## SDK移行時の検証（2026-10-25 JST）
 

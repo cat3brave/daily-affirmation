@@ -122,6 +122,10 @@ export async function translateHarshVoice(
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 
+  if (process.env.GEMINI_TRANSLATION_ENABLED === "false") {
+    return { status: "fallback", text: TRANSLATE_FALLBACK };
+  }
+
   if (!process.env.GEMINI_API_KEY) return { status: "fallback", text: TRANSLATE_FALLBACK };
 
   const usage = await reserveAiUsage(context.supabase);
