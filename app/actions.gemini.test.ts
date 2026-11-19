@@ -24,6 +24,7 @@ let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("GEMINI_API_KEY", "private-api-key-secret");
+  vi.stubEnv("GEMINI_TRANSLATION_ENABLED", undefined);
   auth.retry.mockResolvedValue({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
   auth.rpc.mockImplementation(() => ({ abortSignal: () => ({ retry: auth.retry }) }));
   auth.getAuthenticatedContext.mockResolvedValue({ user: { id: "test-user" }, supabase: { rpc: auth.rpc } });
@@ -235,4 +236,43 @@ it.each(["", "   ", null, 42])("rejects invalid translation input %j before auth
   expect(auth.getAuthenticatedContext).not.toHaveBeenCalled();
   expect(fetchMock).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+describe("translation with GEMINI_TRANSLATION_ENABLED=false", () => {
+  beforeEach(() => vi.stubEnv("GEMINI_TRANSLATION_ENABLED", "false"));
+
+  it("keeps input validation and authentication ahead of the fallback", async () => {
+    expect((await translateHarshVoice(" ")).status).toBe("invalid_input");
+    expect(auth.getAuthenticatedContext).not.toHaveBeenCalled();
+
+    auth.getAuthenticatedContext.mockResolvedValueOnce(null);
+    expect((await translateHarshVoice("厳しい声")).status).toBe("auth_required");
+    expect(auth.getAuthenticatedContext).toHaveBeenCalledOnce();
+    expect(auth.rpc).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the prepared translation without reserving quota or calling Gemini", async () => {
+    expect(await translateHarshVoice("厳しい声")).toEqual({
+      status: "fallback",
+      text: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。",
+    });
+    expect(auth.getAuthenticatedContext).toHaveBeenCalledOnce();
+    expect(auth.rpc).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps affirmation generation active and can restore AI translation", async () => {
+    fetchMock.mockImplementation(async () => Response.json(payload));
+
+    expect(await generateAffirmation()).toEqual({ status: "success", text: "優しい言葉" });
+    expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+    expect(fetchMock).toHaveBeenCalledOnce();
+
+    vi.stubEnv("GEMINI_TRANSLATION_ENABLED", "true");
+    expect(await translateHarshVoice("厳しい声")).toEqual({ status: "success", text: "優しい言葉" });
+    expect(auth.rpc).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
