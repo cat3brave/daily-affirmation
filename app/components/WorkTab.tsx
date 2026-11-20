@@ -10,9 +10,10 @@ import ThreeGoodThingsCard from "./ThreeGoodThingsCard";
 type WorkTabProps = {
   onGoodThingsReady?: (heading: HTMLHeadingElement) => void;
   handleFloatCloud: (text: string) => void;
+  translationEnabled: boolean;
 };
 
-export default function WorkTab({ handleFloatCloud, onGoodThingsReady }: WorkTabProps) {
+export default function WorkTab({ handleFloatCloud, onGoodThingsReady, translationEnabled }: WorkTabProps) {
   const breathingHeadingRef = useRef<HTMLHeadingElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const reduceMotion = useReducedMotion();
@@ -52,7 +53,7 @@ export default function WorkTab({ handleFloatCloud, onGoodThingsReady }: WorkTab
         深呼吸ガイドへ
       </a>
       {/* 5つのカードを並べるだけ！（順番もここで自由に入れ替えられます） */}
-      <GentleTranslatorCard />
+      <GentleTranslatorCard translationEnabled={translationEnabled} />
       <AndBalanceCard />
       <MaybeCloudCard handleFloatCloud={handleFloatCloud} />
       <SixtyScoreCard />

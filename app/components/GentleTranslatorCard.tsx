@@ -5,7 +5,7 @@ import { translateHarshVoice, type GenerationStatus } from "../actions";
 
 const MAX_HARSH_VOICE_LENGTH = 300;
 
-export default function GentleTranslatorCard() {
+export default function GentleTranslatorCard({ translationEnabled }: { translationEnabled: boolean }) {
   const { capture } = useDashboardOperation();
   const [harshVoice, setHarshVoice] = useState("");
   const [translatedVoice, setTranslatedVoice] = useState("");
@@ -14,6 +14,7 @@ export default function GentleTranslatorCard() {
   const [translationError, setTranslationError] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const isTranslatingRef = useRef(false);
+  const showFallbackNotice = translationEnabled && resultStatus === "fallback";
 
   const handleTranslate = async () => {
     const current = capture();
@@ -64,16 +65,21 @@ export default function GentleTranslatorCard() {
         🗣️➡️🕊️ 優しい翻訳機
       </p>
       <p className="text-sky-700/60 text-xs mb-4 text-center leading-relaxed">
-        入力された内容をもとに、自分を責めすぎない見方の一例を提案します。
+        {translationEnabled
+          ? "入力された内容をもとに、自分を責めすぎない見方の一例を提案します。"
+          : "自分を責めすぎない見方の一例として、あらかじめ用意した言葉を表示します。"}
       </p>
       <p
         id="gentle-translator-guidance"
         className="w-full bg-sky-50/80 border border-sky-100 text-sky-700/70 text-xs leading-relaxed rounded-2xl px-2 sm:px-4 py-3 mb-4"
       >
-        入力した文章はGoogle Gemini APIへ送信されます。個人情報・連絡先・医療情報など、機微な情報は入力しないでください。
+        {translationEnabled
+          ? "入力した文章はGoogle Gemini APIへ送信されます。"
+          : "現在は定型文で運用しています。入力内容にかかわらず、表示する言葉は同じです。"}
+        個人情報・連絡先・医療情報など、機微な情報は入力しないでください。
       </p>
       <label htmlFor="harsh-voice-input" className="sr-only">
-        優しい言葉に翻訳したい自分への厳しい声
+        {translationEnabled ? "優しい言葉に翻訳したい自分への厳しい声" : "自分に向けた厳しい言葉"}
       </label>
       <textarea
         id="harsh-voice-input"
@@ -108,11 +114,13 @@ export default function GentleTranslatorCard() {
         aria-describedby="gentle-translator-guidance"
         className="px-2 sm:px-6 py-4 bg-sky-400 hover:bg-sky-500 disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-colors shadow-sm w-full mb-4 tracking-widest"
       >
-        {isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄"}
+        {translationEnabled
+          ? (isTranslating ? "翻訳中..." : "優しい言葉に翻訳する 🪄")
+          : (isTranslating ? "表示中..." : "用意した言葉を表示する")}
       </button>
       {isTranslating && (
         <p role="status" className="w-full text-center text-sm text-sky-800">
-          入力した文章を翻訳しています…
+          {translationEnabled ? "入力した文章を翻訳しています…" : "用意した言葉を表示しています…"}
         </p>
       )}
       {translationError && (
@@ -146,13 +154,13 @@ export default function GentleTranslatorCard() {
           <span className="font-bold text-blue-500 block mb-2 tracking-wide">
             {resultStatus === "success" ? "🕊️ AIによる提案（見方の一例）" : "🕊️ 用意した言葉"}
           </span>
-          {resultStatus === "fallback" && (
+          {showFallbackNotice && (
             <p className="text-xs leading-relaxed mb-2">
               AIの応答を取得できなかったため、用意した言葉を表示しています。
             </p>
           )}
           <p>{translatedVoice}</p>
-          {resultStatus === "fallback" && (
+          {showFallbackNotice && (
             <p className="mt-2 text-xs leading-relaxed">入力はそのままです。もう一度翻訳できます。</p>
           )}
         </motion.div>

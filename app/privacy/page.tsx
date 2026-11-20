@@ -37,7 +37,8 @@ export default function PrivacyPage() {
         <section className="mt-8" aria-labelledby="ai-data">
           <h2 id="ai-data" className="text-xl font-bold text-sky-900">Google Gemini APIへ送る内容</h2>
           <p className="mt-3 leading-7">
-            アファメーション生成にGemini APIを使用します。「優しい翻訳機」では、入力した文章を翻訳のためGemini APIへ送信します。
+            アファメーション生成にGemini APIを使用します。「優しい翻訳機」は、AIを使う運用時に、入力した文章を翻訳のためGemini APIへ送信します。
+            定型文で運用している間は、用意した言葉を表示します。
             個人情報、連絡先、医療情報などの機微な情報は翻訳欄へ入力しないでください。
           </p>
         </section>

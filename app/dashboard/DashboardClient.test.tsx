@@ -469,7 +469,7 @@ describe("DashboardPage", () => {
     const original = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = scroll;
     try {
-      render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+      render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
       fireEvent.click(screen.getByRole("button", { name: "よかったことを記録する" }));
       await screen.findByTestId("work-tab");
       expectTabPanelRelationships("work");
@@ -490,14 +490,14 @@ describe("DashboardPage", () => {
     }
   });
   it("サーバー認証済みユーザーを渡し、認証待ち表示を出さない", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(dashboardMocks.useAuthUser).toHaveBeenCalledWith({ id: "user-dashboard-1", email: "dashboard@example.com" });
     expect(screen.queryByText("ログイン情報を確認しています...")).not.toBeInTheDocument();
     expect(screen.getByTestId("dashboard-header")).toBeInTheDocument();
   });
 
   it("認証確認後はホームタブと成長記録を初期表示する", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     expectTabPanelRelationships("home");
     expect(screen.getByTestId("home-tab")).toBeInTheDocument();
@@ -523,7 +523,7 @@ describe("DashboardPage", () => {
   });
 
   it("ワークボタンでWorkTabへ切り替え成長記録を非表示にする", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     clickTab("ワーク");
 
@@ -538,7 +538,7 @@ describe("DashboardPage", () => {
   });
 
   it("お守りボタンでAmuletTabへ切り替える", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     clickTab("お守り");
 
@@ -549,7 +549,7 @@ describe("DashboardPage", () => {
   });
 
   it("ホームへ戻るとHomeTabと成長記録を再表示する", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     clickTab("ワーク");
     expect(screen.queryByTestId("home-tab")).not.toBeInTheDocument();
@@ -564,7 +564,7 @@ describe("DashboardPage", () => {
   it("現在の言葉をお気に入り保存処理へ渡す", async () => {
     const currentText = "保存される現在の言葉";
     configureDashboardMocks({ affirmationText: currentText });
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     fireEvent.click(screen.getByRole("button", { name: "save current affirmation" }));
 
@@ -575,32 +575,32 @@ describe("DashboardPage", () => {
   });
 
   it("ユーザーと言葉と登録状態からお気に入りdisabledを判定する", () => {
-    const { rerender } = render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    const { rerender } = render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(screen.getByTestId("favorite-disabled-state")).toHaveTextContent("false");
     expect(getLastHomeTabProps().isFavoriteDisabled).toBe(false);
 
     configureDashboardMocks({ userId: null });
-    rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    rerender(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(screen.queryByTestId("home-tab")).not.toBeInTheDocument();
 
     configureDashboardMocks({ affirmationText: "   " });
-    rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    rerender(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(screen.getByTestId("favorite-disabled-state")).toHaveTextContent("true");
     expect(getLastHomeTabProps().isFavoriteDisabled).toBe(true);
 
     configureDashboardMocks({ isFavoriteResult: true });
-    rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    rerender(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(screen.getByTestId("favorite-disabled-state")).toHaveTextContent("true");
     expect(getLastHomeTabProps().isFavoriteDisabled).toBe(true);
 
     configureDashboardMocks({ isFavoriteResult: false });
-    rerender(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    rerender(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
     expect(screen.getByTestId("favorite-disabled-state")).toHaveTextContent("false");
     expect(getLastHomeTabProps().isFavoriteDisabled).toBe(false);
   });
 
   it("HomeTabから失敗モーダルを開閉できる", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     expect(getLastTadaModalProps().showTada).toBe(false);
     expect(screen.getByTestId("tada-modal")).toHaveAttribute(
@@ -623,7 +623,7 @@ describe("DashboardPage", () => {
   });
 
   it("ヘッダー操作で鳥の目線表示を切り替える", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     expect(getLastDashboardHeaderProps().isBirdView).toBe(false);
     expect(getLastBirdViewPanelProps().isBirdView).toBe(false);
@@ -648,7 +648,7 @@ describe("DashboardPage", () => {
   });
 
   it("花とお気に入りの状態をHomeTabとBirdViewPanelへ渡す", () => {
-    render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+    render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
 
     expect(getLastHomeTabProps()).toMatchObject({
       isLoading: false,
@@ -689,6 +689,6 @@ it.each(["success", "fallback", "timed_out", null] as const)("表示元%sをHome
     resultStatus, text: "同じ文章", authError: "", rateLimitError: "", isLoading: false,
     handleGenerateAffirmation: dashboardMocks.handleGenerateAffirmation,
   });
-  render(<DashboardPage user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
+  render(<DashboardPage translationEnabled user={{ id: "user-dashboard-1", email: "dashboard@example.com" }} />);
   expect(getLastHomeTabProps().affirmationResultStatus).toBe(resultStatus);
 });

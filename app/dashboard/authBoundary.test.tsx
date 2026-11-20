@@ -63,7 +63,7 @@ function Owned({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
     <button onClick={() => favorites.handleRemoveFavoriteAffirmation("same")}>delete</button>
     <button onClick={garden.handleWalk}>walk</button>
     <button onClick={ai.handleGenerateAffirmation}>generate</button>
-    <DataExportButton /><LogoutButton userId={auth.userId!} /><GentleTranslatorCard /><ThreeGoodThingsCard /><BloomGraph userId={auth.userId!} refreshKey={0} />
+    <DataExportButton /><LogoutButton userId={auth.userId!} /><GentleTranslatorCard translationEnabled /><ThreeGoodThingsCard /><BloomGraph userId={auth.userId!} refreshKey={0} />
   </>;
 }
 function Boundary() {
