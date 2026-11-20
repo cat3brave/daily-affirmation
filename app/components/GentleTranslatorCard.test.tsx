@@ -83,8 +83,36 @@ afterEach(() => {
 });
 
 describe("GentleTranslatorCard", () => {
+  it("定型文運用では待機中と結果に定型文の案内を表示する", async () => {
+    const pending = createDeferred<GeminiActionResult>();
+    translatorMocks.translateHarshVoice.mockReturnValueOnce(pending.promise);
+    const { rerender } = render(<GentleTranslatorCard translationEnabled={false} />);
+    const textbox = screen.getByRole("textbox", { name: "自分に向けた厳しい言葉" });
+    expect(textbox).toHaveAccessibleDescription(/現在は定型文で運用しています/);
+    expect(screen.queryByText(/Google Gemini APIへ送信/)).not.toBeInTheDocument();
+
+    fireEvent.change(textbox, { target: { value: "少し失敗した" } });
+    fireEvent.click(screen.getByRole("button", { name: "用意した言葉を表示する" }));
+    expect(screen.getByRole("status")).toHaveTextContent("用意した言葉を表示しています…");
+
+    await act(async () => {
+      pending.resolve({ status: "fallback", text: FALLBACK_MESSAGE });
+      await pending.promise;
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("用意した言葉");
+    expect(screen.getByRole("status")).toHaveTextContent(FALLBACK_MESSAGE);
+    expect(screen.queryByText(/AIの応答を取得/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(textbox).toHaveValue("少し失敗した");
+    expect(translatorMocks.translateHarshVoice).toHaveBeenCalledExactlyOnceWith("少し失敗した");
+
+    rerender(<GentleTranslatorCard translationEnabled key="ai-enabled" />);
+    expect(getTextbox()).toHaveAccessibleDescription(/Google Gemini APIへ送信されます/);
+    expect(screen.getByRole("button", { name: /優しい言葉に翻訳する/ })).toBeVisible();
+  });
+
   it("textareaに案内と文字数を関連付け、翻訳操作をbuttonとして扱う", () => {
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     const textbox = getTextbox();
     const guidance = screen.getByText(/入力した文章はGoogle Gemini API/);
@@ -98,7 +126,7 @@ describe("GentleTranslatorCard", () => {
   });
 
   it("空文字・空白だけではボタンがdisabledで通信しない", () => {
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     expect(getTranslateButton()).toBeDisabled();
 
@@ -110,7 +138,7 @@ describe("GentleTranslatorCard", () => {
   });
 
   it("入力文字数とmaxLength=300を確認する", () => {
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     const textbox = getTextbox();
 
@@ -127,7 +155,7 @@ describe("GentleTranslatorCard", () => {
       status: "success",
       text: "少し距離を置いて見られていますね。",
     });
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "  私はだめだ  " } });
     fireEvent.click(getTranslateButton());
@@ -140,7 +168,7 @@ describe("GentleTranslatorCard", () => {
 
   it("翻訳中は処理を通知し、入力を無効にして以前の結果を消す", async () => {
     translatorMocks.translateHarshVoice.mockResolvedValueOnce({ status: "success", text: "前の翻訳です。" });
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "最初の声" } });
     fireEvent.click(getTranslateButton());
@@ -176,7 +204,7 @@ describe("GentleTranslatorCard", () => {
       status: "auth_required",
       message: "ログイン状態を確認できませんでした。ログインし直してください。",
     });
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "消さない入力" } });
     fireEvent.click(getTranslateButton());
@@ -200,7 +228,7 @@ describe("GentleTranslatorCard", () => {
           "利用が集中しています。少し時間をおいてから、もう一度お試しください。",
       })
       .mockResolvedValueOnce({ status: "success", text: "再試行できました。" });
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
     fireEvent.click(getTranslateButton());
@@ -220,7 +248,7 @@ describe("GentleTranslatorCard", () => {
     translatorMocks.translateHarshVoice
       .mockResolvedValueOnce({ status: "invalid_input", message: "入力内容を確認してください。" })
       .mockResolvedValueOnce({ status: "success", text: "新しい翻訳です。" });
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "一回目" } });
     fireEvent.click(getTranslateButton());
@@ -236,7 +264,7 @@ describe("GentleTranslatorCard", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const error = new Error("translate failed");
     translatorMocks.translateHarshVoice.mockRejectedValueOnce(error);
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     let clickError: unknown;
     try {
@@ -258,7 +286,7 @@ describe("GentleTranslatorCard", () => {
   it("同一タイミングの連続操作でもtranslateHarshVoiceを1回だけ呼ぶ", async () => {
     const translateDeferred = createDeferred<GeminiActionResult>();
     translatorMocks.translateHarshVoice.mockReturnValue(translateDeferred.promise);
-    render(<GentleTranslatorCard />);
+    render(<GentleTranslatorCard translationEnabled />);
 
     fireEvent.change(getTextbox(), { target: { value: "同時に押す声" } });
     fireEvent.click(getTranslateButton());
@@ -280,7 +308,7 @@ it("時間切れではalertと既存フォールバックを表示し入力を�
     status: "timed_out", message: "AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。",
     text: "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。",
   });
-  render(<GentleTranslatorCard />);
+  render(<GentleTranslatorCard translationEnabled />);
   fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
   fireEvent.click(getTranslateButton());
   expect(await screen.findByRole("alert")).toHaveTextContent("AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。");
@@ -307,7 +335,7 @@ it.each(["usage_limited", "usage_unavailable"] as const)("%s後も入力を保�
     ? { status, reason: "daily_limit", retryAt: "2026-10-18T15:00:00Z", message: "本日の利用上限。2026/10/19 00:00:00（日本時間）" }
     : { status, message: "利用状況を確認できませんでした。" };
   translatorMocks.translateHarshVoice.mockResolvedValueOnce(failure);
-  render(<GentleTranslatorCard />);
+  render(<GentleTranslatorCard translationEnabled />);
   fireEvent.change(getTextbox(), { target: { value: "保持する入力" } });
   fireEvent.click(getTranslateButton());
   expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
@@ -324,7 +352,7 @@ it.each(["success", "fallback", "timed_out"] as const)("%sの表示元を区別�
   translatorMocks.translateHarshVoice.mockResolvedValueOnce(
     status === "timed_out" ? { status, text: "同じ文章", message: "時間切れ案内" } : { status, text: "同じ文章" },
   );
-  render(<GentleTranslatorCard />);
+  render(<GentleTranslatorCard translationEnabled />);
   fireEvent.change(getTextbox(), { target: { value: "入力" } });
   fireEvent.click(getTranslateButton());
   const label = status === "success" ? "AIによる提案（見方の一例）" : "用意した言葉";

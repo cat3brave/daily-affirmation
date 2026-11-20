@@ -47,12 +47,12 @@ afterEach(cleanup);
 describe("WorkTab", () => {
   it("入場アニメーション完了後に見出しを通知し、退場中は通知しない", () => {
     const ready = vi.fn();
-    const { rerender } = render(<WorkTab handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
+    const { rerender } = render(<WorkTab translationEnabled handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
     expect(ready).not.toHaveBeenCalled();
     act(() => animation.complete?.());
     expect(ready).toHaveBeenCalledWith(screen.getByRole("heading", { name: "3つのよかったこと" }));
     animation.present = false;
-    rerender(<WorkTab handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
+    rerender(<WorkTab translationEnabled handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
     act(() => animation.complete?.());
     expect(ready).toHaveBeenCalledOnce();
   });
@@ -60,11 +60,11 @@ describe("WorkTab", () => {
   it("動きを減らす設定では描画後に見出しを通知する", () => {
     animation.reduced = true;
     const ready = vi.fn();
-    render(<WorkTab handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
+    render(<WorkTab translationEnabled handleFloatCloud={vi.fn()} onGoodThingsReady={ready} />);
     expect(ready).toHaveBeenCalledWith(screen.getByRole("heading", { name: "3つのよかったこと" }));
   });
   it("名前付きセクション内に6つのカードを表示する", () => {
-    render(<WorkTab handleFloatCloud={vi.fn()} />);
+    render(<WorkTab translationEnabled handleFloatCloud={vi.fn()} />);
 
     const section = screen.getByRole("region", { name: "心を整えるワーク" });
     expect(section).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("WorkTab", () => {
     const original = HTMLElement.prototype.scrollIntoView;
     HTMLElement.prototype.scrollIntoView = scroll;
     try {
-      render(<WorkTab handleFloatCloud={vi.fn()} />);
+      render(<WorkTab translationEnabled handleFloatCloud={vi.fn()} />);
       const entry = screen.getByRole("link", { name: "深呼吸ガイドへ" });
       expect(entry).toHaveAttribute("href", "#breathing-guide");
       fireEvent.click(entry);
@@ -93,7 +93,7 @@ describe("WorkTab", () => {
 
   it("MaybeCloudCardの操作結果をhandleFloatCloudへ渡す", () => {
     const handleFloatCloud = vi.fn();
-    render(<WorkTab handleFloatCloud={handleFloatCloud} />);
+    render(<WorkTab translationEnabled handleFloatCloud={handleFloatCloud} />);
 
     fireEvent.click(screen.getByRole("button", { name: "雲を浮かべる" }));
 

@@ -3,6 +3,7 @@
 import { generateGeminiText, GeminiTimeoutError } from "./lib/geminiRequest";
 import { reserveAiUsage, type AiUsageFailure } from "./lib/aiUsage";
 import { getAuthenticatedContext } from "./lib/supabaseServer";
+import { isGeminiTranslationEnabled } from "./lib/translationMode";
 
 export type GeminiActionResult =
   | AiUsageFailure
@@ -122,7 +123,7 @@ export async function translateHarshVoice(
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
   }
 
-  if (process.env.GEMINI_TRANSLATION_ENABLED === "false") {
+  if (!isGeminiTranslationEnabled()) {
     return { status: "fallback", text: TRANSLATE_FALLBACK };
   }
 

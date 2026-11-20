@@ -26,17 +26,23 @@ import FloatingCloudLayer from "../components/FloatingCloudLayer";
 import BirdViewPanel from "../components/BirdViewPanel";
 import DashboardHeader from "../components/DashboardHeader";
 
-export default function DashboardClient({ user }: { user: { id: string; email: string } }) {
+export default function DashboardClient({ user, translationEnabled }: {
+  user: { id: string; email: string };
+  translationEnabled: boolean;
+}) {
   const auth = useAuthUser(user);
   if (!auth.isAuthChecked || !auth.userId) {
     return <main><p role="status">ログイン情報を確認しています...</p></main>;
   }
   return <DashboardAuthContext.Provider value={auth}>
-    <OwnedDashboard key={`${auth.authGeneration}:${auth.userId}`} auth={auth} />
+    <OwnedDashboard key={`${auth.authGeneration}:${auth.userId}`} auth={auth} translationEnabled={translationEnabled} />
   </DashboardAuthContext.Provider>;
 }
 
-function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
+function OwnedDashboard({ auth, translationEnabled }: {
+  auth: ReturnType<typeof useAuthUser>;
+  translationEnabled: boolean;
+}) {
   const { supabase, userId, userEmail } = auth;
 
   const {
@@ -184,7 +190,11 @@ function OwnedDashboard({ auth }: { auth: ReturnType<typeof useAuthUser> }) {
                   )}
 
                   {id === "work" && currentTab === id && (
-                    <WorkTab handleFloatCloud={handleFloatCloud} onGoodThingsReady={handleGoodThingsReady} />
+                    <WorkTab
+                      handleFloatCloud={handleFloatCloud}
+                      onGoodThingsReady={handleGoodThingsReady}
+                      translationEnabled={translationEnabled}
+                    />
                   )}
 
                   {id === "amulet" && currentTab === id && (
