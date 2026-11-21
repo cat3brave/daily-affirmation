@@ -18,6 +18,7 @@ afterEach(cleanup);
 function renderHomeTab(setShowTada = vi.fn(), onRecordGoodThings = vi.fn()) {
   render(
     <HomeTab
+      affirmationEnabled
       onRecordGoodThings={onRecordGoodThings}
       isLoading={false}
       text=""

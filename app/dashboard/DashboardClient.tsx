@@ -26,8 +26,9 @@ import FloatingCloudLayer from "../components/FloatingCloudLayer";
 import BirdViewPanel from "../components/BirdViewPanel";
 import DashboardHeader from "../components/DashboardHeader";
 
-export default function DashboardClient({ user, translationEnabled }: {
+export default function DashboardClient({ user, affirmationEnabled, translationEnabled }: {
   user: { id: string; email: string };
+  affirmationEnabled: boolean;
   translationEnabled: boolean;
 }) {
   const auth = useAuthUser(user);
@@ -35,12 +36,18 @@ export default function DashboardClient({ user, translationEnabled }: {
     return <main><p role="status">ログイン情報を確認しています...</p></main>;
   }
   return <DashboardAuthContext.Provider value={auth}>
-    <OwnedDashboard key={`${auth.authGeneration}:${auth.userId}`} auth={auth} translationEnabled={translationEnabled} />
+    <OwnedDashboard
+      key={`${auth.authGeneration}:${auth.userId}`}
+      auth={auth}
+      affirmationEnabled={affirmationEnabled}
+      translationEnabled={translationEnabled}
+    />
   </DashboardAuthContext.Provider>;
 }
 
-function OwnedDashboard({ auth, translationEnabled }: {
+function OwnedDashboard({ auth, affirmationEnabled, translationEnabled }: {
   auth: ReturnType<typeof useAuthUser>;
+  affirmationEnabled: boolean;
   translationEnabled: boolean;
 }) {
   const { supabase, userId, userEmail } = auth;
@@ -158,6 +165,7 @@ function OwnedDashboard({ auth, translationEnabled }: {
                   {id === "home" && currentTab === id && (
                     <HomeTab
                       onRecordGoodThings={openGoodThings}
+                      affirmationEnabled={affirmationEnabled}
                       isLoading={isLoading}
                       text={text}
                       affirmationResultStatus={resultStatus}

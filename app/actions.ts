@@ -3,6 +3,7 @@
 import { generateGeminiText, GeminiTimeoutError } from "./lib/geminiRequest";
 import { reserveAiUsage, type AiUsageFailure } from "./lib/aiUsage";
 import { getAuthenticatedContext } from "./lib/supabaseServer";
+import { isGeminiAffirmationEnabled } from "./lib/affirmationMode";
 import { isGeminiTranslationEnabled } from "./lib/translationMode";
 
 export type GeminiActionResult =
@@ -15,6 +16,8 @@ export type GeminiActionResult =
   | { status: "rate_limited"; message: string };
 
 export type GenerationStatus = Extract<GeminiActionResult, { text: string }>["status"];
+export type AffirmationActionResult = GeminiActionResult | { status: "prepared"; text: string };
+export type AffirmationResultStatus = Extract<AffirmationActionResult, { text: string }>["status"];
 
 const TIMEOUT_MESSAGE =
   "AIの応答が時間切れになりました。少し時間をおいて、もう一度お試しください。";
@@ -24,6 +27,13 @@ const INVALID_INPUT_MESSAGE = "入力内容を確認してください。";
 const RATE_LIMITED_MESSAGE =
   "利用が集中しています。少し時間をおいてから、もう一度お試しください。";
 const AFFIRMATION_FALLBACK = "自分に向ける言葉を、少し穏やかにしてもいいですね。";
+const PREPARED_AFFIRMATIONS = [
+  "行けたらOK。そう思ってもいいですね。",
+  "自分の作業に目を向けてもいいですね。",
+  "気づくだけで十分なときもありますね。",
+  "ひとりで全部を背負わなくてもいいですね。",
+  "60点でOKと思ってもいいですね。",
+] as const;
 const TRANSLATE_FALLBACK =
   "ひとつの出来事だけで、自分のすべてを決めなくてもいいですね。";
 
@@ -58,10 +68,15 @@ function isGeminiRateLimitError(error: unknown): boolean {
 // -----------------------------------------------------------------
 // ① アファメーション生成機能
 // -----------------------------------------------------------------
-export async function generateAffirmation(): Promise<GeminiActionResult> {
+export async function generateAffirmation(): Promise<AffirmationActionResult> {
   const context = await getAuthenticatedContext();
   if (!context) {
     return { status: "auth_required", message: AUTH_REQUIRED_MESSAGE };
+  }
+
+  if (!isGeminiAffirmationEnabled()) {
+    const index = Math.floor(Math.random() * PREPARED_AFFIRMATIONS.length);
+    return { status: "prepared", text: PREPARED_AFFIRMATIONS[index] };
   }
 
   if (!process.env.GEMINI_API_KEY) return { status: "fallback", text: AFFIRMATION_FALLBACK };

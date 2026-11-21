@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GeminiActionResult } from "../actions";
+import type { AffirmationActionResult } from "../actions";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -8,7 +8,7 @@ type Deferred<T> = {
 };
 
 const affirmationMocks = vi.hoisted(() => {
-  const generateAffirmation = vi.fn<() => Promise<GeminiActionResult>>();
+  const generateAffirmation = vi.fn<() => Promise<AffirmationActionResult>>();
 
   return {
     generateAffirmation,
@@ -71,7 +71,7 @@ describe("useAffirmationGenerator", () => {
     });
     expect(result.current.text).toBe("前の言葉です");
 
-    const generateDeferred = createDeferred<GeminiActionResult>();
+    const generateDeferred = createDeferred<AffirmationActionResult>();
     affirmationMocks.generateAffirmation.mockReturnValueOnce(
       generateDeferred.promise,
     );
@@ -166,7 +166,7 @@ describe("useAffirmationGenerator", () => {
   });
 
   it("同一タイミングで連続実行してもgenerateAffirmationを1回だけ呼ぶ", async () => {
-    const generateDeferred = createDeferred<GeminiActionResult>();
+    const generateDeferred = createDeferred<AffirmationActionResult>();
     affirmationMocks.generateAffirmation.mockReturnValue(generateDeferred.promise);
     const { result } = renderHook(() => useAffirmationGenerator());
 
@@ -199,7 +199,7 @@ it("時間切れは案内とフォールバックを保持し、次の操作で�
   expect(result.current.authError).toBe("");
   expect(result.current.rateLimitError).toBe("");
   expect(result.current.isLoading).toBe(false);
-  const retry = createDeferred<GeminiActionResult>();
+  const retry = createDeferred<AffirmationActionResult>();
   affirmationMocks.generateAffirmation.mockReturnValueOnce(retry.promise);
   act(() => {
     void result.current.handleGenerateAffirmation();
@@ -216,7 +216,7 @@ it("時間切れは案内とフォールバックを保持し、次の操作で�
 });
 
 it.each(["usage_limited", "usage_unavailable"] as const)("%sを表示し次の成功で消して再操作できる", async (status) => {
-  const failure: GeminiActionResult = status === "usage_limited"
+  const failure: AffirmationActionResult = status === "usage_limited"
     ? { status, reason: "minute_limit", retryAt: "2026-10-18T00:00:00Z", message: "少し待ってください（日本時間）" }
     : { status, message: "利用状況を確認できませんでした。" };
   affirmationMocks.generateAffirmation.mockResolvedValueOnce(failure);
@@ -231,7 +231,7 @@ it.each(["usage_limited", "usage_unavailable"] as const)("%sを表示し次の�
 });
 
 
-it.each(["success", "fallback"] as const)("%sを同じ文章でも明示状態として保持する", async (status) => {
+it.each(["success", "fallback", "prepared"] as const)("%sを同じ文章でも明示状態として保持する", async (status) => {
   affirmationMocks.generateAffirmation.mockResolvedValueOnce({ status, text: HOOK_FALLBACK });
   const { result } = renderHook(() => useAffirmationGenerator());
   await act(async () => { await result.current.handleGenerateAffirmation(); });
