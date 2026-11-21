@@ -1,11 +1,11 @@
 import { useDashboardOperation } from "./dashboardAuth";
 import { useRef, useState } from "react";
-import { generateAffirmation, type GenerationStatus } from "../actions";
+import { generateAffirmation, type AffirmationResultStatus } from "../actions";
 
 export function useAffirmationGenerator() {
   const { capture } = useDashboardOperation();
   const [text, setText] = useState<string>("");
-  const [resultStatus, setResultStatus] = useState<GenerationStatus | null>(null);
+  const [resultStatus, setResultStatus] = useState<AffirmationResultStatus | null>(null);
   const [authError, setAuthError] = useState<string>("");
   const [rateLimitError, setRateLimitError] = useState<string>("");
   const [usageError, setUsageError] = useState<string>("");
@@ -40,7 +40,7 @@ export function useAffirmationGenerator() {
         setTimeoutError(result.message);
         setText(result.text);
         setResultStatus(result.status);
-      } else if (result.status === "success" || result.status === "fallback") {
+      } else if ("text" in result) {
         setText(result.text);
         setResultStatus(result.status);
       }

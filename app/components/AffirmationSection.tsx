@@ -1,10 +1,11 @@
-import type { GenerationStatus } from "../actions";
+import type { AffirmationResultStatus } from "../actions";
 import { motion } from "framer-motion";
 
 type AffirmationSectionProps = {
+  affirmationEnabled: boolean;
   isLoading: boolean;
   text: string;
-  resultStatus: GenerationStatus | null;
+  resultStatus: AffirmationResultStatus | null;
   authError: string;
   rateLimitError: string;
   timeoutError?: string;
@@ -15,6 +16,7 @@ type AffirmationSectionProps = {
 };
 
 export default function AffirmationSection({
+  affirmationEnabled,
   isLoading,
   text,
   resultStatus,
@@ -26,6 +28,8 @@ export default function AffirmationSection({
   handleFavoriteAffirmation,
   isFavoriteDisabled,
 }: AffirmationSectionProps) {
+  const buttonLabel = affirmationEnabled ? "言葉を受け取る" : "用意した言葉を受け取る";
+
   return (
     <>
       {/* 1. 肯定文の表示エリア */}
@@ -36,7 +40,7 @@ export default function AffirmationSection({
             aria-atomic="true"
             className="text-lg text-blue-400/70 animate-pulse tracking-widest"
           >
-            言葉を紡いでいます...
+            {affirmationEnabled ? "言葉を紡いでいます..." : "用意した言葉を表示しています…"}
           </p>
         ) : authError ? (
           <div
@@ -77,8 +81,8 @@ export default function AffirmationSection({
               </p>
               {resultStatus === "fallback" && (
                 <p className="mb-2 text-xs leading-relaxed">
-                  AIの応答を取得できなかったため、用意した言葉を表示しています。
-                  「言葉を受け取る」から、もう一度試せます。
+                  {affirmationEnabled && "AIの応答を取得できなかったため、用意した言葉を表示しています。"}
+                  「{buttonLabel}」から、もう一度試せます。
                 </p>
               )}
               <p className="text-xl font-medium leading-loose tracking-widest md:text-2xl">{text}</p>
@@ -112,7 +116,9 @@ export default function AffirmationSection({
           id="affirmation-ai-guidance"
           className="mb-3 text-center text-xs text-sky-700/60"
         >
-          この機能は外部AI（Google Gemini）を利用します。
+          {affirmationEnabled
+            ? "この機能は外部AI（Google Gemini）を利用します。"
+            : "現在は、お守り言葉をもとに用意した言葉を表示します。"}
         </p>
         <motion.button
           type="button"
@@ -131,7 +137,7 @@ export default function AffirmationSection({
           aria-describedby="affirmation-ai-guidance"
           className={`max-w-full px-6 sm:px-12 py-5 bg-sky-700 text-white rounded-full shadow-md transition-colors duration-300 text-lg font-bold tracking-widest border-4 border-sky-700 ${isLoading ? "opacity-70 cursor-not-allowed" : ""}`}
         >
-          {isLoading ? "受け取り中..." : "言葉を受け取る"}
+          {isLoading ? (affirmationEnabled ? "受け取り中..." : "表示中…") : buttonLabel}
         </motion.button>
       </div>
     </>

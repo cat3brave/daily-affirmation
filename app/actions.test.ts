@@ -53,6 +53,7 @@ function result(text: string): GenerateContentResult {
 }
 
 beforeEach(() => {
+  vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", undefined);
   process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
   process.env.GEMINI_API_KEY = "test-api-key";
@@ -79,6 +80,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   delete process.env.GEMINI_API_KEY;
 });
 
@@ -88,6 +90,35 @@ function expectGeminiNotCalled() {
 }
 
 describe("generateAffirmation", () => {
+  it("定型文運用では認証後に各お守り言葉に沿った文を返し、Geminiと利用枠を呼ばない", async () => {
+    vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", "false");
+    vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0).mockReturnValueOnce(0.2).mockReturnValueOnce(0.4)
+      .mockReturnValueOnce(0.6).mockReturnValueOnce(0.8);
+
+    for (const text of [
+      "行けたらOK。そう思ってもいいですね。",
+      "自分の作業に目を向けてもいいですね。",
+      "気づくだけで十分なときもありますね。",
+      "ひとりで全部を背負わなくてもいいですね。",
+      "60点でOKと思ってもいいですね。",
+    ]) {
+      await expect(generateAffirmation()).resolves.toEqual({ status: "prepared", text });
+    }
+    expect(mocks.getUser).toHaveBeenCalledTimes(5);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expectGeminiNotCalled();
+  });
+
+  it("定型文運用でも未認証では言葉を返さない", async () => {
+    vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", "false");
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await expect(generateAffirmation()).resolves.toEqual({ status: "auth_required", message: AUTH_MESSAGE });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expectGeminiNotCalled();
+  });
+
   it("認証後にGeminiを1回呼び正常結果を返す", async () => {
     mocks.generateContent.mockResolvedValue(result("  今日は十分ですよ  "));
 
@@ -170,6 +201,8 @@ describe("generateAffirmation", () => {
 
 describe("translateHarshVoice", () => {
   it("入力をtrimして300文字に制限し正常結果を返す", async () => {
+    vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", "false");
+    vi.stubEnv("GEMINI_TRANSLATION_ENABLED", "true");
     mocks.generateContent.mockResolvedValue(result("  優しい言葉です  "));
     const limited = "責".repeat(300);
 

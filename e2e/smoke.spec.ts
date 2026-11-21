@@ -10,6 +10,42 @@ test.beforeEach(async ({ page }) => {
   await stubExternalServices(page);
 });
 
+test("affirmation guidance and Server Action result match the configured mode", async ({ page }) => {
+  const preparedMode = process.env.GEMINI_AFFIRMATION_ENABLED === "false";
+  await loginToDashboard(page);
+  const favoriteEndpoint = "http://127.0.0.1:54321/rest/v1/favorite_affirmations";
+  await page.route(favoriteEndpoint, async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ status: 201 });
+    } else {
+      await route.fallback();
+    }
+  });
+  const button = page.getByRole("button", {
+    name: preparedMode ? "用意した言葉を受け取る" : "言葉を受け取る",
+    exact: true,
+  });
+  await expect(button).toHaveAccessibleDescription(preparedMode
+    ? "現在は、お守り言葉をもとに用意した言葉を表示します。"
+    : "この機能は外部AI（Google Gemini）を利用します。");
+  await button.click();
+  const result = page.getByRole("status").filter({ hasText: "用意した言葉" });
+  await expect(result).toBeVisible();
+  const aiFallback = page.getByText(/AIの応答を取得できなかったため/);
+  await expect(aiFallback).toHaveCount(preparedMode ? 0 : 1);
+  await expect(button).toBeEnabled();
+  const text = await result.locator("p").last().innerText();
+  const saved = page.waitForResponse((response) =>
+    response.url() === favoriteEndpoint && response.request().method() === "POST",
+  );
+  const favorite = page.getByRole("button", { name: /お気に入りにする/ });
+  await favorite.click();
+  const response = await saved;
+  expect(response.status()).toBe(201);
+  expect(response.request().postDataJSON()).toEqual({ user_id: "e2e-user-id", text });
+  await expect(page.getByRole("button", { name: /お気に入り済み/ })).toBeDisabled();
+});
+
 test("login succeeds and authenticated dashboard tabs can be navigated", async ({
   page,
 }) => {

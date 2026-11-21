@@ -1,4 +1,4 @@
-import type { GenerationStatus } from "../actions";
+import type { AffirmationResultStatus } from "../actions";
 import AffirmationSection from "./AffirmationSection";
 import FavoriteAffirmationsList from "./FavoriteAffirmationsList";
 import FlowerGardenSection from "./FlowerGardenSection";
@@ -6,9 +6,10 @@ import FlowerGardenSection from "./FlowerGardenSection";
 // 親（page.tsx）から受け取るデータの型を定義します
 type HomeTabProps = {
   onRecordGoodThings: () => void;
+  affirmationEnabled: boolean;
   isLoading: boolean;
   text: string;
-  affirmationResultStatus: GenerationStatus | null;
+  affirmationResultStatus: AffirmationResultStatus | null;
   affirmationAuthError: string;
   affirmationRateLimitError: string;
   affirmationTimeoutError?: string;
@@ -36,6 +37,7 @@ type HomeTabProps = {
 
 export default function HomeTab({
   onRecordGoodThings,
+  affirmationEnabled,
   isLoading,
   text,
   affirmationResultStatus,
@@ -76,6 +78,7 @@ export default function HomeTab({
         </p>
       </div>
       <AffirmationSection
+        affirmationEnabled={affirmationEnabled}
         isLoading={isLoading}
         text={text}
         resultStatus={affirmationResultStatus}

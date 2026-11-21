@@ -11,13 +11,19 @@ it("未認証ではクライアントを返さずログインへ戻す", async (
   await expect(DashboardPage()).rejects.toThrow("redirect");
   expect(mocks.redirect).toHaveBeenCalledWith("/login");
 });
-it.each([[undefined, true], ["true", true], ["false", false]] as const)(
-  "設定が %s のとき検証済みID・メールと翻訳設定の真偽値だけを渡す",
-  async (setting, translationEnabled) => {
-    vi.stubEnv("GEMINI_TRANSLATION_ENABLED", setting);
+it.each([
+  [undefined, undefined, true, true],
+  ["true", "false", true, false],
+  ["false", "true", false, true],
+  ["false", "false", false, false],
+] as const)(
+  "生成設定が %s、翻訳設定が %s のとき検証済みID・メールと各設定の真偽値だけを渡す",
+  async (affirmationSetting, translationSetting, affirmationEnabled, translationEnabled) => {
+    vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", affirmationSetting);
+    vi.stubEnv("GEMINI_TRANSLATION_ENABLED", translationSetting);
     mocks.getAuthenticatedUser.mockResolvedValue({ id: "user", email: "user@example.test", access_token: "secret", metadata: {} });
     const element = await DashboardPage();
-    expect(element.props).toEqual({ user: { id: "user", email: "user@example.test" }, translationEnabled });
+    expect(element.props).toEqual({ user: { id: "user", email: "user@example.test" }, affirmationEnabled, translationEnabled });
     expect(mocks.redirect).not.toHaveBeenCalled();
   },
 );

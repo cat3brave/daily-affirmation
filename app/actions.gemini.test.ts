@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GeminiActionResult } from "./actions";
+import type { AffirmationActionResult } from "./actions";
 import { GEMINI_TIMEOUT_MS } from "./lib/geminiRequest";
 
 const auth = vi.hoisted(() => ({ getAuthenticatedContext: vi.fn(), rpc: vi.fn(), retry: vi.fn() }));
@@ -24,6 +24,7 @@ let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("GEMINI_API_KEY", "private-api-key-secret");
+  vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", undefined);
   vi.stubEnv("GEMINI_TRANSLATION_ENABLED", undefined);
   auth.retry.mockResolvedValue({ data: [{ allowed: true, reason: "allowed", daily_remaining: 19, minute_remaining: 2, retry_at: null }], error: null });
   auth.rpc.mockImplementation(() => ({ abortSignal: () => ({ retry: auth.retry }) }));
@@ -33,13 +34,26 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
-async function start(call: () => Promise<GeminiActionResult>) {
+async function start(call: () => Promise<AffirmationActionResult>) {
   const pending = call();
   void pending.catch(() => undefined);
   await vi.advanceTimersByTimeAsync(0);
   expect(fetchMock).toHaveBeenCalledOnce();
   return { pending };
 }
+
+it("定型文運用では送信・利用枠確保が各0回で、再有効化後は各1回行う", async () => {
+  vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", "false");
+  await expect(generateAffirmation()).resolves.toMatchObject({ status: "prepared" });
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(auth.rpc).not.toHaveBeenCalled();
+
+  vi.stubEnv("GEMINI_AFFIRMATION_ENABLED", "true");
+  fetchMock.mockResolvedValue(Response.json(payload));
+  await expect(generateAffirmation()).resolves.toEqual({ status: "success", text: "優しい言葉" });
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(auth.rpc).toHaveBeenCalledExactlyOnceWith("reserve_ai_usage");
+});
 function responseBody(json: () => Promise<unknown>) {
   const response = new Response();
   response.json = json;
