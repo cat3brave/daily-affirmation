@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "description": "daily-affirmation AI改善評価モデル。重みは設計上の仮定であり、公式基準や科学的に検証された尺度ではない。安全・プライバシー・アクセシビリティは点数で相殺しない。",
+  "scoring": "0=重大な問題、1=大きな改善余地、2=部分的に達成、3=概ね良好、4=十分な根拠で良好。未確認はnull",
+  "dimensions": [
+    {"id":"usefulness","name":"有用性","weight":18,"question":"想定利用者が主目的を達成でき、実際の負担軽減につながるか","examples":["主要タスク完了率","利用者が感じた有用性","使わない自由"]},
+    {"id":"intuitiveness","name":"直感性","weight":11,"question":"初回利用者が説明なしで基本操作を見つけ理解できるか","examples":["初見タスク成功率","迷い・誤タップの観察"]},
+    {"id":"operability","name":"操作性","weight":11,"question":"少ない手順で目的を達成でき、失敗から復帰できるか","examples":["完了までの操作回数","戻る・取消・下書き保持"]},
+    {"id":"readability","name":"視認性","weight":9,"question":"小さな画面・文字拡大時にも重要情報と操作が読み取れるか","examples":["320px幅・200%ズーム","コントラスト","フォーカス可視化"]},
+    {"id":"performance","name":"快適性","weight":9,"question":"待ち時間・遅延・過度な動きが負担にならないか","examples":["LCP・INP・CLSの実測","低速通信","prefers-reduced-motion"]},
+    {"id":"reliability","name":"信頼性","weight":12,"question":"主要操作が安定し、保存・エラー・再試行時も期待どおりか","examples":["単体・E2E・本番E2E","エラー・再試行・データ整合性"]},
+    {"id":"privacy","name":"安全性","weight":10,"question":"認証・認可・データ取り扱い・AI送信の境界が適切か","examples":["RLS/所有者境界","秘密情報","同意・プライバシー説明"]},
+    {"id":"accessibility","name":"アクセシビリティ","weight":10,"question":"支援技術や入力方法、個人差があっても主要操作を完了できるか","examples":["WCAG 2.2 AA","キーボード・音声読み上げ","タッチターゲット"]},
+    {"id":"emotional_value","name":"情緒的価値","weight":6,"question":"安心感と自主性を支え、羞恥・強制・罪悪感を生まないか","examples":["欠席・未記録を責めない","任意利用と終了","自然な言葉"]},
+    {"id":"sustainability","name":"持続可能性","weight":4,"question":"運用負担・費用・保守性が許容範囲で継続できるか","examples":["変更の局所性","依存関係と費用","運用手順"]}
+  ],
+  "gates": [
+    {"id":"scope","name":"許可範囲と差分の一致"},
+    {"id":"no_regression","name":"主要タスク・保存・エラー時の回帰確認"},
+    {"id":"privacy_security","name":"セキュリティ・プライバシーに未解決の重大問題がない"},
+    {"id":"accessibility","name":"対象変更のアクセシビリティ重大回帰がない"},
+    {"id":"verification","name":"AGENTS.mdで必要なローカル検証が成功した"},
+    {"id":"ci_verify","name":"最新PR headに対応する必須Verify成功"},
+    {"id":"preview_review","name":"Vercel/実画面・差分レビューと競合確認が完了した"}
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "assessmentVersion": "1.0",
+  "app": "daily-affirmation",
+  "scope": "評価する画面・主要タスク・変更内容を記入",
+  "baseCommit": "unknown",
+  "headCommit": "unknown",
+  "evaluatedAt": "YYYY-MM-DD",
+  "dimensions": {
+    "usefulness": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "intuitiveness": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "operability": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "readability": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "performance": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "reliability": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "privacy": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "accessibility": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "emotional_value": {"score": null, "confidence": "unknown", "evidence": [], "note": ""},
+    "sustainability": {"score": null, "confidence": "unknown", "evidence": [], "note": ""}
+  },
+  "gates": {
+    "scope": {"status": "unknown", "evidence": []},
+    "no_regression": {"status": "unknown", "evidence": []},
+    "privacy_security": {"status": "unknown", "evidence": []},
+    "accessibility": {"status": "unknown", "evidence": []},
+    "verification": {"status": "unknown", "evidence": []},
+    "ci_verify": {"status": "unknown", "evidence": []},
+    "preview_review": {"status": "unknown", "evidence": []}
+  },
+  "findings": []
+}
