@@ -6,6 +6,7 @@
 
 - 10項目の評価軸をAIに共有し、問題・根拠・優先順位を整理できる。
 - 評価JSONに、未確認を合格扱いせず記録できる。
+- 検証の成功・失敗・環境停止・未実行を同じ実行記録で区別できる。
 - リリース前の7つの必須ゲートを同じ形式で確認できる。
 - Codexに「調査のみ」「1件だけ実装」「独立レビュー」の指示を使い分けられる。
 - 実行コード、依存パッケージ、CI、既存の品質ゲートを変更しない。
@@ -52,6 +53,10 @@ Copy-Item docs/ai-improvement-harness/assessment-template.json docs/ai-improveme
 - 未確認の項目は `score: null`、`confidence: "unknown"` のままにする。
 - 7ゲートの `fail` または `unknown` が一つでもあれば、完了・マージ可能とは扱わない。
 - 評価対象の実装と評価基準の変更は同じPRに混ぜない。
+
+### 手順3：検証結果を分類する
+
+`EXECUTION_RECORD.md` の補助票を使い、コマンドの終了コードと観測結果を分けて記録する。ブラウザー不在などの環境停止をアプリの回帰と混同せず、どちらも成功扱いにはしない。監査コマンドが成功終了しても、出力に脆弱性があればseverityと修正可能版を残す。
 
 ## 評価JSONの書き方
 
@@ -107,3 +112,4 @@ Copy-Item docs/ai-improvement-harness/assessment-template.json docs/ai-improveme
 - `QUALITY_POLICY.md`：アプリ固有の品質原則、測定基準、停止条件。
 - `assessment-template.json`：証拠を記入するJSON雛形。
 - `CODEX_PROMPTS.md`：調査、実装、独立レビューの依頼文。
+- `EXECUTION_RECORD.md`：事前確認、結果分類、再試行条件の記録票。
