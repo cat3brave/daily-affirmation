@@ -7,6 +7,7 @@
 - 10項目の評価軸をAIに共有し、問題・根拠・優先順位を整理できる。
 - 評価JSONに、未確認を合格扱いせず記録できる。
 - 検証の成功・失敗・環境停止・未実行を同じ実行記録で区別できる。
+- Enter操作とIME変換がある入力欄で、意図しない実行と入力消失を固定ケースで評価できる。
 - リリース前の7つの必須ゲートを同じ形式で確認できる。
 - Codexに「調査のみ」「1件だけ実装」「独立レビュー」の指示を使い分けられる。
 - 実行コード、依存パッケージ、CI、既存の品質ゲートを変更しない。
@@ -57,6 +58,8 @@ Copy-Item docs/ai-improvement-harness/assessment-template.json docs/ai-improveme
 ### 手順3：検証結果を分類する
 
 `EXECUTION_RECORD.md` の補助票を使い、コマンドの終了コードと観測結果を分けて記録する。ブラウザー不在などの環境停止をアプリの回帰と混同せず、どちらも成功扱いにはしない。監査コマンドが成功終了しても、出力に脆弱性があればseverityと修正可能版を残す。
+
+該当する入力操作を変更するときは `INTERACTION_CASES.md` の固定ケースを参照する。ケースの適用条件を満たさない画面へ機械的に広げず、単体テストと実端末確認の範囲を区別する。
 
 ## 評価JSONの書き方
 
@@ -113,3 +116,4 @@ Copy-Item docs/ai-improvement-harness/assessment-template.json docs/ai-improveme
 - `assessment-template.json`：証拠を記入するJSON雛形。
 - `CODEX_PROMPTS.md`：調査、実装、独立レビューの依頼文。
 - `EXECUTION_RECORD.md`：事前確認、結果分類、再試行条件の記録票。
+- `INTERACTION_CASES.md`：IME変換など、入力保持に関する固定評価ケース。
