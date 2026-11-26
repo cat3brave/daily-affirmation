@@ -30,7 +30,11 @@ export default function MaybeCloudCard({ handleFloatCloud }: Props) {
           type="text"
           value={maybeInput}
           onChange={(e) => setMaybeInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onReleaseCloud()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              onReleaseCloud();
+            }
+          }}
           placeholder="例: 絶対に嫌われた..."
           className="flex-1 px-4 py-3 rounded-2xl border border-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 bg-white/80 text-sky-800 text-sm shadow-inner"
         />
