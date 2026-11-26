@@ -59,6 +59,16 @@ describe("MaybeCloudCard", () => {
     expect(input).toHaveValue("");
   });
 
+  it("日本語入力の変換確定中はEnterで放たず入力を保持する", () => {
+    const { handleFloatCloud, input } = renderMaybeCloudCard();
+
+    fireEvent.change(input, { target: { value: "絶対に失敗する" } });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+
+    expect(handleFloatCloud).not.toHaveBeenCalled();
+    expect(input).toHaveValue("絶対に失敗する");
+  });
+
   it("空の状態でEnterを押してもcallbackを呼ばない", () => {
     const { handleFloatCloud, input } = renderMaybeCloudCard();
 
