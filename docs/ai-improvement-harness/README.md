@@ -6,6 +6,7 @@
 
 - 10項目の評価軸をAIに共有し、問題・根拠・優先順位を整理できる。
 - 評価JSONに、未確認を合格扱いせず記録できる。
+- 評価JSONの構造、根拠なしの採点・pass、rubricとの項目ずれをローカルで検出できる。
 - 検証の成功・失敗・環境停止・未実行を同じ実行記録で区別できる。
 - Enter操作とIME変換がある入力欄で、意図しない実行と入力消失を固定ケースで評価できる。
 - リリース前の7つの必須ゲートを同じ形式で確認できる。
@@ -29,7 +30,7 @@
 
 このディレクトリには、評価方針、固定rubric、評価票、Codex向け指示文だけを置く。既存の `AGENTS.md`、`package.json`、CIワークフロー、品質ゲートは変更しない。
 
-レポート自動生成器はまだ導入していない。評価票はJSONとして記録し、人が根拠とゲート状態を照合する。自動生成器を追加する場合は、テスト基盤の独立した変更としてAGENTS.mdの必要な検証を行う。
+レポート自動生成器はまだ導入していない。評価票はJSONとして記録し、検証スクリプトと人の両方で根拠・ゲート状態を照合する。自動生成器を追加する場合は、テスト基盤の独立した変更としてAGENTS.mdの必要な検証を行う。
 
 ### 手順1：評価の下書きを作成
 
@@ -54,6 +55,14 @@ Copy-Item docs/ai-improvement-harness/assessment-template.json docs/ai-improveme
 - 未確認の項目は `score: null`、`confidence: "unknown"` のままにする。
 - 7ゲートの `fail` または `unknown` が一つでもあれば、完了・マージ可能とは扱わない。
 - 評価対象の実装と評価基準の変更は同じPRに混ぜない。
+
+入力後、次のコマンドで固定rubricとの項目ずれ、scoreとconfidenceの矛盾、根拠なしの採点・passを確認する。
+
+```sh
+node docs/ai-improvement-harness/validate-assessment.mjs docs/ai-improvement-harness/my-assessment.json
+```
+
+この検証はJSONの構造と記録条件だけを確認する。証拠の内容が正しいこと、必須ゲートが成功したこと、マージ可能であることは認定しない。`fail` や `unknown` を含む評価票も、未確認を正確に記録した有効な評価票として受け入れる。
 
 ### 手順3：検証結果を分類する
 
@@ -116,6 +125,8 @@ Playwrightを使う場合は、E2Eを起動する前に同ファイルの既定�
 - `rubric.json`：10項目、重み、確認例、必須ゲート。
 - `QUALITY_POLICY.md`：アプリ固有の品質原則、測定基準、停止条件。
 - `assessment-template.json`：証拠を記入するJSON雛形。
+- `validate-assessment.mjs`：評価JSONと固定rubricの整合性を確認するローカル検証スクリプト。
+- `validate-assessment.test.mjs`：既知の不整合を検出し、既存テンプレートを誤って拒否しない固定テスト。
 - `CODEX_PROMPTS.md`：調査、実装、独立レビューの依頼文。
 - `EXECUTION_RECORD.md`：事前確認、結果分類、再試行条件の記録票。
 - `INTERACTION_CASES.md`：IME変換など、入力保持に関する固定評価ケース。
